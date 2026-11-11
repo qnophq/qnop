@@ -31,7 +31,7 @@ import { useConfig } from '../../api/hooks/useConfig';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { PasswordField } from '../../components/auth/PasswordField';
 import { PasswordStrengthMeter } from '../../components/auth/PasswordStrengthMeter';
-import { fetchVerificationUsername, verifyEmail } from '../../api/auth';
+import { verifyEmail } from '../../api/auth';
 import { apiErrorCode, apiErrorMessage } from '../../utils/apiError';
 import { passwordStrength } from '../../utils/passwordStrength';
 import { useTranslation } from 'react-i18next';
@@ -57,7 +57,6 @@ export function VerifyEmailPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [mismatch, setMismatch] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   function fail(err: unknown, inSetNew: boolean) {
@@ -65,25 +64,24 @@ export function VerifyEmailPage() {
     if (code === 'INVALID_VERIFICATION_TOKEN') {
       setStatus('invalid');
     } else if (code === 'VERIFICATION_PASSWORD_MISMATCH') {
-      setMismatch(true);
       setError(t('verifyEmail.passwordMismatch'));
     } else if (code === 'VERIFICATION_USERNAME_TAKEN') {
-      setError(t('verifyEmail.usernameTaken'));
       if (!inSetNew) {
-        void startSetNew();
+        setStatus('setNew');
       }
+      setError(t('verifyEmail.usernameTaken'));
+    } else if (code === 'VERIFICATION_SET_NEW_EXPIRED') {
+      setError(t('verifyEmail.setNewExpired'));
     } else {
       setError(apiErrorMessage(err, t('verifyEmail.failed')));
     }
   }
 
-  async function startSetNew() {
-    try {
-      setUsername(await fetchVerificationUsername(token));
-      setStatus('setNew');
-    } catch (err) {
-      fail(err, true);
-    }
+  // The username is typed, never pre-filled: whoever registered the address before need not be
+  // the person holding this link.
+  function startSetNew() {
+    setError(null);
+    setStatus('setNew');
   }
 
   const onConfirm = async (event: FormEvent) => {
@@ -145,11 +143,9 @@ export function VerifyEmailPage() {
             >
               {t('verifyEmail.submit')}
             </Button>
-            {mismatch && (
-              <Button variant="outlined" onClick={() => void startSetNew()} fullWidth>
-                {t('verifyEmail.setNewAction')}
-              </Button>
-            )}
+            <Button variant="text" onClick={startSetNew} fullWidth>
+              {t('verifyEmail.setNewAction')}
+            </Button>
           </Stack>
         </Box>
       )}
@@ -191,6 +187,16 @@ export function VerifyEmailPage() {
               fullWidth
             >
               {t('verifyEmail.setNewSubmit')}
+            </Button>
+            <Button
+              variant="text"
+              onClick={() => {
+                setError(null);
+                setStatus('confirm');
+              }}
+              fullWidth
+            >
+              {t('verifyEmail.backToConfirm')}
             </Button>
           </Stack>
         </Box>

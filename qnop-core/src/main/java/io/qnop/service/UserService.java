@@ -100,6 +100,17 @@ public class UserService {
     users.findByIdForUpdate(id);
   }
 
+  /**
+   * Locks the account row like {@link #lockForUpdate} and then reports whether it is still pending
+   * verification, read from the database after the lock (issue #900): a verification that committed
+   * while this request waited is seen, not the state loaded before.
+   */
+  @Transactional
+  public boolean lockAndCheckPending(UUID id) {
+    users.findByIdForUpdate(id);
+    return users.isEmailVerificationPending(id);
+  }
+
   /** An internal user by exact username, if one exists. */
   @Transactional(readOnly = true)
   public Optional<User> findInternalByUsername(String username) {

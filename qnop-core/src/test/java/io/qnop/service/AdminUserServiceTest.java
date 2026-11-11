@@ -450,6 +450,8 @@ class AdminUserServiceTest {
     assertThat(pending.isEnabled()).isTrue();
     assertThat(pending.isEmailVerificationPending()).isFalse();
     assertThat(pending.getPasswordHash()).isEqualTo(UserService.PENDING_PASSWORD_PLACEHOLDER);
+    // The registration's display name does not survive; the username stays.
+    assertThat(pending.getDisplayName()).isEqualTo("p");
   }
 
   @Test

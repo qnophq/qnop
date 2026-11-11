@@ -25,6 +25,7 @@ import io.qnop.entity.UserRole;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.InvalidTextException;
+import io.qnop.service.PasswordPolicy;
 import io.qnop.service.UserService;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
 import io.qnop.service.auth.EmailVerificationTokenService.PendingVerification;
@@ -35,6 +36,7 @@ import io.qnop.service.mail.RelativeTimePhrase;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -73,9 +75,7 @@ public class RegistrationService {
    */
   static final Duration ISSUE_THROTTLE = Duration.ofMinutes(5);
 
-  // The self-registration policy, as in the OpenAPI RegisterRequest (issue #900).
-  static final int MIN_PASSWORD_LENGTH = 8;
-  static final int MAX_PASSWORD_LENGTH = 200;
+  // The self-registration username rules, as in the OpenAPI RegisterRequest (issue #900).
   static final int MIN_USERNAME_LENGTH = 3;
   static final int MAX_USERNAME_LENGTH = 64;
 
@@ -112,6 +112,7 @@ public class RegistrationService {
   public void register(String username, String email, String password, String displayName) {
     // Before anything else, so the answer depends on the input alone (anti-enumeration).
     InvalidTextException.requireNoControlCharacters("displayName", displayName);
+    PasswordPolicy.require("password", password);
     // Encoded up front on every branch: the BCrypt cost dominates the request, so paying it only
     // when an account is created would let response times tell the branches apart (issue #903).
     String passwordHash = passwordEncoder.encode(password);
@@ -129,7 +130,12 @@ public class RegistrationService {
       User pending = byEmail.get();
       // Account row first, then its tokens — the same order as verify — so concurrent
       // registrations of one address serialise and the link cap stays exact.
-      userService.lockForUpdate(pending.getId());
+      if (!userService.lockAndCheckPending(pending.getId())) {
+        // Activated or decided about while this request waited for the lock: the address now
+        // belongs to an account like any other.
+        queueAttemptNotice(email, pending.getId());
+        return;
+      }
       if (verificationTokens.issuedWithin(pending.getId(), ISSUE_THROTTLE)) {
         // Per-address throttle: no new link, no mail (the response stays the same).
         return;
@@ -176,10 +182,11 @@ public class RegistrationService {
    *   <li>{@code setNew = false} confirms the registration this link belongs to: {@code password}
    *       must be its password, and the account gets exactly its username, display name and
    *       password. A mismatch changes nothing and leaves the link usable.
-   *   <li>{@code setNew = true} sets new credentials instead: {@code password} becomes the
-   *       password, {@code username} (default: the registration's) the username and the display
-   *       name. This is how the owner of an address claims an account somebody else registered with
-   *       it — no registration by anybody else can prevent that.
+   *   <li>{@code setNew = true} sets new credentials instead: {@code password} (the shared {@link
+   *       PasswordPolicy}) becomes the password and {@code username} (required, typed by the link
+   *       holder) the username and the display name. Allowed while the link is younger than the
+   *       password-reset link lifetime — the trust it exercises is a reset link's. This is how the
+   *       owner of an address claims an account somebody else registered with it.
    * </ul>
    *
    * <p>Either way every other link of the address is spent. There is no attempt cap: a link holder
@@ -191,7 +198,8 @@ public class RegistrationService {
    * @throws VerificationPasswordMismatchException when confirming with another password
    * @throws VerificationUsernameTakenException when the username belongs to another account (the
    *     link stays usable; set new credentials with another username)
-   * @throws VerificationInputException when new credentials violate the account policy
+   * @throws VerificationSetNewExpiredException when setting new credentials with an older link
+   * @throws InvalidTextException when new credentials violate the account policy
    */
   @Transactional
   public void verify(String rawToken, String password, boolean setNew, String username) {
@@ -206,8 +214,18 @@ public class RegistrationService {
     String displayName;
     String passwordHash;
     if (setNew) {
-      chosenUsername = username == null || username.isBlank() ? pending.username() : username;
-      requireValidNewCredentials(chosenUsername, password);
+      // Setting credentials with nothing but the link is the trust of a password-reset link, so it
+      // gets that link's lifetime; confirming the registration keeps the full link lifetime.
+      if (pending.issuedAt().isBefore(Instant.now().minus(setNewWindow()))) {
+        throw new VerificationSetNewExpiredException();
+      }
+      // Typed by the link holder: nothing another registrant chose is carried over.
+      if (username == null || username.isBlank()) {
+        throw new InvalidTextException("username", "is required to set new credentials");
+      }
+      chosenUsername = username.strip();
+      requireValidUsername(chosenUsername);
+      PasswordPolicy.require("password", password);
       // The display name of a claimed account is its username: nothing the registrations wrote
       // survives into it. The owner can change it in the profile.
       displayName = chosenUsername;
@@ -236,41 +254,20 @@ public class RegistrationService {
     }
   }
 
-  /**
-   * The username the registration behind a still-usable link asked for (issue #900), so the verify
-   * page can offer it when its holder sets new credentials. Holding the link is the authority here,
-   * exactly as for {@link #verify}.
-   */
-  @Transactional(readOnly = true)
-  public String registrationUsername(String rawToken) {
-    PendingVerification pending = verificationTokens.peek(rawToken);
-    if (!pending.accountPending()) {
-      throw new InvalidVerificationTokenException("Verification token is no longer valid");
-    }
-    return pending.username();
-  }
-
-  /** The self-registration policy for credentials chosen at verification (same as register). */
-  private static void requireValidNewCredentials(String username, String password) {
-    if (password == null
-        || password.length() < MIN_PASSWORD_LENGTH
-        || password.length() > MAX_PASSWORD_LENGTH) {
-      throw new VerificationInputException(
-          "The password must be "
-              + MIN_PASSWORD_LENGTH
-              + " to "
-              + MAX_PASSWORD_LENGTH
-              + " characters long.");
-    }
+  /** The username rules of self-registration (as in the OpenAPI RegisterRequest). */
+  private static void requireValidUsername(String username) {
     if (username.length() < MIN_USERNAME_LENGTH || username.length() > MAX_USERNAME_LENGTH) {
-      throw new VerificationInputException(
-          "The username must be "
-              + MIN_USERNAME_LENGTH
-              + " to "
-              + MAX_USERNAME_LENGTH
-              + " characters long.");
+      throw new InvalidTextException(
+          "username",
+          "must be " + MIN_USERNAME_LENGTH + " to " + MAX_USERNAME_LENGTH + " characters long");
     }
     InvalidTextException.requireNoControlCharacters("username", username);
+  }
+
+  /** How long a link may set new credentials: the configured password-reset link lifetime. */
+  private Duration setNewWindow() {
+    return Duration.ofMinutes(
+        settings.getInteger(ApplicationSettingKey.AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES));
   }
 
   /**
@@ -344,10 +341,15 @@ public class RegistrationService {
     }
   }
 
-  /** New credentials chosen at verification violate the account policy (issue #900). */
-  public static class VerificationInputException extends RuntimeException {
-    public VerificationInputException(String message) {
-      super(message);
+  /**
+   * The link is older than the password-reset link lifetime, so it can only confirm its
+   * registration now; different credentials need a fresh link (issue #900).
+   */
+  public static class VerificationSetNewExpiredException extends RuntimeException {
+    public VerificationSetNewExpiredException() {
+      super(
+          "This link can only confirm its registration now. To choose different credentials,"
+              + " register again to get a fresh link.");
     }
   }
 }

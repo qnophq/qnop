@@ -76,8 +76,8 @@ class RateLimitIT extends AbstractIntegrationTest {
 
   @Test
   void throttlesVerifyEmailPerClientIp() throws Exception {
-    // Default 10 per 15 minutes (issue #900); an unknown token is a 400 until the bucket is empty.
-    for (int attempt = 1; attempt <= 10; attempt++) {
+    // Default 20 per 15 minutes (issue #900); an unknown token is a 400 until the bucket is empty.
+    for (int attempt = 1; attempt <= 20; attempt++) {
       assertThat(postVerify().statusCode())
           .as("attempt %d within the limit must not be rate-limited", attempt)
           .isEqualTo(400);

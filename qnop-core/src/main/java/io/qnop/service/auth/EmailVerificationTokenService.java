@@ -118,6 +118,7 @@ public class EmailVerificationTokenService {
     boolean legacy = token.getCandidatePasswordHash() == null;
     return new PendingVerification(
         token.getId(),
+        token.getCreatedAt(),
         user.getId(),
         user.isEmailVerificationPending(),
         legacy ? user.getUsername() : token.getCandidateUsername(),
@@ -196,6 +197,7 @@ public class EmailVerificationTokenService {
    */
   public record PendingVerification(
       UUID tokenId,
+      Instant issuedAt,
       UUID userId,
       boolean accountPending,
       String username,

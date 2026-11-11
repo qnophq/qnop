@@ -193,4 +193,13 @@ class PasswordResetFlowServiceTest {
         .isInstanceOf(PasswordResetTokenService.InvalidPasswordResetTokenException.class);
     verify(refreshTokens, never()).revokeAllForUser(any());
   }
+
+  @Test
+  @DisplayName(
+      "reset applies the password policy before the token is spent, including the 72-byte limit")
+  void resetAppliesThePolicy() {
+    assertThatThrownBy(() -> service.reset("tok", "ä".repeat(36) + "x"))
+        .isInstanceOf(io.qnop.service.InvalidTextException.class);
+    verify(resetTokens, never()).consume(any());
+  }
 }

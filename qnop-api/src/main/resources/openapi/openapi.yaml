@@ -1928,18 +1928,22 @@ paths:
       description: |
         Confirms a self-registration and activates the account (issue #900). Public.
         The link proves control of the mailbox, and for an account nobody has verified
-        yet mailbox control is account control — the same trust a password-reset link
-        carries. With `setNew` false (default) the request confirms the registration the
-        link belongs to: `password` must be its password and the account gets exactly
-        its credentials; a mismatch is `VERIFICATION_PASSWORD_MISMATCH` and leaves the
-        link usable. With `setNew` true the holder sets new credentials instead:
-        `password` (8–200 characters) and `username` (default: the registration's)
-        become the account's, the username also its display name. Either way every
-        other link of the address is spent. A username of another account is
+        yet mailbox control is account control. With `setNew` false (default) the
+        request confirms the registration the link belongs to: `password` must be its
+        password and the account gets exactly its credentials; a mismatch is
+        `VERIFICATION_PASSWORD_MISMATCH` and leaves the link usable. Confirming works
+        for the whole link lifetime (24 hours). With `setNew` true the holder sets new
+        credentials instead — the trust of a password-reset link, so only while the
+        link is younger than the configured password-reset link lifetime
+        (`VERIFICATION_SET_NEW_EXPIRED` after that: register again for a fresh link).
+        `username` is then required and becomes the username and display name;
+        `password` follows the password policy (8–200 characters, at most 72 UTF-8
+        bytes; otherwise `VALIDATION_ERROR`). Either way every other link of the
+        address is spent. A username of another account is
         `VERIFICATION_USERNAME_TAKEN` (the link stays usable); an unknown, expired or
         used link, or an account no longer pending, is `INVALID_VERIFICATION_TOKEN`.
         Only an account still pending verification can be activated — never one an
-        administrator has disabled. Rate-limited per client IP.
+        administrator has disabled. Rate-limited per client network.
       operationId: verifyEmail
       security: []
       requestBody:
@@ -1956,40 +1960,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VerifyEmailResponse'
         '400':
-          description: Invalid link, password mismatch, taken username or invalid new credentials
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-  /auth/verify-email/registration:
-    post:
-      tags:
-        - AuthRegistration
-      summary: Read the username a verification link registered
-      description: |
-        Returns the username the registration behind a still-usable verification link
-        asked for, so the verify page can offer it when the link holder sets new
-        credentials (issue #900). Public; holding the link is the authority, exactly as
-        for `/auth/verify-email`. Rate-limited per client IP.
-      operationId: getVerificationRegistration
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VerificationTokenRequest'
-      responses:
-        '200':
-          description: The registration's username
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VerificationRegistration'
-        '400':
-          description: Unknown, expired or used link, or an account no longer pending
+          description: Invalid link, password mismatch, taken username, invalid new credentials or a link too old to set new ones
           content:
             application/json:
               schema:
@@ -5395,7 +5366,7 @@ components:
           format: password
           minLength: 8
           maxLength: 200
-          description: The replacement password. Must meet the minimum-length policy.
+          description: "The replacement password. Password policy — 8–200 characters and at most 72 UTF-8 bytes (VALIDATION_ERROR otherwise)."
       required:
         - currentPassword
         - newPassword
@@ -6719,6 +6690,7 @@ components:
           type: string
           minLength: 8
           maxLength: 200
+          description: "Password policy — 8–200 characters and at most 72 UTF-8 bytes (VALIDATION_ERROR otherwise)."
         displayName:
           type: string
           maxLength: 255
@@ -6761,26 +6733,10 @@ components:
           type: string
           minLength: 3
           maxLength: 64
-          description: With `setNew`, the username to use; defaults to the registration's.
+          description: With `setNew`, the username to use (required then).
       required:
         - token
         - password
-    VerificationTokenRequest:
-      type: object
-      properties:
-        token:
-          type: string
-          minLength: 1
-          maxLength: 512
-      required:
-        - token
-    VerificationRegistration:
-      type: object
-      properties:
-        username:
-          type: string
-      required:
-        - username
     VerifyEmailResponse:
       type: object
       properties:
@@ -6809,6 +6765,7 @@ components:
           type: string
           minLength: 8
           maxLength: 200
+          description: "Password policy — 8–200 characters and at most 72 UTF-8 bytes (VALIDATION_ERROR otherwise)."
       required:
         - token
         - newPassword

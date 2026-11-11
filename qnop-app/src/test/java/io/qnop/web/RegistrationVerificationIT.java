@@ -343,15 +343,7 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
     register("owner", "claimed@qnop.test", PASSWORD).andExpect(status().isOk());
     verify(mail, never()).sendMailFromTemplateAfterCommit(any(), any(), anyMap(), any());
 
-    // ... but the link already in the mailbox is enough. The verify page offers the
-    // registration's username and the owner sets their own credentials.
-    mockMvc
-        .perform(
-            post(VERIFY + "/registration")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"token\":\"%s\"}".formatted(squatterTriggered)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.username").value("squatter"));
+    // ... but the link already in the mailbox is enough: the owner sets their own credentials.
     verifyEmail(squatterTriggered, PASSWORD)
         .andExpect(jsonPath("$.code").value("VERIFICATION_PASSWORD_MISMATCH"));
     setNewCredentials(squatterTriggered, PASSWORD, "owner").andExpect(status().isOk());
@@ -447,6 +439,87 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
         java.security.MessageDigest.getInstance("SHA-256")
             .digest(input.getBytes(StandardCharsets.UTF_8));
     return java.util.HexFormat.of().formatHex(digest);
+  }
+
+  @Test
+  @DisplayName(
+      "after activation neither the used link nor any other link of the address works, and an"
+          + " unknown token is rejected the same way")
+  void linksCannotBeReplayed() throws Exception {
+    register("replay", "replay@qnop.test", PASSWORD).andExpect(status().isOk());
+    String first = lastVerificationToken("replay@qnop.test");
+    ageVerificationTokens(java.time.Duration.ofMinutes(6));
+    clearInvocations(mail);
+    register("replay", "replay@qnop.test", PASSWORD).andExpect(status().isOk());
+    String second = lastVerificationToken("replay@qnop.test");
+
+    verifyEmail(second, PASSWORD).andExpect(status().isOk());
+
+    for (String link : List.of(first, second)) {
+      verifyEmail(link, PASSWORD)
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
+      setNewCredentials(link, "Other-Pass-1234!", "replayer")
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
+    }
+    verifyEmail("not-a-token", PASSWORD)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
+    assertThat(internal("replay").getUsername()).isEqualTo("replay");
+  }
+
+  @Test
+  @DisplayName(
+      "a link older than the password-reset lifetime can still confirm but no longer set new"
+          + " credentials")
+  void setNewOnlyWithinTheResetLinkLifetime() throws Exception {
+    register("aged", "aged@qnop.test", PASSWORD).andExpect(status().isOk());
+    String token = lastVerificationToken("aged@qnop.test");
+    // Default reset-link lifetime is 30 minutes.
+    ageVerificationTokens(java.time.Duration.ofMinutes(31));
+
+    setNewCredentials(token, "Other-Pass-1234!", "other")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VERIFICATION_SET_NEW_EXPIRED"));
+    verifyEmail(token, PASSWORD).andExpect(status().isOk());
+    assertThat(internal("aged").isEnabled()).isTrue();
+  }
+
+  @Test
+  @DisplayName(
+      "a password beyond 72 UTF-8 bytes is a validation error on every path: register, set new,"
+          + " reset and change")
+  void oversizedPasswordsAreValidationErrors() throws Exception {
+    String oversized = "ä".repeat(36) + "x"; // 37 characters, 73 bytes
+
+    register("bytes", "bytes@qnop.test", oversized)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+    register("bytes", "bytes@qnop.test", PASSWORD).andExpect(status().isOk());
+    setNewCredentials(lastVerificationToken("bytes@qnop.test"), oversized, "bytes")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/auth/reset-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"whatever\",\"newPassword\":\"%s\"}".formatted(oversized)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/auth/change-password")
+                .header("Authorization", "Bearer " + token(MEMBER_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"currentPassword\":\"%s\",\"newPassword\":\"%s\"}"
+                        .formatted(SEED_PASSWORD, oversized)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
   }
 
   private User internal(String username) {

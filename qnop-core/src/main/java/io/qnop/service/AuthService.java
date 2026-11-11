@@ -115,6 +115,7 @@ public class AuthService {
   @Transactional
   public ChangePasswordOutcome changePassword(
       UUID userId, String currentPassword, String newPassword) {
+    PasswordPolicy.require("newPassword", newPassword);
     User user = userRepository.findById(userId).orElse(null);
     if (user == null) {
       return ChangePasswordOutcome.USER_NOT_FOUND;

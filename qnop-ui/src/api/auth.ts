@@ -45,14 +45,6 @@ export async function verifyEmail(
   });
 }
 
-/** The username the registration behind a verification link asked for (issue #900). */
-export async function fetchVerificationUsername(token: string): Promise<string> {
-  const response = await authRegistrationApi.getVerificationRegistration({
-    verificationTokenRequest: { token },
-  });
-  return response.data.username;
-}
-
 /** Requests a password-reset email. Uniform ack regardless of whether the account exists. */
 export async function forgotPassword(email: string): Promise<void> {
   await authPasswordResetApi.forgotPassword({ forgotPasswordRequest: { email } });

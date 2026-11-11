@@ -58,6 +58,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   @Query("SELECT u FROM User u WHERE u.id = :id")
   Optional<User> findByIdForUpdate(@Param("id") UUID id);
 
+  /** The pending flag straight from the database, bypassing a loaded entity (issue #900). */
+  @Query("SELECT u.emailVerificationPending FROM User u WHERE u.id = :id")
+  boolean isEmailVerificationPending(@Param("id") UUID id);
+
   /** Finds an internal user by exact username. */
   Optional<User> findByUsernameAndSource(String username, UserSource source);
 

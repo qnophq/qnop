@@ -62,8 +62,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *     drained ceiling keeps the uniform {@code 204} but sends no mail.
  * @param resetPasswordToken per-token limit for reset attempts (default 10 / 3600s): bounds retries
  *     with one token, not guessing — see ADR-0027
- * @param verifyEmail IP-keyed limit for {@code POST /api/v1/auth/verify-email} and its {@code
- *     /registration} lookup, one shared bucket (default 10 / 900s, issue #900)
+ * @param verifyEmail IP-keyed limit for {@code POST /api/v1/auth/verify-email} (default 20 / 900s,
+ *     issue #900)
  * @param loginDeviceCookieLifetime how long a recognised-device cookie stays valid after the login
  *     that issued it (default 30 days)
  * @param maxBuckets upper bound on the number of live token buckets held in memory (default
@@ -109,7 +109,7 @@ public record RateLimitProperties(
         forgotPasswordEmailNetwork != null ? forgotPasswordEmailNetwork : new Limit(3, 3600);
     forgotPasswordEmail = forgotPasswordEmail != null ? forgotPasswordEmail : new Limit(10, 3600);
     resetPasswordToken = resetPasswordToken != null ? resetPasswordToken : new Limit(10, 3600);
-    verifyEmail = verifyEmail != null ? verifyEmail : new Limit(10, 900);
+    verifyEmail = verifyEmail != null ? verifyEmail : new Limit(20, 900);
     loginDeviceCookieLifetime =
         loginDeviceCookieLifetime != null && loginDeviceCookieLifetime.isPositive()
             ? loginDeviceCookieLifetime

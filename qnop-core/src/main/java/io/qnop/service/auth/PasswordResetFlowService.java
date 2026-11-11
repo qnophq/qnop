@@ -23,6 +23,7 @@ package io.qnop.service.auth;
 import io.qnop.entity.User;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.PasswordPolicy;
 import io.qnop.service.RefreshTokenService;
 import io.qnop.service.UserService;
 import io.qnop.service.mail.MailLocaleResolver;
@@ -100,6 +101,8 @@ public class PasswordResetFlowService {
    */
   @Transactional
   public void reset(String rawToken, String newPassword) {
+    // Before the token is spent, so a password outside the policy does not burn the link.
+    PasswordPolicy.require("newPassword", newPassword);
     User user = resetTokens.consume(rawToken);
     userService.applyPasswordReset(user.getId(), newPassword);
     refreshTokens.revokeAllForUser(user.getId());

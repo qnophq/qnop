@@ -130,25 +130,31 @@ comes into being without an authenticated session. Both are hardened:
   account stays administrator-disabled: when in doubt the account is **not**
   reopened for self-service verification.
 - **Principle: for an account nobody has verified yet, mailbox control is account
-  control** — the same trust level as a password-reset link, which already lets
-  whoever reads the mailbox set the password of a verified account. The
-  verification link proves mailbox control, so whoever uses it decides the
-  credentials. `POST /auth/verify-email` (the former `GET ?token=` is gone) takes
-  the token and a password and works in one of two ways:
+  control.** A password-reset link already lets whoever reads the mailbox set the
+  password of a verified account; a verification link gets exactly that power —
+  setting credentials with nothing but the link — and, to keep the trust level the
+  same, only for as long as a reset link lives (the configured
+  `auth.password_reset_token_ttl_minutes`, default 30 minutes). Confirming the
+  registration the link belongs to, which also needs that registration's
+  password, keeps the full link lifetime of 24 hours. `POST /auth/verify-email`
+  (the former `GET ?token=` is gone) takes the token and a password and works in
+  one of two ways:
   - *confirm* (`setNew` false, the normal case): the password must be the one of
     the registration the link belongs to, and the account gets exactly that
     registration's username, display name and password. A mismatch
     (`VERIFICATION_PASSWORD_MISMATCH`) changes nothing and leaves the link usable.
-  - *set new* (`setNew` true): the link holder's password (registration policy,
-    8–200 characters) and username (default: the registration's; uniqueness
-    checked) become the account's; the username is also the display name, so no
-    text a registration wrote survives. `POST /auth/verify-email/registration`
-    returns the registration's username so the page can pre-fill it.
+  - *set new* (`setNew` true, only within the reset-link lifetime, otherwise
+    `VERIFICATION_SET_NEW_EXPIRED` — the page tells the user to register again for
+    a fresh link): the link holder's password (shared password policy below) and a
+    username they type (required, never pre-filled; uniqueness checked) become the
+    account's; the username is also the display name, so no text another
+    registration wrote survives.
 
   Either way every other link of the address is spent. Consequences: a registration
   by somebody who does not own the address can never complete, hijack or block the
-  account. Any link that reaches the mailbox — including one the other person's
-  registration triggered — lets the owner claim it with their own credentials. This
+  account. Any fresh link that reaches the mailbox — including one the other
+  person's registration triggered — lets the owner claim it with their own
+  credentials; a stale one, after a new registration, gives them a fresh link. This
   ends the earlier back-and-forth (newest registration replaces the row → cool-down
   → per-token credentials with eviction → throttle), all of which still let a
   password chosen by someone without the mailbox matter.
@@ -162,9 +168,15 @@ comes into being without an authenticated session. Both are hardened:
   account row.
 - **No attempt cap.** The holder of a link gains nothing by guessing the
   registration's password, since they may simply set a new one; so wrong passwords
-  never spend a link. CPU cost per source is bounded by the per-IP rate limit on
-  both verify endpoints (default 10 per 15 minutes,
-  `qnop.auth.rate-limit.verify-email.*`, part of the ADR-0027 catalogue).
+  never spend a link. CPU cost per source is bounded by the per-network rate limit
+  on the verify endpoint (default 20 per 15 minutes, room for a retry or two of an
+  honest flow; `qnop.auth.rate-limit.verify-email.*`, part of the ADR-0027
+  catalogue).
+- **One password policy** (`PasswordPolicy`) for every password a user chooses —
+  registration, set new, reset and change: 8–200 characters **and** at most 72
+  UTF-8 bytes (BCrypt's input limit; beyond it the encoder refuses, which used to
+  surface as a 500). Violations are `400 VALIDATION_ERROR` naming the field; reset
+  checks before it spends its token.
 - **Mail volume.** At most three links per address are outstanding (the oldest is
   spent, in one targeted update) and at most one new link and mail is issued per
   address per five minutes (newest token's `created_at`; inside the window a
@@ -174,9 +186,12 @@ comes into being without an authenticated session. Both are hardened:
   bound the volume further. The cap check and insert run under a lock on the
   account row.
 - **A candidate username reserves nothing.** If another account takes it before
-  verification, the answer is `VERIFICATION_USERNAME_TAKEN` (also for the
-  unique-index race, never a 500) and the link stays usable: its holder sets new
-  credentials with another username.
+  verification, the answer is `VERIFICATION_USERNAME_TAKEN` (also for the race on
+  the username unique index; any other integrity conflict is a plain `409` retry)
+  and the link stays usable: its holder sets new credentials with another
+  username. A registration that waited for the account-row lock re-reads the
+  pending state after acquiring it and sends the neutral notice if the account was
+  activated meanwhile.
 - **The verification mail greets the address, not the request.** The greeting is
   the local part of the address; no text from the registration request appears in
   any registration mail.
@@ -184,7 +199,9 @@ comes into being without an authenticated session. Both are hardened:
   `USER_PENDING_VERIFICATION`): that would activate credentials nobody confirmed.
   The admin's way in is the password-reset link (or a generated password), which
   activates the account without any registrant's password, so only whoever holds
-  the link at the address — or the admin's chosen credential — gets in.
+  the link at the address — or the admin's chosen credential — gets in. The
+  reset-link path also resets the display name to the username; the username
+  itself stays (the admin can rename the account).
 - **Lock order.** Verify and further registrations of one address both lock the
   account row first and its tokens second, so they serialise per address and
   cannot deadlock each other.

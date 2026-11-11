@@ -24,16 +24,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
 
 /**
- * Rate-limits {@code POST /api/v1/auth/verify-email} and its {@code /registration} lookup per
- * client network (issue #900), in one bucket. A verification costs a password-hash comparison (and,
- * when new credentials are set, a hash computation), so an unthrottled endpoint would be a cheap
- * way to burn server CPU. Limit {@code qnop.auth.rate-limit.verify-email.*} (default 10 / 900s).
+ * Rate-limits {@code POST /api/v1/auth/verify-email} per client network (issue #900). A
+ * verification costs a password-hash comparison (and, when new credentials are set, a hash
+ * computation), so an unthrottled endpoint would be a cheap way to burn server CPU. Limit {@code
+ * qnop.auth.rate-limit.verify-email.*} (default 20 / 900s: an honest flow may take a few requests,
+ * e.g. a retry with another username).
  */
 @Component
 public class VerifyEmailRateLimitFilter extends AbstractRateLimitFilter {
 
   static final String PATH = "/api/v1/auth/verify-email";
-  static final String REGISTRATION_PATH = "/api/v1/auth/verify-email/registration";
 
   private final HttpClientIpResolver clientIpResolver;
   private final RateLimitProperties.Limit limit;
@@ -49,9 +49,7 @@ public class VerifyEmailRateLimitFilter extends AbstractRateLimitFilter {
 
   @Override
   protected boolean handles(HttpServletRequest request) {
-    String uri = request.getRequestURI();
-    return "POST".equalsIgnoreCase(request.getMethod())
-        && (PATH.equals(uri) || REGISTRATION_PATH.equals(uri));
+    return "POST".equalsIgnoreCase(request.getMethod()) && PATH.equals(request.getRequestURI());
   }
 
   @Override

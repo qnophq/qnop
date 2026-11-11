@@ -272,6 +272,9 @@ public class AdminUserService {
       // active with no usable password, so only whoever receives this link at the address can
       // sign in; the verification links die with the pending state.
       user.setPasswordHash(UserService.PENDING_PASSWORD_PLACEHOLDER);
+      // Whatever a registration wrote as display name goes; the username stays (the admin can
+      // rename the account) and the owner sets everything else.
+      user.setDisplayName(user.getUsername());
       user.setEnabled(true);
     }
     SetupLinkOutcome outcome =

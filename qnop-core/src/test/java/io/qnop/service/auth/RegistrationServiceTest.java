@@ -39,8 +39,8 @@ import io.qnop.service.UserService;
 import io.qnop.service.UserService.ActivationOutcome;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
 import io.qnop.service.auth.EmailVerificationTokenService.PendingVerification;
-import io.qnop.service.auth.RegistrationService.VerificationInputException;
 import io.qnop.service.auth.RegistrationService.VerificationPasswordMismatchException;
+import io.qnop.service.auth.RegistrationService.VerificationSetNewExpiredException;
 import io.qnop.service.auth.RegistrationService.VerificationUsernameTakenException;
 import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailService;
@@ -84,6 +84,10 @@ class RegistrationServiceTest {
         .thenReturn("qnop");
     lenient().when(mailLocales.forUser(any())).thenReturn("en");
     lenient().when(passwordEncoder.encode("password1")).thenReturn("HASH");
+    lenient()
+        .when(settings.getInteger(ApplicationSettingKey.AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES))
+        .thenReturn(30);
+    lenient().when(userService.lockAndCheckPending(any())).thenReturn(true);
     lenient().when(userService.findInternalByEmail(any())).thenReturn(Optional.empty());
     lenient().when(userService.findInternalByUsername(any())).thenReturn(Optional.empty());
     lenient()
@@ -117,7 +121,7 @@ class RegistrationServiceTest {
 
   private static PendingVerification pendingVerification(UUID userId, boolean accountPending) {
     return new PendingVerification(
-        UUID.randomUUID(), userId, accountPending, "jane", "Jane", "CAND-HASH");
+        UUID.randomUUID(), Instant.now(), userId, accountPending, "jane", "Jane", "CAND-HASH");
   }
 
   @Test
@@ -247,7 +251,7 @@ class RegistrationServiceTest {
 
     service.register("jane", "jane@example.com", "password1", null);
 
-    verify(userService).lockForUpdate(existing.getId());
+    verify(userService).lockAndCheckPending(existing.getId());
     verify(verificationTokens).issueForRegistration(existing, "jane", "jane", "HASH");
     verify(userService, never()).createPendingRegistration(any(), any(), any(), any());
     verify(mailService)
@@ -344,29 +348,20 @@ class RegistrationServiceTest {
   }
 
   @Test
-  @DisplayName("setting new credentials keeps the registration's username when none is given")
-  void verifySetNewDefaultsTheUsername() {
-    UUID userId = UUID.randomUUID();
-    PendingVerification pending = pendingVerification(userId, true);
-    when(verificationTokens.peek("tok")).thenReturn(pending);
-    when(passwordEncoder.encode("owner-pass-1")).thenReturn("OWNER-HASH");
-    when(userService.activateVerifiedRegistration(userId, "jane", "jane", "OWNER-HASH"))
-        .thenReturn(ActivationOutcome.ACTIVATED);
-
-    service.verify("tok", "owner-pass-1", true, "  ");
-
-    verify(userService).activateVerifiedRegistration(userId, "jane", "jane", "OWNER-HASH");
-  }
-
-  @Test
   @DisplayName("new credentials follow the registration policy")
   void verifySetNewEnforcesThePolicy() {
     when(verificationTokens.peek("tok")).thenReturn(pendingVerification(UUID.randomUUID(), true));
 
     assertThatThrownBy(() -> service.verify("tok", "short", true, "owner"))
-        .isInstanceOf(VerificationInputException.class);
+        .isInstanceOf(InvalidTextException.class);
+    // 73 UTF-8 bytes in 37 characters: past BCrypt's limit, a validation error rather than a 500.
+    assertThatThrownBy(() -> service.verify("tok", "ä".repeat(36) + "x", true, "owner"))
+        .isInstanceOf(InvalidTextException.class);
     assertThatThrownBy(() -> service.verify("tok", "long-enough-1", true, "ab"))
-        .isInstanceOf(VerificationInputException.class);
+        .isInstanceOf(InvalidTextException.class);
+    // The username is typed by the link holder; nothing is taken over from a registration.
+    assertThatThrownBy(() -> service.verify("tok", "long-enough-1", true, "  "))
+        .isInstanceOf(InvalidTextException.class);
     verify(userService, never()).activateVerifiedRegistration(any(), any(), any(), any());
   }
 
@@ -413,13 +408,56 @@ class RegistrationServiceTest {
   }
 
   @Test
-  @DisplayName("the registration lookup returns the username of a usable link's registration")
-  void registrationUsername() {
-    when(verificationTokens.peek("tok")).thenReturn(pendingVerification(UUID.randomUUID(), true));
-    assertThat(service.registrationUsername("tok")).isEqualTo("jane");
+  @DisplayName(
+      "an older link can still confirm its registration but no longer set new credentials:"
+          + " that is a reset link's trust, so it gets a reset link's lifetime")
+  void setNewIsLimitedToTheResetLinkLifetime() {
+    UUID userId = UUID.randomUUID();
+    PendingVerification old =
+        new PendingVerification(
+            UUID.randomUUID(),
+            Instant.now().minus(java.time.Duration.ofMinutes(31)),
+            userId,
+            true,
+            "jane",
+            "Jane",
+            "CAND-HASH");
+    when(verificationTokens.peek("tok")).thenReturn(old);
 
-    when(verificationTokens.peek("dead")).thenReturn(pendingVerification(UUID.randomUUID(), false));
-    assertThatThrownBy(() -> service.registrationUsername("dead"))
-        .isInstanceOf(InvalidVerificationTokenException.class);
+    assertThatThrownBy(() -> service.verify("tok", "owner-pass-1", true, "owner"))
+        .isInstanceOf(VerificationSetNewExpiredException.class);
+    verify(userService, never()).activateVerifiedRegistration(any(), any(), any(), any());
+
+    when(passwordEncoder.matches("password1", "CAND-HASH")).thenReturn(true);
+    when(userService.activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH"))
+        .thenReturn(ActivationOutcome.ACTIVATED);
+    service.verify("tok", "password1", false, null);
+    verify(userService).activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH");
+  }
+
+  @Test
+  @DisplayName(
+      "an address activated while the registration waited for the lock gets the notice, not a"
+          + " dead verification link")
+  void pendingStateIsReCheckedUnderTheLock() {
+    User existing = pending("squatter", "jane@example.com");
+    when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(existing));
+    when(userService.lockAndCheckPending(existing.getId())).thenReturn(false);
+
+    service.register("jane", "jane@example.com", "password1", "Jane");
+
+    verify(verificationTokens, never()).issueForRegistration(any(), any(), any(), any());
+    verify(mailService)
+        .sendMailFromTemplateAfterCommit(
+            eq(MailTemplateKey.REGISTRATION_ATTEMPT), eq("jane@example.com"), anyMap(), any());
+  }
+
+  @Test
+  @DisplayName("registration applies the password policy, including the 72-byte limit")
+  void registerAppliesThePasswordPolicy() {
+    assertThatThrownBy(
+            () -> service.register("jane", "jane@example.com", "ä".repeat(36) + "x", "Jane"))
+        .isInstanceOf(InvalidTextException.class);
+    verify(passwordEncoder, never()).encode(any());
   }
 }

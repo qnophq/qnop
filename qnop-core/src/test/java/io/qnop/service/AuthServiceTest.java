@@ -146,4 +146,14 @@ class AuthServiceTest {
         .thenReturn(Optional.of(user));
     return user;
   }
+
+  @Test
+  @DisplayName(
+      "change-password applies the password policy: more than 72 UTF-8 bytes is a validation"
+          + " error, not a server error (#900)")
+  void changePasswordAppliesThePolicy() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> service.changePassword(UUID.randomUUID(), "current", "ä".repeat(36) + "x"))
+        .isInstanceOf(InvalidTextException.class);
+  }
 }
