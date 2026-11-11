@@ -300,7 +300,7 @@ public class TeamService {
                         p.userId(),
                         p.displayName(),
                         p.slug(),
-                        p.email(),
+                        null, // names only on the member surface (issue #917)
                         p.teamRole().name(),
                         p.joinedAt()))
             .toList();
@@ -371,7 +371,11 @@ public class TeamService {
     }
   }
 
-  /** Add a member as a lead of the team (or an admin); otherwise 403 (issue #470). */
+  /**
+   * Add a member as a lead of the team (or an admin); otherwise 403 (issue #470). Only an enabled
+   * account can be enrolled here — a disabled or unknown user answers the same 404, so the surface
+   * reveals nothing about account state — and the result carries no e-mail address (issue #917).
+   */
   @Transactional
   public TeamMemberView addMemberAsLead(
       UUID teamId, UUID actorId, boolean admin, UUID userId, String teamRole) {
@@ -379,7 +383,10 @@ public class TeamService {
     // row lock (#691), and a check outside that lock would only be a second
     // reading of a number that can change before the insert.
     requireLeadOrAdmin(teamId, actorId, admin);
-    return addMember(teamId, userId, teamRole);
+    if (users.findById(userId).filter(User::isEnabled).isEmpty()) {
+      throw new UserNotFoundException(userId);
+    }
+    return addMember(teamId, userId, teamRole).withoutEmail();
   }
 
   /**
@@ -401,7 +408,7 @@ public class TeamService {
     }
     // The last-lead guard and the team lock live in the base setMemberRole (issue #542),
     // so this self-service path is covered by the same invariant as the admin path.
-    return setMemberRole(teamId, userId, teamRole);
+    return setMemberRole(teamId, userId, teamRole).withoutEmail();
   }
 
   /**
@@ -518,14 +525,26 @@ public class TeamService {
       Instant createdAt,
       Instant updatedAt) {}
 
-  /** A team member joined with their user identity (slug for the profile link, issue #470/#486). */
+  /**
+   * A team member joined with their user identity (slug for the profile link, issue #470/#486).
+   * {@code email} is set only on the admin surface; member/lead surfaces carry {@code null}.
+   */
   public record TeamMemberView(
       UUID userId,
       String displayName,
       String slug,
       String email,
       String teamRole,
-      Instant joinedAt) {}
+      Instant joinedAt) {
+
+    /**
+     * This view for the non-admin member surface (issue #917): e-mail addresses are an admin-only
+     * field, like on the directory and search layer.
+     */
+    public TeamMemberView withoutEmail() {
+      return new TeamMemberView(userId, displayName, slug, null, teamRole, joinedAt);
+    }
+  }
 
   /** Full team detail including its members. */
   public record TeamDetailView(
