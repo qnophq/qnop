@@ -21,12 +21,16 @@
 package io.qnop.service;
 
 import io.qnop.entity.Team;
+import io.qnop.entity.TeamInvitation;
 import io.qnop.entity.TeamMembership;
 import io.qnop.entity.TeamRole;
 import io.qnop.entity.User;
+import io.qnop.repository.TeamInvitationProjection;
+import io.qnop.repository.TeamInvitationRepository;
 import io.qnop.repository.TeamMemberCount;
 import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
+import io.qnop.repository.UserInvitationProjection;
 import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserTeamProjection;
 import io.qnop.service.limits.InstanceLimitService;
@@ -50,6 +54,10 @@ import org.springframework.transaction.annotation.Transactional;
  * team names and duplicate memberships surface as {@link TeamConflictException} (409); unknown
  * teams or members as {@link TeamNotFoundException} (404); an unknown user being added as {@link
  * UserNotFoundException} (404). Deleting a team cascades its memberships in the database.
+ *
+ * <p>Consent (issue #936, ADR-0064): an add by a team lead who is not an admin creates a pending
+ * {@link TeamInvitation}, which grants nothing until the invited user accepts it; only an admin
+ * adds a member directly or grants the {@code LEAD} role.
  */
 @Service
 public class TeamService {
@@ -59,18 +67,21 @@ public class TeamService {
 
   private final TeamRepository teams;
   private final TeamMembershipRepository memberships;
+  private final TeamInvitationRepository invitations;
   private final UserRepository users;
   private final TeamSlugService slugs;
 
   public TeamService(
       TeamRepository teams,
       TeamMembershipRepository memberships,
+      TeamInvitationRepository invitations,
       UserRepository users,
       TeamSlugService slugs,
       InstanceLimitService limits) {
     this.limits = limits;
     this.teams = teams;
     this.memberships = memberships;
+    this.invitations = invitations;
     this.users = users;
     this.slugs = slugs;
   }
@@ -109,6 +120,8 @@ public class TeamService {
                         p.teamRole().name(),
                         p.joinedAt()))
             .toList();
+    List<TeamMemberView> pending =
+        invitations.findPendingByTeamId(id).stream().map(TeamService::toInvitedView).toList();
     return new TeamDetailView(
         team.getId(),
         team.getName(),
@@ -118,7 +131,8 @@ public class TeamService {
         team.isProfileShowReviews(),
         team.getCreatedAt(),
         team.getUpdatedAt(),
-        members);
+        members,
+        pending);
   }
 
   /**
@@ -213,6 +227,8 @@ public class TeamService {
     }
     TeamMembership saved =
         memberships.save(TeamMembership.of(teamId, userId, requireTeamRole(teamRole)));
+    // A direct add supersedes a pending invitation of the same user (issue #936).
+    invitations.findByTeamIdAndUserId(teamId, userId).ifPresent(invitations::delete);
     return toMemberView(user, saved);
   }
 
@@ -307,6 +323,13 @@ public class TeamService {
     String viewerRole = membership.map(m -> m.getTeamRole().name()).orElse(null);
     boolean canManage =
         admin || membership.map(m -> m.getTeamRole() == TeamRole.LEAD).orElse(false);
+    // Pending invitations are a management concern: only whoever may revoke them sees them.
+    List<TeamMemberView> pending =
+        canManage
+            ? invitations.findPendingByTeamId(teamId).stream()
+                .map(p -> toInvitedView(p).withoutEmail())
+                .toList()
+            : List.of();
     return new MemberTeamView(
         team.getId(),
         team.getName(),
@@ -316,7 +339,8 @@ public class TeamService {
         canManage,
         team.isProfileShowMembers(),
         team.isProfileShowReviews(),
-        members);
+        members,
+        pending);
   }
 
   /**
@@ -375,18 +399,136 @@ public class TeamService {
    * Add a member as a lead of the team (or an admin); otherwise 403 (issue #470). Only an enabled
    * account can be enrolled here — a disabled or unknown user answers the same 404, so the surface
    * reveals nothing about account state — and the result carries no e-mail address (issue #917).
+   *
+   * <p>Consent (issue #936, ADR-0064): an admin's add takes effect immediately, with any role. A
+   * lead's add only <em>invites</em> the user — the result has status {@code INVITED} and grants
+   * nothing until the user accepts — and may only offer the {@code MEMBER} role; granting {@code
+   * LEAD} is an admin decision (403 {@code LEAD_GRANT_REQUIRES_ADMIN}).
    */
   @Transactional
   public TeamMemberView addMemberAsLead(
       UUID teamId, UUID actorId, boolean admin, UUID userId, String teamRole) {
-    // The quota is not checked here: addMember below counts it under the team's
-    // row lock (#691), and a check outside that lock would only be a second
-    // reading of a number that can change before the insert.
+    // The quota is not checked here for the direct add: addMember below counts it
+    // under the team's row lock (#691), and a check outside that lock would only be
+    // a second reading of a number that can change before the insert.
     requireLeadOrAdmin(teamId, actorId, admin);
-    if (users.findById(userId).filter(User::isEnabled).isEmpty()) {
+    TeamRole role = requireTeamRole(teamRole);
+    User user = users.findById(userId).filter(User::isEnabled).orElse(null);
+    if (user == null) {
       throw new UserNotFoundException(userId);
     }
-    return addMember(teamId, userId, teamRole).withoutEmail();
+    if (admin) {
+      return addMember(teamId, userId, role.name()).withoutEmail();
+    }
+    requireAdminForLeadGrant(role);
+    return invite(teamId, actorId, userId, user).withoutEmail();
+  }
+
+  /**
+   * Records a pending invitation under the team's row lock, so it cannot race an add of the same
+   * user (issue #936). The quota is checked here as an early refusal and again on acceptance, which
+   * is the moment the seat is actually taken.
+   */
+  private TeamMemberView invite(UUID teamId, UUID actorId, UUID userId, User user) {
+    if (teams.findByIdForUpdate(teamId).isEmpty()) {
+      throw TeamNotFoundException.team(teamId);
+    }
+    limits.requireTeamMemberCapacity(teamId);
+    if (memberships.existsByTeamIdAndUserId(teamId, userId)) {
+      throw new TeamConflictException(
+          "ALREADY_MEMBER", "This user is already a member of the team.");
+    }
+    if (invitations.existsByTeamIdAndUserId(teamId, userId)) {
+      throw new TeamConflictException(
+          "ALREADY_INVITED", "This user has already been invited to the team.");
+    }
+    TeamInvitation saved = invitations.saveAndFlush(TeamInvitation.of(teamId, userId, actorId));
+    return new TeamMemberView(
+        userId,
+        user.getDisplayName(),
+        user.getSlug(),
+        user.getEmail(),
+        TeamRole.MEMBER.name(),
+        saved.getCreatedAt(),
+        STATUS_INVITED);
+  }
+
+  /** Only an admin grants the LEAD role (issue #936, ADR-0064). */
+  private static void requireAdminForLeadGrant(TeamRole role) {
+    if (role == TeamRole.LEAD) {
+      throw new TeamAccessForbiddenException(
+          "LEAD_GRANT_REQUIRES_ADMIN", "Only an administrator can grant the lead role.");
+    }
+  }
+
+  /**
+   * Withdraw a pending invitation as a lead of the team (or an admin); otherwise 403. An unknown
+   * invitation is a 404 (issue #936).
+   */
+  @Transactional
+  public void revokeInvitationAsLead(UUID teamId, UUID actorId, boolean admin, UUID userId) {
+    requireLeadOrAdmin(teamId, actorId, admin);
+    revokeInvitation(teamId, userId);
+  }
+
+  /** Withdraw a pending invitation (admin surface, issue #936); an unknown one is a 404. */
+  @Transactional
+  public void revokeInvitation(UUID teamId, UUID userId) {
+    TeamInvitation invitation =
+        invitations
+            .findByTeamIdAndUserId(teamId, userId)
+            .orElseThrow(() -> TeamNotFoundException.invitation(teamId, userId));
+    invitations.delete(invitation);
+  }
+
+  /** The caller's own pending invitations into enabled teams, newest first (issue #936). */
+  @Transactional(readOnly = true)
+  public List<InvitationView> listMyInvitations(UUID userId) {
+    return invitations.findInvitationsOfUser(userId).stream()
+        .map(TeamService::toInvitationView)
+        .toList();
+  }
+
+  /**
+   * The invited user accepts: the invitation becomes a {@code MEMBER} membership, under the team's
+   * row lock and the per-team quota (issue #936). Only the invited user can accept — the lookup is
+   * keyed on the caller, so anybody else's invitation is simply not found (404). An invitation into
+   * a team an admin has since disabled is not offered and cannot be accepted.
+   */
+  @Transactional
+  public MyTeamView acceptInvitation(UUID teamId, UUID userId) {
+    Team team =
+        teams
+            .findByIdForUpdate(teamId)
+            .filter(Team::isEnabled)
+            .orElseThrow(() -> TeamNotFoundException.invitation(teamId, userId));
+    TeamInvitation invitation =
+        invitations
+            .findByTeamIdAndUserId(teamId, userId)
+            .orElseThrow(() -> TeamNotFoundException.invitation(teamId, userId));
+    limits.requireTeamMemberCapacity(teamId);
+    invitations.delete(invitation);
+    TeamMembership membership =
+        memberships
+            .findByTeamIdAndUserId(teamId, userId)
+            .orElseGet(() -> memberships.save(TeamMembership.of(teamId, userId, TeamRole.MEMBER)));
+    long count =
+        memberships.countMembersByTeamIds(List.of(teamId)).stream()
+            .findFirst()
+            .map(TeamMemberCount::count)
+            .orElse(1L);
+    return new MyTeamView(
+        team.getId(), team.getName(), team.getSlug(), membership.getTeamRole().name(), count);
+  }
+
+  /** The invited user declines: the invitation is deleted; 404 when there is none (issue #936). */
+  @Transactional
+  public void declineInvitation(UUID teamId, UUID userId) {
+    TeamInvitation invitation =
+        invitations
+            .findByTeamIdAndUserId(teamId, userId)
+            .orElseThrow(() -> TeamNotFoundException.invitation(teamId, userId));
+    invitations.delete(invitation);
   }
 
   /**
@@ -401,6 +543,10 @@ public class TeamService {
   public TeamMemberView setMemberRoleAsLead(
       UUID teamId, UUID actorId, boolean admin, UUID userId, String teamRole) {
     requireLeadOrAdmin(teamId, actorId, admin);
+    if (!admin) {
+      // A lead may still demote, but granting LEAD is an admin decision (issue #936).
+      requireAdminForLeadGrant(requireTeamRole(teamRole));
+    }
     if (actorId.equals(userId)) {
       throw new TeamConflictException(
           "SELF_ROLE_CHANGE",
@@ -481,6 +627,23 @@ public class TeamService {
         membership.getJoinedAt());
   }
 
+  /** A pending invitation shown in a team's roster as an {@code INVITED} member (issue #936). */
+  private static TeamMemberView toInvitedView(TeamInvitationProjection p) {
+    return new TeamMemberView(
+        p.userId(),
+        p.displayName(),
+        p.slug(),
+        p.email(),
+        TeamRole.MEMBER.name(),
+        p.invitedAt(),
+        STATUS_INVITED);
+  }
+
+  private static InvitationView toInvitationView(UserInvitationProjection p) {
+    return new InvitationView(
+        p.teamId(), p.teamName(), p.teamSlug(), p.invitedByName(), p.invitedAt());
+  }
+
   private static TeamSummaryView toSummary(Team team, long memberCount) {
     return new TeamSummaryView(
         team.getId(),
@@ -536,16 +699,38 @@ public class TeamService {
       String slug,
       String email,
       String teamRole,
-      Instant joinedAt) {
+      Instant joinedAt,
+      String status) {
+
+    /** An active member (the status every membership row has). */
+    public TeamMemberView(
+        UUID userId,
+        String displayName,
+        String slug,
+        String email,
+        String teamRole,
+        Instant joinedAt) {
+      this(userId, displayName, slug, email, teamRole, joinedAt, STATUS_ACTIVE);
+    }
 
     /**
      * This view for the non-admin member surface (issue #917): e-mail addresses are an admin-only
      * field, like on the directory and search layer.
      */
     public TeamMemberView withoutEmail() {
-      return new TeamMemberView(userId, displayName, slug, null, teamRole, joinedAt);
+      return new TeamMemberView(userId, displayName, slug, null, teamRole, joinedAt, status);
     }
   }
+
+  /** {@link TeamMemberView#status()} of a membership (issue #936). */
+  public static final String STATUS_ACTIVE = "ACTIVE";
+
+  /** {@link TeamMemberView#status()} of a pending invitation (issue #936). */
+  public static final String STATUS_INVITED = "INVITED";
+
+  /** A pending invitation of the caller into a team, with who sent it (issue #936). */
+  public record InvitationView(
+      UUID teamId, String teamName, String teamSlug, String invitedByName, Instant invitedAt) {}
 
   /** Full team detail including its members. */
   public record TeamDetailView(
@@ -557,7 +742,8 @@ public class TeamService {
       boolean profileShowReviews,
       Instant createdAt,
       Instant updatedAt,
-      List<TeamMemberView> members) {}
+      List<TeamMemberView> members,
+      List<TeamMemberView> pendingInvitations) {}
 
   /** One page of {@link TeamSummaryView}s plus the total count. */
   public record TeamPage(List<TeamSummaryView> items, long total, int page, int size) {}
@@ -580,5 +766,6 @@ public class TeamService {
       boolean canManage,
       boolean profileShowMembers,
       boolean profileShowReviews,
-      List<TeamMemberView> members) {}
+      List<TeamMemberView> members,
+      List<TeamMemberView> pendingInvitations) {}
 }

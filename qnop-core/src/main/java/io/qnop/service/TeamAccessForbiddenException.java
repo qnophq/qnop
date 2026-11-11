@@ -27,7 +27,19 @@ package io.qnop.service;
  */
 public class TeamAccessForbiddenException extends RuntimeException {
 
+  private final String code;
+
   public TeamAccessForbiddenException(String message) {
+    this("TEAM_ACCESS_FORBIDDEN", message);
+  }
+
+  /** With a more specific stable code, e.g. {@code LEAD_GRANT_REQUIRES_ADMIN} (issue #936). */
+  public TeamAccessForbiddenException(String code, String message) {
     super(message);
+    this.code = code;
+  }
+
+  public String getCode() {
+    return code;
   }
 }

@@ -25,6 +25,8 @@ import io.qnop.api.v1.model.AdminTeamMemberRequest;
 import io.qnop.api.v1.model.AdminTeamMemberRoleUpdateRequest;
 import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.MyTeam;
+import io.qnop.api.v1.model.MyTeamInvitation;
+import io.qnop.api.v1.model.MyTeamInvitationListResponse;
 import io.qnop.api.v1.model.MyTeamListResponse;
 import io.qnop.api.v1.model.MyTeamUpdateRequest;
 import io.qnop.api.v1.model.PublicTeamProfile;
@@ -32,6 +34,7 @@ import io.qnop.api.v1.model.PublicTeamProfileMember;
 import io.qnop.api.v1.model.PublicTeamReview;
 import io.qnop.api.v1.model.TeamDetail;
 import io.qnop.api.v1.model.TeamMember;
+import io.qnop.api.v1.model.TeamMembershipStatus;
 import io.qnop.api.v1.model.TeamRole;
 import io.qnop.service.PublicTeamProfileService;
 import io.qnop.service.TeamAccessForbiddenException;
@@ -165,9 +168,51 @@ public class MyTeamsController implements TeamsApi {
     return ResponseEntity.noContent().build();
   }
 
+  @Override
+  public ResponseEntity<MyTeamInvitationListResponse> listMyTeamInvitations() {
+    List<TeamService.InvitationView> mine = teams.listMyInvitations(CurrentUser.requireUserId());
+    Map<UUID, Instant> avatarTs =
+        teamAvatars.updatedAt(mine.stream().map(TeamService.InvitationView::teamId).toList());
+    return ResponseEntity.ok(
+        new MyTeamInvitationListResponse()
+            .items(
+                mine.stream()
+                    .map(
+                        v ->
+                            new MyTeamInvitation()
+                                .teamId(v.teamId())
+                                .teamName(v.teamName())
+                                .teamSlug(v.teamSlug())
+                                .teamAvatarUrl(
+                                    AvatarUrls.forTeam(v.teamId(), avatarTs.get(v.teamId())))
+                                .invitedByName(v.invitedByName())
+                                .invitedAt(toOffset(v.invitedAt())))
+                    .toList()));
+  }
+
+  @Override
+  public ResponseEntity<MyTeam> acceptMyTeamInvitation(UUID teamId) {
+    TeamService.MyTeamView joined = teams.acceptInvitation(teamId, CurrentUser.requireUserId());
+    return ResponseEntity.ok(
+        toMyTeam(joined, AvatarUrls.forTeam(teamId, teamAvatars.updatedAt(teamId).orElse(null))));
+  }
+
+  @Override
+  public ResponseEntity<Void> declineMyTeamInvitation(UUID teamId) {
+    teams.declineInvitation(teamId, CurrentUser.requireUserId());
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> revokeMyTeamInvitation(UUID teamId, UUID userId) {
+    teams.revokeInvitationAsLead(
+        teamId, CurrentUser.requireUserId(), CurrentUser.isAdmin(), userId);
+    return ResponseEntity.noContent().build();
+  }
+
   @ExceptionHandler(TeamAccessForbiddenException.class)
   public ResponseEntity<ErrorResponse> onForbidden(TeamAccessForbiddenException ex) {
-    return error(HttpStatus.FORBIDDEN, "TEAM_ACCESS_FORBIDDEN", ex.getMessage());
+    return error(HttpStatus.FORBIDDEN, ex.getCode(), ex.getMessage());
   }
 
   @ExceptionHandler(TeamNotFoundException.class)
@@ -209,7 +254,10 @@ public class MyTeamsController implements TeamsApi {
     // One batched avatar-timestamp lookup for the whole roster (same pattern as
     // the admin user list), so building URLs never streams image bytes per row.
     Map<UUID, Instant> avatarTimestamps =
-        avatars.updatedAt(v.members().stream().map(TeamMemberView::userId).toList());
+        avatars.updatedAt(
+            java.util.stream.Stream.concat(v.members().stream(), v.pendingInvitations().stream())
+                .map(TeamMemberView::userId)
+                .toList());
     return new TeamDetail()
         .id(v.id())
         .name(v.name())
@@ -221,7 +269,11 @@ public class MyTeamsController implements TeamsApi {
         .profileShowMembers(v.profileShowMembers())
         .profileShowReviews(v.profileShowReviews())
         .members(
-            v.members().stream().map(m -> toMember(m, avatarTimestamps.get(m.userId()))).toList());
+            v.members().stream().map(m -> toMember(m, avatarTimestamps.get(m.userId()))).toList())
+        .pendingInvitations(
+            v.pendingInvitations().stream()
+                .map(m -> toMember(m, avatarTimestamps.get(m.userId())))
+                .toList());
   }
 
   /**
@@ -290,7 +342,8 @@ public class MyTeamsController implements TeamsApi {
         .slug(v.slug())
         .avatarUrl(AvatarUrls.forUser(v.userId(), avatarUpdatedAt))
         .teamRole(TeamRole.fromValue(v.teamRole()))
-        .joinedAt(toOffset(v.joinedAt()));
+        .joinedAt(toOffset(v.joinedAt()))
+        .status(TeamMembershipStatus.fromValue(v.status()));
   }
 
   private static OffsetDateTime toOffset(Instant instant) {

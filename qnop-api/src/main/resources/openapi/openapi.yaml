@@ -1495,6 +1495,34 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /admin/teams/{teamId}/invitations/{userId}:
+    delete:
+      tags:
+        - AdminTeams
+      summary: Revoke a pending team invitation
+      description: |
+        Withdraws a team lead's pending invitation of the user (issue #936,
+        ADR-0064). The invitation never granted anything, so revoking it only
+        removes it from the invited user's list.
+      operationId: revokeTeamInvitation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '204':
+          description: Invitation revoked
+        '404':
+          description: The team has no pending invitation of this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /admin/storage-consistency:
     get:
       tags:
@@ -1558,6 +1586,120 @@ paths:
                 $ref: '#/components/schemas/OrphanDeleteResponse'
         '400':
           description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /teams/invitations:
+    get:
+      tags:
+        - Teams
+      summary: List the caller's pending team invitations
+      description: |
+        The invitations a team lead has sent the caller and the caller has not
+        answered yet (issue #936, ADR-0064), newest first. A pending invitation
+        grants nothing — no team access, no review visibility — until accepted.
+        Invitations into disabled teams are not listed.
+      operationId: listMyTeamInvitations
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The caller's pending invitations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyTeamInvitationListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /teams/invitations/{teamId}/accept:
+    post:
+      tags:
+        - Teams
+      summary: Accept a team invitation
+      description: |
+        The invited caller joins the team as a `MEMBER` (issue #936). Only the
+        invited user can accept; anybody else's invitation answers 404. Subject
+        to the per-team member quota (409 when the team is full).
+      operationId: acceptMyTeamInvitation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+      responses:
+        '200':
+          description: The team the caller now belongs to.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyTeam'
+        '404':
+          description: The caller has no pending invitation to this team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The team has reached its member limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /teams/invitations/{teamId}/decline:
+    post:
+      tags:
+        - Teams
+      summary: Decline a team invitation
+      description: |
+        The invited caller turns the invitation down; it is deleted (issue
+        #936). The team lead may invite again later.
+      operationId: declineMyTeamInvitation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+      responses:
+        '204':
+          description: Invitation declined
+        '404':
+          description: The caller has no pending invitation to this team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /teams/{teamId}/invitations/{userId}:
+    delete:
+      tags:
+        - Teams
+      summary: Revoke a pending invitation of a led team
+      description: |
+        A LEAD of the team (or an ADMIN) withdraws a pending invitation (issue
+        #936). Any other caller gets 403.
+      operationId: revokeMyTeamInvitation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '204':
+          description: Invitation revoked
+        '404':
+          description: The team has no pending invitation of this user
           content:
             application/json:
               schema:
@@ -1746,10 +1888,18 @@ paths:
     post:
       tags:
         - Teams
-      summary: Add a member to a led team
+      summary: Add (or invite) a member to a led team
       description: |
         A LEAD of the team (or an ADMIN) adds a member with a team role (issue
         #470). Any other caller gets 403.
+
+        Consent (issue #936, ADR-0064): an ADMIN's add takes effect at once and
+        the response has `status: ACTIVE`. A lead who is not an admin only
+        **invites** the user — the response has `status: INVITED` and grants no
+        team access until the user accepts (`POST /teams/invitations/{teamId}/accept`).
+        A lead may only offer `MEMBER`; asking for `LEAD` answers 403
+        `LEAD_GRANT_REQUIRES_ADMIN`. 409 `ALREADY_MEMBER` / `ALREADY_INVITED`
+        when the user is already in the team or already invited.
       operationId: addMyTeamMember
       security:
         - bearerAuth: []
@@ -1763,7 +1913,7 @@ paths:
               $ref: '#/components/schemas/AdminTeamMemberRequest'
       responses:
         '201':
-          description: The added member
+          description: The added member (`ACTIVE`) or the sent invitation (`INVITED`)
           content:
             application/json:
               schema:
@@ -1781,7 +1931,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: The user is already a member of the team
+          description: The user is already a member of, or already invited to, the team
           content:
             application/json:
               schema:
@@ -1802,7 +1952,9 @@ paths:
         themselves out. Nobody changes their OWN role through this surface (409
         `SELF_ROLE_CHANGE`, mirroring `SELF_REMOVAL`) — demoting a lead is
         another lead's or an admin's call, and the admin console is the path
-        for one's own role. Any non-lead caller gets 403.
+        for one's own role. Any non-lead caller gets 403. Promoting to `LEAD`
+        is an ADMIN decision (issue #936): a lead who is not an admin gets 403
+        `LEAD_GRANT_REQUIRES_ADMIN`; demoting stays a lead's call.
       operationId: setMyTeamMemberRole
       security:
         - bearerAuth: []
@@ -6299,6 +6451,52 @@ components:
       enum:
         - LEAD
         - MEMBER
+    TeamMembershipStatus:
+      type: string
+      description: |
+        Whether a roster entry is a member (`ACTIVE`) or a pending invitation a
+        team lead sent and the user has not accepted yet (`INVITED`, issue #936,
+        ADR-0064). An invited user has no team access at all.
+      enum:
+        - ACTIVE
+        - INVITED
+    MyTeamInvitation:
+      type: object
+      description: A pending invitation of the caller into a team (issue #936).
+      properties:
+        teamId:
+          type: string
+          format: uuid
+        teamName:
+          type: string
+        teamSlug:
+          type: string
+          nullable: true
+        teamAvatarUrl:
+          type: string
+          nullable: true
+          description: The team's avatar URL with a cache-buster, or null when none is set.
+        invitedByName:
+          type: string
+          nullable: true
+          description: Display name of the lead who sent the invitation; null once that account is gone.
+        invitedAt:
+          type: string
+          format: date-time
+      required:
+        - teamId
+        - teamName
+        - invitedAt
+    MyTeamInvitationListResponse:
+      type: object
+      description: The caller's pending team invitations (issue #936).
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MyTeamInvitation'
+      required:
+        - items
     AdminTeamMember:
       type: object
       description: A team member joined with their user identity.
@@ -6323,6 +6521,9 @@ components:
         joinedAt:
           type: string
           format: date-time
+          description: When the user joined — for an `INVITED` entry, when the invitation was sent.
+        status:
+          $ref: '#/components/schemas/TeamMembershipStatus'
       required:
         - userId
         - displayName
@@ -6414,6 +6615,11 @@ components:
           format: date-time
         members:
           type: array
+          items:
+            $ref: '#/components/schemas/AdminTeamMember'
+        pendingInvitations:
+          type: array
+          description: Pending invitations sent by a team lead (issue #936), each with `status` INVITED.
           items:
             $ref: '#/components/schemas/AdminTeamMember'
       required:
@@ -6622,6 +6828,9 @@ components:
         joinedAt:
           type: string
           format: date-time
+          description: When the user joined — for an `INVITED` entry, when the invitation was sent.
+        status:
+          $ref: '#/components/schemas/TeamMembershipStatus'
       required:
         - userId
         - displayName
@@ -6667,6 +6876,14 @@ components:
           description: Whether the public team profile (issue #586) exposes the review participation to non-members.
         members:
           type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+        pendingInvitations:
+          type: array
+          description: |
+            Pending invitations (issue #936), each with `status` INVITED — only
+            for a caller who may manage the team (`viewerCanManage`); empty for
+            everyone else.
           items:
             $ref: '#/components/schemas/TeamMember'
       required:
