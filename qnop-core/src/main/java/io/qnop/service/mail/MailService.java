@@ -20,6 +20,7 @@
  */
 package io.qnop.service.mail;
 
+import io.qnop.service.ControlCharacters;
 import jakarta.mail.internet.MimeMessage;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -68,7 +69,9 @@ public class MailService {
         }
       }
       helper.setTo(to);
-      helper.setSubject(subject);
+      // Whatever the template and its values produced, a subject is one header line
+      // (issue #909): control characters, CR/LF included, become spaces.
+      helper.setSubject(ControlCharacters.toSpaces(subject));
       if (multipart) {
         helper.setText(bodyPlain, bodyHtml);
       } else {
