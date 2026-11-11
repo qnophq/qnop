@@ -38,7 +38,18 @@ if n != 1:
 with open(path, "w", encoding="utf-8") as f:
     f.write(text)
 PY
-  echo "--fresh: dropped all recorded components; regenerating from scratch."
+  # A warm Gradle cache serves processed module metadata, so parent POMs and BOMs
+  # are not re-read and would be missing from a from-scratch file. Resolve into
+  # an empty user home instead; only the (checksum-pinned) wrapper distribution
+  # is shared to save the download.
+  REAL_GRADLE_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
+  GRADLE_USER_HOME="$(mktemp -d)"
+  export GRADLE_USER_HOME
+  trap 'rm -rf "$GRADLE_USER_HOME"' EXIT
+  if [[ -d "$REAL_GRADLE_HOME/wrapper" ]]; then
+    ln -s "$REAL_GRADLE_HOME/wrapper" "$GRADLE_USER_HOME/wrapper"
+  fi
+  echo "--fresh: dropped all recorded components; regenerating from scratch with an empty cache."
 elif [[ -n "${1:-}" ]]; then
   echo "usage: $0 [--fresh]" >&2
   exit 2
