@@ -66,6 +66,27 @@ auth.admin_password_reset:
   ctaLabel: "Establecer nueva contraseña"
   preheader: "Un administrador restableció tu contraseña de {{siteName}}."
 
+auth.registration_attempt:
+  subject: "Sobre tu registro en {{siteName}}"
+  bodyPlain: |
+    Hola:
+
+    Alguien ha solicitado crear una cuenta de {{siteName}} con esta dirección de correo electrónico. No se ha creado ninguna cuenta nueva porque esta dirección de correo o el nombre de usuario elegido ya están en uso.
+
+    Si ya tienes una cuenta, inicia sesión aquí; en la página de inicio de sesión también puedes restablecer una contraseña olvidada:
+
+    {{actionUrl}}
+
+    Si no has sido tú, puedes ignorar este mensaje; no ha cambiado nada.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Sobre tu registro</h1>
+    <p style="margin:0 0 14px;">Hola:</p>
+    <p style="margin:0 0 14px;">Alguien ha solicitado crear una cuenta de <strong style="color:#18191f;">{{siteName}}</strong> con esta dirección de correo electrónico. No se ha creado ninguna cuenta nueva porque esta dirección de correo o el nombre de usuario elegido ya están en uso.</p>
+    <p style="margin:0 0 14px;">Si ya tienes una cuenta, inicia sesión; en la página de inicio de sesión también puedes restablecer una contraseña olvidada.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Si no has sido tú, puedes ignorar este correo: no ha cambiado nada.</p>
+  ctaLabel: "Ir al inicio de sesión"
+  preheader: "No se ha creado ninguna cuenta nueva de {{siteName}} para esta dirección."
+
 review.participant_added:
   subject: "Te añadieron como revisor de «{{documentTitle}}»"
   bodyPlain: |

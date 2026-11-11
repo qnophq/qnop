@@ -126,6 +126,9 @@ databaseChangeLog:
       file: migrations/0038-review-pseudonym.yaml
       relativeToChangelogFile: true
   - include:
+      file: migrations/0039-user-email-verification-pending.yaml
+      relativeToChangelogFile: true
+  - include:
       file: migrations/0040-audit-chain.yaml
       relativeToChangelogFile: true
   # Enterprise schema seam (issue #254, ADR-0039): a separately-licensed module

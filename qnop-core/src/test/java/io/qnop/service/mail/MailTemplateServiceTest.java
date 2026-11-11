@@ -494,7 +494,10 @@ class MailTemplateServiceTest {
           .as(key.key())
           .doesNotContain("{{")
           .isNotEqualTo(key.defaultSubject());
-      assertThat(mail.bodyPlain()).as(key.key()).doesNotContain("{{").startsWith("Hallo Jane,");
+      // The registration-attempt notice has no recipient name (issue #900): whoever sent the
+      // request is not necessarily the owner of the address.
+      String greeting = key == MailTemplateKey.REGISTRATION_ATTEMPT ? "Hallo," : "Hallo Jane,";
+      assertThat(mail.bodyPlain()).as(key.key()).doesNotContain("{{").startsWith(greeting);
       assertThat(mail.bodyHtml())
           .as(key.key())
           .doesNotContain("{{")

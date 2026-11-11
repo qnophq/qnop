@@ -109,3 +109,130 @@ Hardening of the session lifecycle (security review, epic #896):
   accounts are compared against a dummy hash computed at startup. Equalising
   the registration path (synchronous account creation and mail only for new
   addresses) is a follow-up on #903.
+
+## Amendment (2026-11, #900 #903 #905): registration, verification and bootstrap credentials
+
+Self-registration and the first-boot admin are the two places where a credential
+comes into being without an authenticated session. Both are hardened:
+
+- **Pending verification is its own state.** `qnop_user.email_verification_pending`
+  (migration `0039`, check `NOT (email_verification_pending AND enabled)`) marks a
+  self-registration that has not confirmed its address. It is distinct from an
+  administrator-disabled account: verification activates **only** a pending
+  account, through a conditional, version-bumping update
+  (`… WHERE email_verification_pending`), so a verification link can never re-enable
+  an account an administrator decided about — not even in a race. An explicit
+  enabled-state decision by an administrator (`enabled` present in the update)
+  settles the pending flag; a display-name or role edit does not.
+  *Backfill:* only provably untouched, never-verified self-registrations become
+  pending — internal, disabled, never signed in, `version = 0` (no edit after the
+  insert) and holding an unconsumed verification token. Every other disabled
+  account stays administrator-disabled: when in doubt the account is **not**
+  reopened for self-service verification.
+- **Principle: for an account nobody has verified yet, mailbox control is account
+  control.** A password-reset link already lets whoever reads the mailbox set the
+  password of a verified account; a verification link gets exactly that power —
+  setting credentials with nothing but the link — and, to keep the trust level the
+  same, only for as long as a reset link lives (the configured
+  `auth.password_reset_token_ttl_minutes`, default 30 minutes). Confirming the
+  registration the link belongs to, which also needs that registration's
+  password, keeps the full link lifetime of 24 hours. `POST /auth/verify-email`
+  (the former `GET ?token=` is gone) takes the token and a password and works in
+  one of two ways:
+  - *confirm* (`setNew` false, the normal case): the password must be the one of
+    the registration the link belongs to, and the account gets exactly that
+    registration's username, display name and password. A mismatch
+    (`VERIFICATION_PASSWORD_MISMATCH`) changes nothing and leaves the link usable.
+  - *set new* (`setNew` true, only within the reset-link lifetime, otherwise
+    `VERIFICATION_SET_NEW_EXPIRED` — the page tells the user to register again for
+    a fresh link): the link holder's password (shared password policy below) and a
+    username they type (required, never pre-filled; uniqueness checked) become the
+    account's; the username is also the display name, so no text another
+    registration wrote survives.
+
+  Either way every other link of the address is spent. Consequences: a registration
+  by somebody who does not own the address can never complete, hijack or block the
+  account. Any fresh link that reaches the mailbox — including one the other
+  person's registration triggered — lets the owner claim it with their own
+  credentials; a stale one, after a new registration, gives them a fresh link. This
+  ends the earlier back-and-forth (newest registration replaces the row → cool-down
+  → per-token credentials with eviction → throttle), all of which still let a
+  password chosen by someone without the mailbox matter.
+- **Registration credentials ride on the link.** Every (re)registration of a pending
+  address issues a token carrying that registration's candidate username, display
+  name and password hash (`email_verification_token.candidate_*`, migration 0039;
+  all set or all null by check constraint); it does not invalidate the other
+  links. The account row of a pending registration holds no registrant password
+  (an unmatchable placeholder). Every update that spends a link nulls its candidate
+  columns. Tokens issued before this change carry no candidate and fall back to the
+  account row.
+- **No attempt cap.** The holder of a link gains nothing by guessing the
+  registration's password, since they may simply set a new one; so wrong passwords
+  never spend a link. CPU cost per source is bounded by the per-network rate limit
+  on the verify endpoint (default 20 per 15 minutes, room for a retry or two of an
+  honest flow; `qnop.auth.rate-limit.verify-email.*`, part of the ADR-0027
+  catalogue).
+- **One password policy** (`PasswordPolicy`) for every password a user chooses —
+  registration, set new, reset and change: 8–200 characters **and** at most 72
+  UTF-8 bytes (BCrypt's input limit; beyond it the encoder refuses, which used to
+  surface as a 500). Violations are `400 VALIDATION_ERROR` naming the field; reset
+  checks before it spends its token.
+- **Mail volume.** At most three links per address are outstanding (the oldest is
+  spent, in one targeted update) and at most one new link and mail is issued per
+  address per five minutes (newest token's `created_at`; inside the window a
+  registration is a uniform no-op that still pays the BCrypt cost). This is volume
+  protection only: inside the window the address has just received a link, and any
+  link lets its owner claim the account. The per-e-mail register buckets of #931
+  bound the volume further. The cap check and insert run under a lock on the
+  account row.
+- **A candidate username reserves nothing.** If another account takes it before
+  verification, the answer is `VERIFICATION_USERNAME_TAKEN` (also for the race on
+  the username unique index; any other integrity conflict is a plain `409` retry)
+  and the link stays usable: its holder sets new credentials with another
+  username. A registration that waited for the account-row lock re-reads the
+  pending state after acquiring it and sends the neutral notice if the account was
+  activated meanwhile.
+- **The verification mail greets the address, not the request.** The greeting is
+  the local part of the address; no text from the registration request appears in
+  any registration mail.
+- **An administrator cannot enable a pending account** (409
+  `USER_PENDING_VERIFICATION`): that would activate credentials nobody confirmed.
+  The admin's way in is the password-reset link (or a generated password), which
+  activates the account without any registrant's password, so only whoever holds
+  the link at the address — or the admin's chosen credential — gets in. The
+  reset-link path also resets the display name to the username; the username
+  itself stays (the admin can rename the account).
+- **Lock order.** Verify and further registrations of one address both lock the
+  account row first and its tokens second, so they serialise per address and
+  cannot deadlock each other.
+- **Duplicate registration sends a neutral notice** (`auth.registration_attempt`)
+  to the entered address when the address or username belongs to any other
+  account; nothing is created or changed and the response stays uniform.
+- **Timing does not tell the branches apart.** Registration encodes the password
+  on every branch (BCrypt dominates the request), and the mails of the
+  anti-enumeration flows — registration, notice and the self-service
+  forgot-password request — are queued with
+  `MailService.sendMailFromTemplateAfterCommit`: an `AFTER_COMMIT` event delivered
+  by `DeferredMailListener` on the bounded `mailDispatchExecutor`, so neither
+  rendering nor SMTP runs in the request thread and a rolled-back request mails
+  nobody. A full queue drops the mail with a WARN rather than running it on the
+  caller (which would bring the timing signal back); queued mails are delivered on
+  shutdown (bounded wait), and the request's MDC travels with each task.
+  Admin-initiated setup links stay synchronous because the admin UI needs the
+  send result. (Login timing: issue #903, first part.)
+- **First-boot admin credential.** A generated password is written to
+  `admin-password.txt` inside a new `qnop-bootstrap-<random>` directory created
+  with `rwx------` in one step, the file with `CREATE_NEW` + `rw-------` in one step:
+  nothing pre-existing (file or symbolic link) is ever followed, there is no window
+  with wider permissions, and where this cannot be guaranteed no file is written
+  (stderr remains). `QNOP_ADMIN_PASSWORD` — a lasting ADMIN credential without a
+  forced change — must be ≥ 12 characters, ≤ 72 bytes, not contain the username,
+  use ≥ 8 different characters and mix three character classes (or be a 20+
+  character passphrase); otherwise the startup fails. The password file is deleted
+  once the generated password has been changed.
+
+Accepted consequences: the verify step asks for a password; a user who forgot the
+one chosen minutes earlier simply sets a new one on the same page. An admin edit that decides the enabled
+state of a pending account turns it into an ordinary (possibly disabled) account
+the link can no longer activate. The admin user list does not yet show the pending
+state separately (follow-up).

@@ -44,7 +44,8 @@
       "SELF_LOCKOUT": "No puedes desactivar tu propia cuenta ni cambiar su rol.",
       "SELF_DELETE": "No puedes eliminar tu propia cuenta.",
       "EMAIL_TAKEN": "Ya existe una cuenta con este correo electrónico.",
-      "USERNAME_TAKEN": "Este nombre de usuario ya está en uso."
+      "USERNAME_TAKEN": "Este nombre de usuario ya está en uso.",
+      "USER_PENDING_VERIFICATION": "Esta cuenta aún espera la confirmación de su correo electrónico. Envía en su lugar un enlace para restablecer la contraseña: se activará cuando su titular establezca una contraseña."
     },
     "toasts": {
       "updateFailed": "No se pudo actualizar a {{name}}.",
@@ -717,6 +718,7 @@
       "auth__registration_verification": "Verificación de cuenta",
       "auth__password_reset": "Restablecimiento de contraseña",
       "auth__admin_password_reset": "Restablecimiento de contraseña por un administrador",
+      "auth__registration_attempt": "Intento de registro",
       "review__participant_added": "Invitación a una revisión",
       "review__daily_digest": "Resumen diario de revisiones",
       "review__annotation_created": "Nueva anotación",

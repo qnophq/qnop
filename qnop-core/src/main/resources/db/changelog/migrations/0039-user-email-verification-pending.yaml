@@ -1,0 +1,74 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Pending e-mail verification as its own account state (issue #900, ADR-0026
+# amendment). Until now a self-registered account waiting for its verification
+# link and an account an administrator disabled were both just enabled = false,
+# so a verification link could switch an administrator's decision back. A NEW
+# changeset: shipped changesets are immutable (checksum-validated on every
+# deployed instance).
+databaseChangeLog:
+  - changeSet:
+      id: 0039-user-email-verification-pending
+      author: qnop
+      comment: >-
+        qnop_user.email_verification_pending (default false), a pending account is
+        never enabled, plus a conservative backfill of untouched unverified
+        self-registrations.
+      changes:
+        - addColumn:
+            tableName: qnop_user
+            columns:
+              - column:
+                  name: email_verification_pending
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints: { nullable: false }
+        - sql:
+            comment: >-
+              Backfill. Only rows that are provably an untouched, never-verified
+              self-registration become pending: an internal, disabled account that
+              has never signed in, was never modified after its insert (version 0,
+              so no administrator edit happened) and still has an outstanding
+              (unconsumed) verification token. Everything else that is disabled
+              stays administrator-disabled — when in doubt the account is NOT
+              reopened for self-service verification. A registrant whose token has
+              already been swept is no worse off than before (the old link was dead
+              anyway) and an administrator can enable the account.
+            splitStatements: true
+            sql: |
+              UPDATE qnop_user u SET email_verification_pending = TRUE
+               WHERE u.source = 'INTERNAL'
+                 AND u.enabled = FALSE
+                 AND u.last_login_at IS NULL
+                 AND u.version = 0
+                 AND EXISTS (SELECT 1 FROM email_verification_token t
+                              WHERE t.user_id = u.id AND t.consumed_at IS NULL);
+              ALTER TABLE qnop_user ADD CONSTRAINT ck_qnop_user_pending_not_enabled
+                CHECK (NOT (email_verification_pending AND enabled));
+  - changeSet:
+      id: 0039-email-verification-token-candidate
+      author: qnop
+      comment: >-
+        The credentials a registration asks for live on its verification token
+        (issue #900): the token that is verified decides the account's username,
+        display name and password. Null on tokens issued before this change; the
+        account row's values apply to those.
+      changes:
+        - addColumn:
+            tableName: email_verification_token
+            columns:
+              - column: { name: candidate_username, type: VARCHAR(64) }
+              - column: { name: candidate_display_name, type: VARCHAR(255) }
+              - column: { name: candidate_password_hash, type: VARCHAR(255) }
+  - changeSet:
+      id: 0039-email-verification-token-checks
+      author: qnop
+      comment: >-
+        Candidate credentials are all set or all absent (issue #900).
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE email_verification_token ADD CONSTRAINT ck_email_verification_token_candidate
+                CHECK (num_nonnulls(candidate_username, candidate_display_name, candidate_password_hash) IN (0, 3));

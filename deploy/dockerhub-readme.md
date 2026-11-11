@@ -46,7 +46,7 @@ docker compose up -d
 
 The server **fails fast at startup** when a required secret is missing or still a placeholder — there are no insecure defaults. Put real values in an env file you keep out of version control.
 
-**First login:** the initial `admin` password is printed to the container's stderr on first start (and written to `/tmp/qnop-admin-password.txt` inside the container):
+**First login:** the initial `admin` password is printed to the container's stderr on first start (and written to `/tmp/qnop-bootstrap-<random>/admin-password.txt`, owner-only, inside the container):
 
 ```bash
 docker compose logs qnop | tail -5

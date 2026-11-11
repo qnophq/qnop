@@ -101,12 +101,12 @@ SMTP for e-mail notifications (verification, reset, review events) is configured
 
 On first startup, qnop bootstraps the internal admin account `admin`:
 
-- With `QNOP_ADMIN_PASSWORD` set, that value is the password (no forced change) — intended for automated environments.
-- Otherwise a **random one-time password** is printed to the container's **stderr** (bypassing the log framework) and written to `/tmp/qnop-admin-password.txt` (mode 0600) inside the container. Log in and change it — the account is flagged `password_change_required`.
+- With `QNOP_ADMIN_PASSWORD` set, that value is the password (no forced change) — intended for automated environments. Because it stays valid, it must be strong: at least 12 characters (at most 72 bytes), not containing `admin`, using at least 8 different characters, and mixing three of lower case, upper case, digits and symbols — or a passphrase of 20+ characters. A weaker value **stops the startup** with an error (issue #905).
+- Otherwise a **random one-time password** is printed to the container's **stderr** (bypassing the log framework) and written to `admin-password.txt` in a freshly created, owner-only directory `qnop-bootstrap-<random>` (mode 0700, file 0600) under the JVM temp directory (`/tmp` in the container). The file is never written through an existing path; where that cannot be guaranteed, only stderr carries the password. The log records the file's path, never the password. The file and its directory are deleted automatically within a minute after the generated password has been changed. Log in and change it — the account is flagged `password_change_required`.
 
 ```bash
 docker compose logs qnop | tail -5        # or:
-docker compose exec qnop cat /tmp/qnop-admin-password.txt
+docker compose exec qnop sh -c 'cat /tmp/qnop-bootstrap-*/admin-password.txt'
 ```
 
 ## Health & operations
@@ -164,7 +164,7 @@ The auth rate limits (login, refresh, registration, password reset — ADR-0027)
 - Make sure the proxy closest to the client does not trust an incoming `X-Forwarded-For` blindly unless it, too, sits behind trusted infrastructure.
 - `QNOP_HTTP_FORWARD_HEADERS_STRATEGY=framework` is a separate setting: it controls scheme/host for redirects and cookies, not the rate-limit IP.
 
-Besides the per-IP limits, login, registration, password-reset request and password reset are also throttled per account / e-mail address / reset token, so spreading attempts over many addresses does not lift the limit. Failed logins are counted per account and client network (IPv4 /24, IPv6 /56), and per recognised device: a successful login sets an `HttpOnly` `qnop_device` cookie (path `/api/v1/auth/login`, valid for `qnop.auth.rate-limit.login-device-cookie-lifetime`, default 30 days), and a browser that carries one is never held back by failures elsewhere. A much higher per-account ceiling bounds failures from unrecognised devices across all networks; a `WARN` line `Login ceiling reached for account …` means it was hit — worth a look. Rotating `QNOP_AUTH_JWT_SECRET` invalidates all device cookies. All limits are tunable under `qnop.auth.rate-limit.*` (see ADR-0027).
+E-mail verification (`POST /api/v1/auth/verify-email`) has its own per-network limit, `qnop.auth.rate-limit.verify-email.*` (default 20 requests per 15 minutes); raise it if many people verify from behind one shared egress address. Besides the per-IP limits, login, registration, password-reset request and password reset are also throttled per account / e-mail address / reset token, so spreading attempts over many addresses does not lift the limit. Failed logins are counted per account and client network (IPv4 /24, IPv6 /56), and per recognised device: a successful login sets an `HttpOnly` `qnop_device` cookie (path `/api/v1/auth/login`, valid for `qnop.auth.rate-limit.login-device-cookie-lifetime`, default 30 days), and a browser that carries one is never held back by failures elsewhere. A much higher per-account ceiling bounds failures from unrecognised devices across all networks; a `WARN` line `Login ceiling reached for account …` means it was hit — worth a look. Rotating `QNOP_AUTH_JWT_SECRET` invalidates all device cookies. All limits are tunable under `qnop.auth.rate-limit.*` (see ADR-0027).
 
 ## Office converter isolation
 

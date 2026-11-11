@@ -1060,7 +1060,10 @@ paths:
       description: |
         Partial update of display name, global role and enabled state. The
         self-lockout guard rejects (409) an attempt to disable or demote your own
-        account or the last remaining admin.
+        account or the last remaining admin. Enabling an account that is still
+        pending its e-mail verification is refused (409 `USER_PENDING_VERIFICATION`);
+        send it a password-reset link instead, which activates it without any
+        registrant-chosen password.
       operationId: updateUser
       security:
         - bearerAuth: []
@@ -1092,7 +1095,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: Self-lockout or last-admin guard violated
+          description: Self-lockout or last-admin guard violated, or the account is pending verification
           content:
             application/json:
               schema:
@@ -1881,10 +1884,13 @@ paths:
       summary: Register a local account
       description: |
         Self-registration of a local user. Public; gated by the
-        `auth.self_registration_enabled` setting. Anti-enumeration: the response is
-        **uniform** whether or not the username/email already exists (no account is
-        created or re-mailed for a duplicate); when registration is disabled the
-        endpoint reports a **disguised 404** so its availability is not revealed.
+        `auth.self_registration_enabled` setting. The account stays pending until the
+        address is verified (see `/auth/verify-email`). Anti-enumeration: the response
+        is **uniform** whether or not the username/email already exists — a duplicate
+        creates no account and instead sends a neutral notice to the entered address,
+        and every mail is sent after the response, off the request thread; when
+        registration is disabled the endpoint reports a **disguised 404** so its
+        availability is not revealed.
       operationId: register
       security: []
       requestBody:
@@ -1915,20 +1921,37 @@ paths:
         '429':
           $ref: '#/components/responses/TooManyRequests'
   /auth/verify-email:
-    get:
+    post:
       tags:
         - AuthRegistration
       summary: Verify a registered email address
-      description: Consumes a single-use verification token and activates the account. Public.
+      description: |
+        Confirms a self-registration and activates the account (issue #900). Public.
+        The link proves control of the mailbox, and for an account nobody has verified
+        yet mailbox control is account control. With `setNew` false (default) the
+        request confirms the registration the link belongs to: `password` must be its
+        password and the account gets exactly its credentials; a mismatch is
+        `VERIFICATION_PASSWORD_MISMATCH` and leaves the link usable. Confirming works
+        for the whole link lifetime (24 hours). With `setNew` true the holder sets new
+        credentials instead — the trust of a password-reset link, so only while the
+        link is younger than the configured password-reset link lifetime
+        (`VERIFICATION_SET_NEW_EXPIRED` after that: register again for a fresh link).
+        `username` is then required and becomes the username and display name;
+        `password` follows the password policy (8–200 characters, at most 72 UTF-8
+        bytes; otherwise `VALIDATION_ERROR`). Either way every other link of the
+        address is spent. A username of another account is
+        `VERIFICATION_USERNAME_TAKEN` (the link stays usable); an unknown, expired or
+        used link, or an account no longer pending, is `INVALID_VERIFICATION_TOKEN`.
+        Only an account still pending verification can be activated — never one an
+        administrator has disabled. Rate-limited per client network.
       operationId: verifyEmail
       security: []
-      parameters:
-        - name: token
-          in: query
-          required: true
-          description: The raw verification token from the emailed link.
-          schema:
-            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEmailRequest'
       responses:
         '200':
           description: Verification result
@@ -1937,11 +1960,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/VerifyEmailResponse'
         '400':
-          description: Unknown, expired, or already-used token
+          description: Invalid link, password mismatch, taken username, invalid new credentials or a link too old to set new ones
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /auth/forgot-password:
     post:
       tags:
@@ -5343,7 +5368,7 @@ components:
           format: password
           minLength: 8
           maxLength: 200
-          description: The replacement password. Must meet the minimum-length policy.
+          description: "The replacement password. Password policy — 8–200 characters and at most 72 UTF-8 bytes (VALIDATION_ERROR otherwise)."
       required:
         - currentPassword
         - newPassword
@@ -6667,6 +6692,7 @@ components:
           type: string
           minLength: 8
           maxLength: 200
+          description: "Password policy — 8–200 characters and at most 72 UTF-8 bytes (VALIDATION_ERROR otherwise)."
         displayName:
           type: string
           maxLength: 255
@@ -6686,6 +6712,33 @@ components:
       required:
         - verificationRequired
         - message
+    VerifyEmailRequest:
+      type: object
+      description: |
+        The emailed verification token plus either the password of the registration it
+        belongs to (`setNew` false) or new credentials (`setNew` true).
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 512
+        password:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 200
+        setNew:
+          type: boolean
+          default: false
+          description: Set `password` (and `username`) as new credentials instead of confirming.
+        username:
+          type: string
+          minLength: 3
+          maxLength: 64
+          description: With `setNew`, the username to use (required then).
+      required:
+        - token
+        - password
     VerifyEmailResponse:
       type: object
       properties:
@@ -6714,6 +6767,7 @@ components:
           type: string
           minLength: 8
           maxLength: 200
+          description: "Password policy — 8–200 characters and at most 72 UTF-8 bytes (VALIDATION_ERROR otherwise)."
       required:
         - token
         - newPassword

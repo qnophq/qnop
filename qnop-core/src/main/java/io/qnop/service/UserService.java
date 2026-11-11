@@ -44,6 +44,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class UserService {
 
+  /**
+   * The password-hash value of an account whose credentials are not set yet (issue #900): not a
+   * BCrypt hash, so no password can ever match it.
+   */
+  public static final String PENDING_PASSWORD_PLACEHOLDER = "!pending-email-verification";
+
   /** Instance quotas (issue #673): every path that creates an account checks them. */
   private final InstanceLimitService limits;
 
@@ -62,33 +68,59 @@ public class UserService {
     this.slugs = slugs;
   }
 
-  /** Creates a disabled internal user with the given role, pending email verification. */
+  /**
+   * Creates an internal user with the given role, disabled and pending e-mail verification (issue
+   * #900). The registration's password is not stored on the row: it lives on the registration's
+   * verification token and reaches the row only through a verified link.
+   */
   @Transactional
-  public User createSelfRegistered(
-      String username, String email, String rawPassword, String displayName, UserRole role) {
+  public User createPendingRegistration(
+      String username, String email, String displayName, UserRole role) {
     InvalidTextException.requireNoControlCharacters("displayName", displayName);
     // Self-registration is the one path a stranger can walk (issue #673).
     limits.requireUserCapacity();
-    String name = displayName == null || displayName.isBlank() ? username : displayName;
-    User user =
-        User.internal(name, normalizeEmail(email), username, passwordEncoder.encode(rawPassword));
+    String name = displayNameOrUsername(displayName, username);
+    // The row never holds a registrant's password (issue #900): the credentials live on each
+    // registration's verification token and reach the row only through a verified link. A
+    // placeholder that no password can match keeps the INTERNAL ⇒ credentials invariant.
+    User user = User.internal(name, normalizeEmail(email), username, PENDING_PASSWORD_PLACEHOLDER);
     user.setRole(role);
-    user.setEnabled(false);
+    user.markPendingEmailVerification();
     user.setSlug(slugs.allocate(name));
     return users.save(user);
+  }
+
+  /**
+   * Locks the account row for the rest of the transaction (issue #900). Every verification and
+   * every further registration of a pending address takes this lock first, so they serialise per
+   * address in one consistent order (account row, then its tokens).
+   */
+  @Transactional
+  public void lockForUpdate(UUID id) {
+    users.findByIdForUpdate(id);
+  }
+
+  /**
+   * Locks the account row like {@link #lockForUpdate} and then reports whether it is still pending
+   * verification, read from the database after the lock (issue #900): a verification that committed
+   * while this request waited is seen, not the state loaded before.
+   */
+  @Transactional
+  public boolean lockAndCheckPending(UUID id) {
+    users.findByIdForUpdate(id);
+    return users.isEmailVerificationPending(id);
+  }
+
+  /** An internal user by exact username, if one exists. */
+  @Transactional(readOnly = true)
+  public Optional<User> findInternalByUsername(String username) {
+    return users.findByUsernameAndSource(username, UserSource.INTERNAL);
   }
 
   /** An internal user by case-insensitive email, if one exists. */
   @Transactional(readOnly = true)
   public Optional<User> findInternalByEmail(String email) {
     return users.findByEmailIgnoreCaseAndSource(normalizeEmail(email), UserSource.INTERNAL);
-  }
-
-  /** Whether an internal user already exists with the given username or email. */
-  @Transactional(readOnly = true)
-  public boolean internalUserExists(String username, String email) {
-    return users.existsByEmailIgnoreCaseAndSource(normalizeEmail(email), UserSource.INTERNAL)
-        || users.findByUsernameAndSource(username, UserSource.INTERNAL).isPresent();
   }
 
   @Transactional(readOnly = true)
@@ -123,12 +155,44 @@ public class UserService {
    * The lean, workspace-public slice of a user (issue #454): what any signed-in user may see about
    * a colleague — display name and tenure, nothing more (no email, role or source).
    */
-  /** Activates a user after successful email verification. */
+  /**
+   * Activates an account after a successful e-mail verification (issue #900) with exactly the
+   * credentials of the verified registration — only while the account is still pending. Changes
+   * nothing when it is not (an administrator decided about it, or another link was verified first)
+   * or when the registration's username has meanwhile been taken by another account. The profile
+   * slug follows the verified display name, so an earlier registrant's text does not survive into
+   * the public profile URL (#473). A username claimed concurrently surfaces as the unique index's
+   * {@code DataIntegrityViolationException}.
+   */
   @Transactional
-  public User enable(UUID id) {
+  public ActivationOutcome activateVerifiedRegistration(
+      UUID id, String username, String displayName, String passwordHash) {
+    InvalidTextException.requireNoControlCharacters("displayName", displayName);
+    boolean usernameTaken =
+        users
+            .findByUsernameAndSource(username, UserSource.INTERNAL)
+            .filter(other -> !id.equals(other.getId()))
+            .isPresent();
+    if (usernameTaken) {
+      return ActivationOutcome.USERNAME_TAKEN;
+    }
+    String name = displayNameOrUsername(displayName, username);
+    if (users.activateVerifiedRegistration(id, username, name, passwordHash) != 1) {
+      return ActivationOutcome.NOT_PENDING;
+    }
     User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
-    user.setEnabled(true);
-    return user;
+    String naturalSlug = UserSlugs.candidate(UserSlugs.derive(name), 1);
+    if (!naturalSlug.equalsIgnoreCase(user.getSlug())) {
+      users.updateSlug(id, slugs.allocate(name));
+    }
+    return ActivationOutcome.ACTIVATED;
+  }
+
+  /** The result of {@link #activateVerifiedRegistration}. */
+  public enum ActivationOutcome {
+    ACTIVATED,
+    NOT_PENDING,
+    USERNAME_TAKEN
   }
 
   /**
@@ -179,6 +243,18 @@ public class UserService {
     return users.findByUsernameAndSource(username, UserSource.INTERNAL).isPresent();
   }
 
+  /**
+   * Whether the internal user still has to replace its initial password — {@code false} once it
+   * did, and for a user that no longer exists (bootstrap clean-up, issue #905).
+   */
+  @Transactional(readOnly = true)
+  public boolean internalPasswordChangeStillRequired(String username) {
+    return users
+        .findByUsernameAndSource(username, UserSource.INTERNAL)
+        .map(User::isPasswordChangeRequired)
+        .orElse(false);
+  }
+
   /** Creates an enabled internal {@link UserRole#ADMIN} (used by the first-start bootstrap). */
   @Transactional
   public User createAdmin(
@@ -195,6 +271,10 @@ public class UserService {
     admin.setPasswordChangeRequired(passwordChangeRequired);
     admin.setSlug(slugs.allocate(name));
     return users.save(admin);
+  }
+
+  private static String displayNameOrUsername(String displayName, String username) {
+    return displayName == null || displayName.isBlank() ? username : displayName;
   }
 
   /**

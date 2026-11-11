@@ -44,7 +44,8 @@
       "SELF_LOCKOUT": "Vous ne pouvez ni désactiver votre propre compte ni modifier son rôle.",
       "SELF_DELETE": "Vous ne pouvez pas supprimer votre propre compte.",
       "EMAIL_TAKEN": "Un compte existe déjà avec cette adresse e-mail.",
-      "USERNAME_TAKEN": "Ce nom d’utilisateur est déjà pris."
+      "USERNAME_TAKEN": "Ce nom d’utilisateur est déjà pris.",
+      "USER_PENDING_VERIFICATION": "Ce compte attend encore la confirmation de son adresse e-mail. Envoyez plutôt un lien de réinitialisation du mot de passe — il devient actif dès que son titulaire définit un mot de passe."
     },
     "toasts": {
       "updateFailed": "Impossible de mettre à jour {{name}}.",
@@ -717,6 +718,7 @@
       "auth__registration_verification": "Vérification du compte",
       "auth__password_reset": "Réinitialisation du mot de passe",
       "auth__admin_password_reset": "Réinitialisation du mot de passe par un administrateur",
+      "auth__registration_attempt": "Tentative d’inscription",
       "review__participant_added": "Invitation à une révision",
       "review__daily_digest": "Résumé quotidien des révisions",
       "review__annotation_created": "Nouvelle annotation",

@@ -23,6 +23,7 @@ package io.qnop.service.auth;
 import io.qnop.entity.User;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.PasswordPolicy;
 import io.qnop.service.RefreshTokenService;
 import io.qnop.service.UserService;
 import io.qnop.service.mail.MailLocaleResolver;
@@ -89,7 +90,7 @@ public class PasswordResetFlowService {
     userService
         .findInternalByEmail(email)
         .filter(User::isEnabled)
-        .ifPresent(user -> sendResetEmail(user, MailTemplateKey.PASSWORD_RESET));
+        .ifPresent(this::queueSelfServiceResetEmail);
   }
 
   /**
@@ -100,6 +101,8 @@ public class PasswordResetFlowService {
    */
   @Transactional
   public void reset(String rawToken, String newPassword) {
+    // Before the token is spent, so a password outside the policy does not burn the link.
+    PasswordPolicy.require("newPassword", newPassword);
     User user = resetTokens.consume(rawToken);
     userService.applyPasswordReset(user.getId(), newPassword);
     refreshTokens.revokeAllForUser(user.getId());
@@ -124,21 +127,44 @@ public class PasswordResetFlowService {
   private SetupLinkOutcome sendResetEmail(User user, MailTemplateKey template) {
     String locale = mailLocales.forUser(user.getId());
     var issued = resetTokens.issue(user);
-    String actionUrl =
-        baseUrl()
-            + "/reset-password?token="
-            + URLEncoder.encode(issued.rawToken(), StandardCharsets.UTF_8);
+    String actionUrl = resetUrl(issued.rawToken());
     SendResult result =
         mailService.sendMailFromTemplate(
-            template,
-            user.getEmail(),
-            Map.of(
-                "siteName", siteName(),
-                "recipientName", user.getDisplayName(),
-                "actionUrl", actionUrl,
-                "expiresAtHuman", RelativeTimePhrase.until(issued.expiresAt(), locale)),
-            locale);
+            template, user.getEmail(), resetMailVars(user, actionUrl, issued, locale), locale);
     return new SetupLinkOutcome(result instanceof SendResult.Sent, actionUrl);
+  }
+
+  /**
+   * The self-service request's mail goes out after commit and off the request thread (issue #903):
+   * an SMTP round-trip only on the known-address branch would otherwise tell a caller, by timing
+   * alone, what the uniform 204 is meant to hide.
+   */
+  private void queueSelfServiceResetEmail(User user) {
+    String locale = mailLocales.forUser(user.getId());
+    var issued = resetTokens.issue(user);
+    mailService.sendMailFromTemplateAfterCommit(
+        MailTemplateKey.PASSWORD_RESET,
+        user.getEmail(),
+        resetMailVars(user, resetUrl(issued.rawToken()), issued, locale),
+        locale);
+  }
+
+  private String resetUrl(String rawToken) {
+    return baseUrl()
+        + "/reset-password?token="
+        + URLEncoder.encode(rawToken, StandardCharsets.UTF_8);
+  }
+
+  private Map<String, Object> resetMailVars(
+      User user,
+      String actionUrl,
+      PasswordResetTokenService.IssuedResetToken issued,
+      String locale) {
+    return Map.of(
+        "siteName", siteName(),
+        "recipientName", user.getDisplayName(),
+        "actionUrl", actionUrl,
+        "expiresAtHuman", RelativeTimePhrase.until(issued.expiresAt(), locale));
   }
 
   /** Result of issuing a reset/setup link: whether the email was sent, and the link itself. */

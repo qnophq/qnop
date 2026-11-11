@@ -118,6 +118,37 @@ public enum MailTemplateKey {
       "recipientName",
       "actionUrl",
       "expiresAtHuman"),
+  // Sent instead of a verification mail when a registration collides with an
+  // existing account (issue #900). Neutral on purpose: it goes to the address that
+  // was entered, so the owner of that mailbox learns of the attempt, while the
+  // registration response itself stays uniform. No recipientName — the sender of
+  // the request is not necessarily the account's owner.
+  REGISTRATION_ATTEMPT(
+      "auth.registration_attempt",
+      "Registration attempt",
+      "About your {{siteName}} registration",
+      """
+      Hello,
+
+      Someone asked to create a {{siteName}} account with this email address. No new account was created, because this email address or the chosen username is already in use.
+
+      If you already have an account, sign in here — the sign-in page also lets you reset a forgotten password:
+
+      {{actionUrl}}
+
+      If this wasn't you, you can safely ignore this message; nothing has changed.
+      """,
+      """
+      <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">About your registration</h1>
+      <p style="margin:0 0 14px;">Hello,</p>
+      <p style="margin:0 0 14px;">Someone asked to create a <strong style="color:#18191f;">{{siteName}}</strong> account with this email address. No new account was created, because this email address or the chosen username is already in use.</p>
+      <p style="margin:0 0 14px;">If you already have an account, sign in — the sign-in page also lets you reset a forgotten password.</p>
+      <p style="margin:0;color:#9a9ea8;font-size:13px;">If this wasn't you, you can ignore this email — nothing has changed.</p>
+      """,
+      "Go to sign-in",
+      "No new {{siteName}} account was created for this address.",
+      "siteName",
+      "actionUrl"),
   REVIEW_PARTICIPANT_ADDED(
       "review.participant_added",
       "Review invitation",

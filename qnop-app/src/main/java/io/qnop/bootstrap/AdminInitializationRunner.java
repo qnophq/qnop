@@ -21,15 +21,23 @@
 package io.qnop.bootstrap;
 
 import io.qnop.service.UserService;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -37,17 +45,36 @@ import org.springframework.stereotype.Component;
  * #ADMIN_USERNAME} exists, this runner creates one ({@code role = ADMIN}, {@code
  * password_change_required = true}) and surfaces a one-time credential.
  *
- * <p>The password comes from {@code QNOP_ADMIN_PASSWORD} when set (CI/smoke tests — then no forced
- * change); otherwise it is cryptographically random. A random credential is written to {@code
- * System.err} (bypassing SLF4J, so log forwarders never capture it) and to a {@code 0600} file at
- * {@value #PASSWORD_FILE}; SLF4J only records that bootstrap happened. Idempotent on later starts.
+ * <p>The password comes from {@code QNOP_ADMIN_PASSWORD} when set (automated environments — then no
+ * forced change); a value that fails {@link #checkSuppliedPassword} stops the startup (issue #905).
+ * Otherwise it is cryptographically random. A random credential is written to {@code System.err}
+ * (bypassing SLF4J, so log forwarders never capture it) and to {@value #PASSWORD_FILE_NAME} in a
+ * freshly created, owner-only directory under the temp directory; SLF4J records only that bootstrap
+ * happened and where that file is, never the password.
+ *
+ * <p>The file is written fail-closed (issue #905): the directory is created with a random name and
+ * {@code rwx------} in one step, the file with {@code CREATE_NEW} and {@code rw-------} in one
+ * step, so nothing that existed before — a planted file or a symbolic link — is ever followed or
+ * reused, and there is no window in which the file is readable by others. Wherever that cannot be
+ * guaranteed (a non-POSIX file system, any I/O error) no file is written and the stderr output
+ * remains the only surface. Once the generated password has been changed the file is deleted.
+ * Idempotent on later starts.
  */
 @Component
 public class AdminInitializationRunner implements ApplicationRunner {
 
   static final String ADMIN_USERNAME = "admin";
   static final String ADMIN_DEFAULT_EMAIL = "admin@qnop.local";
-  static final String PASSWORD_FILE = "/tmp/qnop-admin-password.txt";
+  static final String PASSWORD_FILE_NAME = "admin-password.txt";
+  static final String PASSWORD_DIR_PREFIX = "qnop-bootstrap-";
+  static final int MIN_SUPPLIED_PASSWORD_LENGTH = 12;
+
+  /** Rejects long-but-trivial values such as one character repeated (issue #905). */
+  static final int MIN_DISTINCT_CHARACTERS = 8;
+
+  /** BCrypt only looks at the first 72 bytes; anything longer would be silently truncated. */
+  static final int MAX_SUPPLIED_PASSWORD_BYTES = 72;
+
   private static final String ADMIN_PASSWORD_ENV = "QNOP_ADMIN_PASSWORD";
   private static final int GENERATED_PASSWORD_BYTES = 24;
 
@@ -55,9 +82,26 @@ public class AdminInitializationRunner implements ApplicationRunner {
   private static final SecureRandom RANDOM = new SecureRandom();
 
   private final UserService userService;
+  private final Supplier<String> suppliedPassword;
+  private final Path tempRoot;
 
+  /** The password file this instance wrote, until it is removed after the first change. */
+  private volatile Path writtenFile;
+
+  @Autowired
   public AdminInitializationRunner(UserService userService) {
+    this(
+        userService,
+        () -> System.getenv(ADMIN_PASSWORD_ENV),
+        Path.of(System.getProperty("java.io.tmpdir")));
+  }
+
+  /** For tests: the environment value and the directory the private directory is created in. */
+  AdminInitializationRunner(
+      UserService userService, Supplier<String> suppliedPassword, Path tempRoot) {
     this.userService = userService;
+    this.suppliedPassword = suppliedPassword;
+    this.tempRoot = tempRoot;
   }
 
   @Override
@@ -66,7 +110,10 @@ public class AdminInitializationRunner implements ApplicationRunner {
       return;
     }
 
-    String fixedPassword = blankToNull(System.getenv(ADMIN_PASSWORD_ENV));
+    String fixedPassword = blankToNull(suppliedPassword.get());
+    if (fixedPassword != null) {
+      checkSuppliedPassword(fixedPassword);
+    }
     String initialPassword = fixedPassword != null ? fixedPassword : generatePassword();
     boolean passwordChangeRequired = fixedPassword == null;
 
@@ -83,24 +130,126 @@ public class AdminInitializationRunner implements ApplicationRunner {
     }
   }
 
+  /**
+   * Rejects a weak {@code QNOP_ADMIN_PASSWORD} (issue #905). That value is a long-lived ADMIN
+   * credential with no forced change, so it must be at least {@value #MIN_SUPPLIED_PASSWORD_LENGTH}
+   * characters, at most {@value #MAX_SUPPLIED_PASSWORD_BYTES} UTF-8 bytes (BCrypt's limit), not
+   * contain the admin username, use at least {@value #MIN_DISTINCT_CHARACTERS} different
+   * characters, and either mix three character classes (lower case, upper case, digits, other) or
+   * be a passphrase of 20 characters or more. Fails the startup with a message that never echoes
+   * the value.
+   */
+  static void checkSuppliedPassword(String password) {
+    String problem = weaknessOf(password);
+    if (problem != null) {
+      throw new IllegalStateException(
+          ADMIN_PASSWORD_ENV
+              + " is too weak: "
+              + problem
+              + ". Choose a stronger value or unset it.");
+    }
+  }
+
+  private static String weaknessOf(String password) {
+    if (password.length() < MIN_SUPPLIED_PASSWORD_LENGTH) {
+      return "it must be at least " + MIN_SUPPLIED_PASSWORD_LENGTH + " characters long";
+    }
+    if (password.getBytes(StandardCharsets.UTF_8).length > MAX_SUPPLIED_PASSWORD_BYTES) {
+      return "it must be at most " + MAX_SUPPLIED_PASSWORD_BYTES + " bytes long";
+    }
+    if (password.toLowerCase(java.util.Locale.ROOT).contains(ADMIN_USERNAME)) {
+      return "it must not contain the username";
+    }
+    if (password.chars().distinct().count() < MIN_DISTINCT_CHARACTERS) {
+      return "it must contain at least " + MIN_DISTINCT_CHARACTERS + " different characters";
+    }
+    if (characterClasses(password) < 3 && password.length() < 20) {
+      return "it must mix at least three of lower case, upper case, digits and symbols"
+          + " (or be 20 characters or longer)";
+    }
+    return null;
+  }
+
+  private static int characterClasses(String password) {
+    boolean lower = password.chars().anyMatch(Character::isLowerCase);
+    boolean upper = password.chars().anyMatch(Character::isUpperCase);
+    boolean digit = password.chars().anyMatch(Character::isDigit);
+    boolean other = password.chars().anyMatch(c -> !Character.isLetterOrDigit(c));
+    return (lower ? 1 : 0) + (upper ? 1 : 0) + (digit ? 1 : 0) + (other ? 1 : 0);
+  }
+
   private void surfaceGeneratedPassword(String password) {
+    Path file = writePasswordFile(password);
+    writtenFile = file;
     System.err.printf(
-        "%n=== qnop initial admin ===%nusername: %s%npassword: %s%n"
-            + "Change it on first login. Also written to %s (0600).%n================================%n",
-        ADMIN_USERNAME, password, PASSWORD_FILE);
+        "%n=== qnop initial admin ===%nusername: %s%npassword: %s%nChange it on first login.%s%n"
+            + "================================%n",
+        ADMIN_USERNAME, password, file == null ? "" : " Also written to " + file + " (0600).");
+    if (file != null) {
+      log.info("Initial admin password written to {} (owner-only).", file);
+    }
+  }
+
+  /**
+   * Removes the password file once the bootstrap admin has replaced the generated password (issue
+   * #905): from then on it is a stale copy of a dead credential and only an exposure. Checked every
+   * minute while this instance holds such a file; a no-op otherwise.
+   */
+  @Scheduled(fixedDelayString = "PT1M", initialDelayString = "PT1M")
+  public void removePasswordFileOnceChanged() {
+    Path file = writtenFile;
+    if (file == null || userService.internalPasswordChangeStillRequired(ADMIN_USERNAME)) {
+      return;
+    }
+    writtenFile = null;
+    deleteQuietly(file.getParent());
+    log.info("Removed the initial admin password file: the password has been changed.");
+  }
+
+  /**
+   * Writes the credential into a new owner-only directory, or returns {@code null} without leaving
+   * anything behind when that cannot be done safely.
+   */
+  Path writePasswordFile(String password) {
+    Path dir = null;
     try {
-      Path file = Path.of(PASSWORD_FILE);
-      Files.writeString(file, "username=" + ADMIN_USERNAME + "\npassword=" + password + "\n");
-      try {
-        Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rw-------"));
-      } catch (UnsupportedOperationException ignored) {
-        // Non-POSIX filesystem: the stderr surface above is the fallback.
+      dir =
+          Files.createTempDirectory(
+              tempRoot,
+              PASSWORD_DIR_PREFIX,
+              PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+      Path file = dir.resolve(PASSWORD_FILE_NAME);
+      byte[] content =
+          ("username=" + ADMIN_USERNAME + "\npassword=" + password + "\n")
+              .getBytes(StandardCharsets.UTF_8);
+      try (OutputStream out =
+          Files.newOutputStream(
+              Files.createFile(
+                  file,
+                  PosixFilePermissions.asFileAttribute(
+                      PosixFilePermissions.fromString("rw-------"))),
+              StandardOpenOption.WRITE,
+              LinkOption.NOFOLLOW_LINKS)) {
+        out.write(content);
       }
-    } catch (Exception e) {
-      log.warn(
-          "Could not write the initial admin password file at {}: {}",
-          PASSWORD_FILE,
-          e.getMessage());
+      return file;
+    } catch (UnsupportedOperationException | IOException | SecurityException e) {
+      // Non-POSIX file system or any I/O problem: fail closed — stderr stays the only surface.
+      log.warn("Not writing the initial admin password file: {}", e.getMessage());
+      deleteQuietly(dir);
+      return null;
+    }
+  }
+
+  private static void deleteQuietly(Path dir) {
+    if (dir == null) {
+      return;
+    }
+    try {
+      Files.deleteIfExists(dir.resolve(PASSWORD_FILE_NAME));
+      Files.deleteIfExists(dir);
+    } catch (IOException e) {
+      log.warn("Could not remove {}: {}", dir, e.getMessage());
     }
   }
 

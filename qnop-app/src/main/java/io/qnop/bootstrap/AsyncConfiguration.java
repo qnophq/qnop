@@ -67,6 +67,68 @@ public class AsyncConfiguration {
   }
 
   /**
+   * Sends the account mails of the anti-enumeration flows (registration, password-reset request)
+   * after commit and off the request thread (issue #903), so how long a request took no longer
+   * tells whether an address is known.
+   *
+   * <p>A full queue drops the mail with a WARN instead of running it on the caller: running it
+   * there would put the SMTP round-trip back into exactly the requests whose timing must not vary.
+   * A dropped mail is recoverable (the user asks again), and a flood that fills 500 slots is
+   * throttled by the per-IP limits anyway. On shutdown queued mails are still delivered (bounded
+   * wait). The request's diagnostic context (MDC) travels with each task, so a failed send can be
+   * correlated with its request even though the address is never logged (issue #659).
+   */
+  @Bean(name = "mailDispatchExecutor")
+  @ConditionalOnProperty(
+      name = "qnop.notifications.sync-dispatch",
+      havingValue = "false",
+      matchIfMissing = true)
+  public ThreadPoolTaskExecutor mailDispatchExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setThreadNamePrefix("mail-dispatch-");
+    executor.setCorePoolSize(1);
+    executor.setMaxPoolSize(2);
+    executor.setQueueCapacity(500);
+    executor.setTaskDecorator(AsyncConfiguration::withCallerMdc);
+    executor.setRejectedExecutionHandler(
+        (task, pool) ->
+            org.slf4j.LoggerFactory.getLogger(AsyncConfiguration.class)
+                .warn("mail-dispatch queue full; dropping one account mail"));
+    executor.setWaitForTasksToCompleteOnShutdown(true);
+    executor.setAwaitTerminationSeconds(30);
+    return executor;
+  }
+
+  /** Runs {@code task} with the submitting thread's MDC, restoring the worker's afterwards. */
+  static Runnable withCallerMdc(Runnable task) {
+    java.util.Map<String, String> callerContext = org.slf4j.MDC.getCopyOfContextMap();
+    return () -> {
+      java.util.Map<String, String> previous = org.slf4j.MDC.getCopyOfContextMap();
+      setMdc(callerContext);
+      try {
+        task.run();
+      } finally {
+        setMdc(previous);
+      }
+    };
+  }
+
+  private static void setMdc(java.util.Map<String, String> context) {
+    if (context == null) {
+      org.slf4j.MDC.clear();
+    } else {
+      org.slf4j.MDC.setContextMap(context);
+    }
+  }
+
+  /** Synchronous variant for integration tests (same switch as the review notifications). */
+  @Bean(name = "mailDispatchExecutor")
+  @ConditionalOnProperty(name = "qnop.notifications.sync-dispatch", havingValue = "true")
+  public TaskExecutor syncMailDispatchExecutor() {
+    return new SyncTaskExecutor();
+  }
+
+  /**
    * Dispatches the published event stream (issue #685, ADR-0059). Bounded, and full means DROP
    * (warn-logged) rather than CallerRuns: an extension's slow listener must never be able to slow
    * the committing request thread — delivery is best-effort by contract, and a consumer needing

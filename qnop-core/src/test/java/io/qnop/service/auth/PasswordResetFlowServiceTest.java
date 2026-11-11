@@ -89,7 +89,9 @@ class PasswordResetFlowServiceTest {
   }
 
   @Test
-  @DisplayName("requestReset issues a token and emails the link for an enabled local account")
+  @DisplayName(
+      "requestReset issues a token and queues the link mail for after the commit (#903),"
+          + " never sending it inside the request")
   void requestResetEnabled() {
     User user = User.internal("Jane", "jane@example.com", "jane", "hash");
     when(settings.getBoolean(ApplicationSettingKey.AUTH_PASSWORD_RESET_ENABLED)).thenReturn(true);
@@ -100,9 +102,14 @@ class PasswordResetFlowServiceTest {
 
     service.requestReset("jane@example.com");
 
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
     verify(mailService)
-        .sendMailFromTemplate(
-            eq(MailTemplateKey.PASSWORD_RESET), eq("jane@example.com"), anyMap(), eq("en"));
+        .sendMailFromTemplateAfterCommit(
+            eq(MailTemplateKey.PASSWORD_RESET), eq("jane@example.com"), vars.capture(), eq("en"));
+    verify(mailService, never()).sendMailFromTemplate(any(), any(), anyMap(), any());
+    assertThat(vars.getValue().keySet()).containsAll(MailTemplateKey.PASSWORD_RESET.placeholders());
+    assertThat(vars.getValue().get("actionUrl").toString()).endsWith("/reset-password?token=RAW");
   }
 
   @Test
@@ -146,6 +153,22 @@ class PasswordResetFlowServiceTest {
   }
 
   @Test
+  @DisplayName(
+      "requestReset stays silent for an account pending verification — a reset link must not"
+          + " become a way around confirming the address (#900)")
+  void requestResetPendingUser() {
+    User user = User.internal("Jane", "jane@example.com", "jane", "hash");
+    user.markPendingEmailVerification();
+    when(settings.getBoolean(ApplicationSettingKey.AUTH_PASSWORD_RESET_ENABLED)).thenReturn(true);
+    when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(user));
+
+    service.requestReset("jane@example.com");
+
+    verify(resetTokens, never()).issue(any());
+    verify(mailService, never()).sendMailFromTemplateAfterCommit(any(), any(), anyMap(), any());
+  }
+
+  @Test
   @DisplayName("reset consumes the token, applies the new password and ends every session (#897)")
   void resetApplies() {
     User user = User.internal("Jane", "jane@example.com", "jane", "hash");
@@ -169,5 +192,14 @@ class PasswordResetFlowServiceTest {
     assertThatThrownBy(() -> service.reset("bad", "new-password"))
         .isInstanceOf(PasswordResetTokenService.InvalidPasswordResetTokenException.class);
     verify(refreshTokens, never()).revokeAllForUser(any());
+  }
+
+  @Test
+  @DisplayName(
+      "reset applies the password policy before the token is spent, including the 72-byte limit")
+  void resetAppliesThePolicy() {
+    assertThatThrownBy(() -> service.reset("tok", "ä".repeat(36) + "x"))
+        .isInstanceOf(io.qnop.service.InvalidTextException.class);
+    verify(resetTokens, never()).consume(any());
   }
 }

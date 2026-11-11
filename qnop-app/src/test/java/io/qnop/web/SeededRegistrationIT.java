@@ -20,7 +20,6 @@
  */
 package io.qnop.web;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -54,7 +53,10 @@ class SeededRegistrationIT extends SeededIntegrationTest {
   @Test
   void verifyEmailRejectsAnUnknownToken() throws Exception {
     mockMvc
-        .perform(get(VERIFY).param("token", "does-not-exist"))
+        .perform(
+            post(VERIFY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"does-not-exist\",\"password\":\"whatever-1\"}"))
         .andExpect(status().isBadRequest());
   }
 }
