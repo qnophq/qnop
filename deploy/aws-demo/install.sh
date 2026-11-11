@@ -3,8 +3,9 @@
 #
 # Idempotent installer for the qnop demo host. Run as root (user-data does).
 #
-# - copies the demo stack to /opt/qnop-demo (scripts + compose, never .env
-#   or golden/, so re-running after a `git pull` only refreshes the code)
+# - copies the demo stack to /opt/qnop-demo (scripts + compose + the seed
+#   dataset, never .env or golden/, so re-running after a `git pull` only
+#   refreshes the code)
 # - generates /opt/qnop-demo/.env with random secrets on first run
 # - installs the 12-hourly reset cron job
 # - starts (or updates) the stack
@@ -13,9 +14,13 @@ set -euo pipefail
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST=/opt/qnop-demo
 
-mkdir -p "$DEST/golden"
-install -m 0755 "$SRC/reset-demo.sh" "$SRC/build-golden-state.sh" "$SRC/stage-demo-settings.sh" "$DEST/"
+mkdir -p "$DEST/golden" "$DEST/seed"
+install -m 0755 "$SRC/reset-demo.sh" "$SRC/build-golden-state.sh" "$SRC/seed-demo.sh" \
+  "$SRC/stage-demo-settings.sh" "$DEST/"
 install -m 0644 "$SRC/docker-compose.yml" "$SRC/Caddyfile" "$DEST/"
+# The shared dataset seed-demo.sh loads (rotating the admin credential in the
+# same transaction, issue #924).
+install -m 0644 "$SRC/../../testdata/db/clean.sql" "$SRC/../../testdata/db/seed.sql" "$DEST/seed/"
 
 if [ ! -f "$DEST/.env" ]; then
   umask 077
@@ -55,4 +60,4 @@ chmod 0644 /etc/cron.d/qnop-demo-reset
 cd "$DEST"
 docker compose pull
 docker compose up -d
-echo "qnop demo stack is up. Next: stage the demo content, then run build-golden-state.sh"
+echo "qnop demo stack is up. Next: seed-demo.sh, stage-demo-settings.sh, then build-golden-state.sh"
