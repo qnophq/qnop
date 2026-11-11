@@ -22,7 +22,7 @@ Besides the release tags, every green CI build of `main` publishes a snapshot im
 
 ## Environment contract
 
-All configuration is `QNOP_`-prefixed. The server **fails fast at startup** when a required secret is missing or still a placeholder (ADR-0022).
+All configuration is `QNOP_`-prefixed. The server **fails fast at startup** when a required secret is missing or still a placeholder (ADR-0022), and when `QNOP_DB_PASSWORD` / `QNOP_S3_SECRET_KEY` still hold the public local-development defaults (issue #922; only the `dev` profile used by `bootRun` tolerates them — never set `SPRING_PROFILES_ACTIVE=dev` in a deployment).
 
 ### Required
 

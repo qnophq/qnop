@@ -3,7 +3,9 @@
 #
 # All inputs are QNOP_-prefixed (see .env.example); compose maps them onto the
 # variable names the official images mandate (POSTGRES_* / MINIO_*). Credentials
-# are LOCAL DEV ONLY — never reuse them outside local development.
+# are LOCAL DEV ONLY — never reuse them outside local development; every port is
+# published on 127.0.0.1 only, and the server refuses them outside the `dev`
+# profile (issue #922).
 #
 # Usage:  cp .env.example .env  &&  docker compose up -d
 
@@ -15,7 +17,8 @@ services:
       POSTGRES_PASSWORD: ${QNOP_DB_PASSWORD:-qnop}
       POSTGRES_DB: ${QNOP_DB_NAME:-qnop}
     ports:
-      - '${QNOP_DB_PORT:-5432}:5432'
+      # Bound to loopback only (issue #922) — the dev credentials are public.
+      - '127.0.0.1:${QNOP_DB_PORT:-5432}:5432'
     volumes:
       # postgres:18+ stores data under /var/lib/postgresql/<major>/docker and refuses any mount
       # at the legacy /var/lib/postgresql/data — mount the parent instead (issue #407).
@@ -40,8 +43,9 @@ services:
       MINIO_ROOT_USER: ${QNOP_S3_ACCESS_KEY:-qnop}
       MINIO_ROOT_PASSWORD: ${QNOP_S3_SECRET_KEY:-qnop_secret}
     ports:
-      - '${QNOP_S3_PORT:-9000}:9000' # S3 API
-      - '${QNOP_S3_CONSOLE_PORT:-9001}:9001' # web console
+      # Bound to loopback only (issue #922) — the dev credentials are public.
+      - '127.0.0.1:${QNOP_S3_PORT:-9000}:9000' # S3 API
+      - '127.0.0.1:${QNOP_S3_CONSOLE_PORT:-9001}:9001' # web console
     volumes:
       - qnop_miniodata:/data
     healthcheck:

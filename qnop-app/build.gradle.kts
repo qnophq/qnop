@@ -85,6 +85,14 @@ tasks.named<BootRun>("bootRun") {
             }
         }
     }
+    // bootRun is local development by definition, so it runs under the `dev` profile
+    // (application-dev.yml, issue #922): the shipped local DB/S3 credentials are
+    // tolerated and the bundled Keycloak's loopback issuer is reachable. Packaged
+    // jars/images never get this. An explicit SPRING_PROFILES_ACTIVE (shell or .env)
+    // wins.
+    if (!environment.containsKey("SPRING_PROFILES_ACTIVE")) {
+        environment("SPRING_PROFILES_ACTIVE", "dev")
+    }
 }
 
 dependencies {

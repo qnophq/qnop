@@ -6,7 +6,9 @@
 # is NOT a production or local-dev stack — the QNOP_AUTH_* values below are
 # throwaway test secrets that intentionally match the encryption key/salt used to
 # produce testdata/db/seed.sql, so the seeded rows (e.g. the OIDC client secret)
-# stay decryptable. MinIO backs the document-ingest smoke (#308): the server writes
+# stay decryptable. The DB/S3 passwords differ from the local-dev defaults on
+# purpose: the server refuses those outside the `dev` profile (issue #922), and
+# this stack runs the released image's configuration. MinIO backs the document-ingest smoke (#308): the server writes
 # uploads there, the scheduled extraction job reads them back, and the smoke asserts
 # the rendered representation and byte-identical original.
 #
@@ -20,7 +22,7 @@ services:
     image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
     environment:
       POSTGRES_USER: qnop
-      POSTGRES_PASSWORD: qnop
+      POSTGRES_PASSWORD: smoke-test-db-password
       POSTGRES_DB: qnop
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U qnop -d qnop']
@@ -36,7 +38,7 @@ services:
     command: server /data
     environment:
       MINIO_ROOT_USER: qnop
-      MINIO_ROOT_PASSWORD: qnop_secret
+      MINIO_ROOT_PASSWORD: smoke-test-s3-secret
     healthcheck:
       test: ['CMD', 'mc', 'ready', 'local']
       interval: 5s
@@ -57,14 +59,14 @@ services:
       QNOP_DB_PORT: '5432'
       QNOP_DB_NAME: qnop
       QNOP_DB_USERNAME: qnop
-      QNOP_DB_PASSWORD: qnop
+      QNOP_DB_PASSWORD: smoke-test-db-password
       # Object storage (issue #308): point at the MinIO service and let the app
       # create the bucket on first use — the deployed ingest → extraction → serve
       # path runs against real S3-compatible storage in the smoke.
       QNOP_S3_ENDPOINT: http://minio:9000
       QNOP_S3_BUCKET: qnop-documents
       QNOP_S3_ACCESS_KEY: qnop
-      QNOP_S3_SECRET_KEY: qnop_secret
+      QNOP_S3_SECRET_KEY: smoke-test-s3-secret
       QNOP_S3_PATH_STYLE_ACCESS: 'true'
       QNOP_S3_AUTO_CREATE_BUCKET: 'true'
       # Test-only secrets — must match testdata/db/seed.sql's encryption inputs.

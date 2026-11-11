@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# LOCAL DEVELOPMENT ONLY (issue #922). Active under the `dev` profile, which
+# `./gradlew :qnop-app:bootRun` switches on by default; a released jar or image
+# never activates it on its own. Never set SPRING_PROFILES_ACTIVE=dev in a
+# deployment.
+#
+# Under this profile:
+#   - the shipped local DB/S3 credentials (QNOP_DB_PASSWORD=qnop,
+#     QNOP_S3_SECRET_KEY=qnop_secret) are tolerated instead of failing startup
+#     (DefaultCredentialsGuard);
+#   - OIDC discovery against a private/loopback issuer is allowed, so the bundled
+#     Keycloak (`docker compose --profile keycloak up -d`, http://localhost:8081)
+#     works out of the box. Override with QNOP_AUTH_OIDC_ALLOW_PRIVATE_DISCOVERY_URIS=false.
+qnop:
+  auth:
+    oidc:
+      allow-private-discovery-uris: ${QNOP_AUTH_OIDC_ALLOW_PRIVATE_DISCOVERY_URIS:true}

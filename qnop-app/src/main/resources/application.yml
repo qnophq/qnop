@@ -5,7 +5,9 @@
 # docker-compose maps the same QNOP_DB_* onto the image-mandated POSTGRES_*, so a
 # single .env drives both the DB container and the app. Defaults target the local
 # docker-compose Postgres; production may override with the standard
-# SPRING_DATASOURCE_* keys.
+# SPRING_DATASOURCE_* keys. The DB/S3 credential fallbacks below are the public
+# local-dev values; DefaultCredentialsGuard refuses them outside the `dev`
+# profile (issue #922).
 # Logging (issue #659, ADR-0054). Two things are configured here and nothing else
 # is: what identifies a line, and in which shape it is written.
 #
@@ -136,8 +138,8 @@ qnop:
     encryption-salt: ${QNOP_AUTH_ENCRYPTION_SALT:CHANGE_ME}
     # OIDC discovery against a private/loopback issuer (e.g. a local Keycloak on
     # http://localhost) is blocked by default as an SSRF guard (issue #21). The
-    # local-dev .env turns this on so the bundled Keycloak works out of the box.
-    # NEVER enable in production.
+    # `dev` profile (application-dev.yml, active under bootRun) turns this on so the
+    # bundled Keycloak works out of the box (issue #922). NEVER enable in production.
     oidc:
       allow-private-discovery-uris: ${QNOP_AUTH_OIDC_ALLOW_PRIVATE_DISCOVERY_URIS:false}
       # Post-OIDC-login redirect base (issue #178). Blank → same-origin relative redirects
@@ -162,8 +164,9 @@ qnop:
   #   *_MAX_CANDIDATES (64), *_QUOTE_WEIGHT (0.7), *_CONTEXT_WEIGHT (0.3)
   # Object storage for binary documents (issue #243, ADR-0005). Defaults target the
   # docker-compose MinIO; leave `endpoint` blank to target real AWS S3 (SaaS). The
-  # access/secret keys are storage credentials, not crypto secrets, so short local
-  # MinIO values are fine. `auto-create-bucket` is on for local dev / an empty MinIO;
+  # access/secret keys are storage credentials, not crypto secrets, so short values
+  # are fine — but the shipped secret-key fallback is refused outside the `dev`
+  # profile (issue #922). `auto-create-bucket` is on for local dev / an empty MinIO;
   # real S3 buckets are pre-provisioned, so set it false in production.
   s3:
     endpoint: ${QNOP_S3_ENDPOINT:}
