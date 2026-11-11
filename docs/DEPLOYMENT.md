@@ -93,6 +93,7 @@ Generate a new key (`openssl rand -base64 48`; optionally a new salt with `opens
 | `QNOP_AUTH_RATELIMIT_TRUSTEDPROXYCIDRS` | *(empty)* | Comma-separated CIDRs of your reverse proxies; see [Behind a reverse proxy](#behind-a-reverse-proxy) |
 | `QNOP_HTTP_SHUTDOWN_GRACE` | `30s` | Graceful-shutdown drain window (align your orchestrator's stop grace period) |
 | `QNOP_ATTACHMENTS_MAX_IMAGE_MEGAPIXELS` | `50` | Image attachments larger than this (or 32768 px per side), or whose size cannot be read, are stored download-only: linked, never shown inline or embedded in exports |
+| `QNOP_HTTP_CLIENT_PROXY_HOST` / `_PORT` / `_NON_PROXY_HOSTS` | *(unset)* | Explicit egress proxy for OIDC and usage-tracking requests — a weaker mode; see [Outbound proxy](#outbound-proxy-oidc-and-usage-tracking) |
 | `QNOP_AUTH_OIDC_FRONTEND_BASE_URL` | *(empty)* | Public base URL the OIDC login flow redirects back to, when it differs from the request origin |
 
 SMTP for e-mail notifications (verification, reset, review events) is configured at runtime under **Administration → Settings**, not via environment.
@@ -201,6 +202,27 @@ Usage tracking is off by default and configured under *Administration → Settin
   - **Umami, Plausible and PostHog** read the forwarded address as part of their documented proxy setups; check the visitor counts on your instance after enabling.
   - **Pirsch** — known limitation: its identification-code endpoints are designed to be called from the browser, and its documented proxy setups use a server-side API client instead. Through qnop, Pirsch may attribute every visitor to qnop's address. A server-side access-token mode is tracked in issue #944; until then, prefer another backend if unique-visitor counts matter.
 - **PostHog region.** An empty host means PostHog's US cloud. For an EU project set `tracking.host` to `https://eu.i.posthog.com`. Unique-user counts in PostHog are per page load by design (no persistent id is kept), so read page views and events rather than "unique users".
+
+## Outbound proxy (OIDC and usage tracking)
+
+qnop's requests to OIDC providers (discovery, token, user-info, JWK set) and to the usage-tracking backend go through SSRF-guarded clients (ADR-0056): they resolve the destination themselves, refuse private/loopback/metadata addresses (unless `QNOP_AUTH_OIDC_ALLOW_PRIVATE_DISCOVERY_URIS` / `QNOP_TRACKING_ALLOW_PRIVATE_HOST` allow them), and connect only to the address they checked. They **ignore** the JVM proxy settings (`-Dhttps.proxyHost`, `-Dhttp.proxyHost`, `-Dhttp.nonProxyHosts`).
+
+If those destinations are reachable only through a mandatory egress proxy, opt in explicitly (deployment configuration only — there is no admin-UI setting for this):
+
+| Variable | Property | Meaning |
+|----------|----------|---------|
+| `QNOP_HTTP_CLIENT_PROXY_HOST` | `qnop.http-client.proxy.host` | Proxy host name or IP literal. Unset = direct connections (the default). |
+| `QNOP_HTTP_CLIENT_PROXY_PORT` | `qnop.http-client.proxy.port` | Proxy port; required with the host. |
+| `QNOP_HTTP_CLIENT_PROXY_NON_PROXY_HOSTS` | `qnop.http-client.proxy.non-proxy-hosts` | Comma-separated destinations that stay direct: exact host names (`idp.corp.example`) or `*.suffix` (`*.internal.corp.example`, subdomains only). Case-insensitive. |
+
+The proxy is spoken to over plain HTTP (`CONNECT` tunnels for `https://` destinations, so TLS to the IdP is end-to-end). **Proxy authentication is not supported.** A misconfiguration (host without port, port without host, a host with a scheme or path, an invalid non-proxy entry) stops the server at startup. When proxy mode is active, the server logs one `WARN` line naming the proxy's `host:port`.
+
+**This is a weaker mode — understand the trade-off:**
+
+- For proxied destinations qnop no longer sees the address it connects to: the proxy resolves the name. The connection-time address check cannot apply. qnop still applies the lexical check on every request (no `localhost`/`*.local`/`*.internal`, no private, loopback or metadata IP literals, no non-canonical numeric hosts), but a public-looking name that resolves to an internal address is **not** caught by qnop.
+- **The proxy's egress ACL becomes the remaining control.** Configure it to refuse internal ranges and cloud metadata addresses (`169.254.169.254`, `fd00:ec2::254`, …) for qnop's traffic, ideally to allow only your IdP and analytics hosts.
+- Destinations in the non-proxy list keep the full guard (resolved by qnop, every address checked, connection pinned). Prefer listing internal IdPs there over sending them through the proxy.
+- The proxy host itself is trusted configuration and is exempt from the address checks (it usually lives on a private network).
 
 ## Upgrades
 

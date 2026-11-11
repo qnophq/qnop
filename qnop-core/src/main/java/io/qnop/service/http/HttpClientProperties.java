@@ -21,6 +21,9 @@
 package io.qnop.service.http;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -36,6 +39,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *       usage-tracking proxy, issue #904) and, as JDK {@code HttpURLConnection} defaults, any
  *       remaining legacy client.
  *   <li>{@code smtp*} — the SMTP transport connect/read/write timeouts for outgoing mail.
+ *   <li>{@code proxy.*} — the explicit outbound proxy opt-in for the guarded clients (issue #940,
+ *       ADR-0056 amendment); unset by default, which means direct connections.
  * </ul>
  *
  * @param outboundConnectTimeout TCP-connect ceiling for outbound HTTP (default 5s)
@@ -43,6 +48,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param smtpConnectTimeout SMTP connect ceiling (default 10s)
  * @param smtpReadTimeout SMTP read ceiling (default 30s)
  * @param smtpWriteTimeout SMTP write ceiling (default 30s)
+ * @param proxy the outbound proxy for the guarded clients (default: none, direct connections)
  */
 @ConfigurationProperties(prefix = "qnop.http-client")
 public record HttpClientProperties(
@@ -50,7 +56,8 @@ public record HttpClientProperties(
     Duration outboundReadTimeout,
     Duration smtpConnectTimeout,
     Duration smtpReadTimeout,
-    Duration smtpWriteTimeout) {
+    Duration smtpWriteTimeout,
+    Proxy proxy) {
 
   public HttpClientProperties {
     outboundConnectTimeout = orDefault(outboundConnectTimeout, Duration.ofSeconds(5));
@@ -58,9 +65,114 @@ public record HttpClientProperties(
     smtpConnectTimeout = orDefault(smtpConnectTimeout, Duration.ofSeconds(10));
     smtpReadTimeout = orDefault(smtpReadTimeout, Duration.ofSeconds(30));
     smtpWriteTimeout = orDefault(smtpWriteTimeout, Duration.ofSeconds(30));
+    proxy = proxy == null ? Proxy.NONE : proxy;
   }
 
   private static Duration orDefault(Duration value, Duration fallback) {
     return value == null ? fallback : value;
+  }
+
+  /**
+   * The explicit outbound HTTP proxy for the SSRF-guarded clients (issue #940, ADR-0056 amendment)
+   * — {@code qnop.http-client.proxy.*}.
+   *
+   * <p>A <em>deployment</em> property only: it is never an application setting, so nobody can route
+   * the guarded clients through a host of their choosing from the web UI. The JVM proxy system
+   * properties ({@code http.proxyHost}, {@code https.proxyHost}, {@code http.nonProxyHosts}) stay
+   * ignored; there is no implicit opt-in.
+   *
+   * <p>Unset {@code host} means direct connections (the default). When set, {@code port} is
+   * required. The proxy is spoken to over plain HTTP ({@code CONNECT} for https destinations);
+   * proxy authentication is not supported.
+   *
+   * @param host the proxy host name or IP literal; blank/unset disables proxy mode
+   * @param port the proxy port (1–65535), required with {@code host}
+   * @param nonProxyHosts destinations that bypass the proxy and keep the full direct, address-
+   *     pinned guard: an exact host name ({@code idp.corp.example}) or a leading-wildcard suffix
+   *     ({@code *.corp.example}, matching any subdomain); case-insensitive
+   */
+  public record Proxy(String host, Integer port, List<String> nonProxyHosts) {
+
+    /** No proxy: the guarded clients connect directly. */
+    public static final Proxy NONE = new Proxy(null, null, null);
+
+    /** A host name or IP literal (IPv6 without brackets); no scheme, port, path or credentials. */
+    private static final Pattern HOST =
+        Pattern.compile("[A-Za-z0-9.-]+|[0-9A-Fa-f.]*:[0-9A-Fa-f.]*:[0-9A-Fa-f:.]*");
+
+    /** An exact host name, or {@code *.} followed by a domain suffix. */
+    private static final Pattern NON_PROXY_ENTRY = Pattern.compile("(\\*\\.)?[a-z0-9._:-]+");
+
+    public Proxy {
+      host = host == null || host.isBlank() ? null : host.trim();
+      nonProxyHosts =
+          nonProxyHosts == null
+              ? List.of()
+              : nonProxyHosts.stream()
+                  .filter(entry -> entry != null && !entry.isBlank())
+                  .map(entry -> entry.trim().toLowerCase(Locale.ROOT))
+                  .toList();
+      validate(host, port, nonProxyHosts);
+    }
+
+    private static void validate(String host, Integer port, List<String> nonProxyHosts) {
+      if (host == null) {
+        if (port != null || !nonProxyHosts.isEmpty()) {
+          throw new IllegalArgumentException(
+              "qnop.http-client.proxy.port/non-proxy-hosts are set but"
+                  + " qnop.http-client.proxy.host is not");
+        }
+        return;
+      }
+      if (!HOST.matcher(host).matches()) {
+        throw new IllegalArgumentException(
+            "qnop.http-client.proxy.host must be a bare host name or IP literal"
+                + " (no scheme, port, path or credentials)");
+      }
+      if (port == null || port < 1 || port > 65535) {
+        throw new IllegalArgumentException(
+            "qnop.http-client.proxy.port must be set to 1-65535 when"
+                + " qnop.http-client.proxy.host is set");
+      }
+      for (String entry : nonProxyHosts) {
+        if (!NON_PROXY_ENTRY.matcher(entry).matches()) {
+          throw new IllegalArgumentException(
+              "qnop.http-client.proxy.non-proxy-hosts entry is not a host name or *.suffix: "
+                  + entry);
+        }
+      }
+    }
+
+    /** Whether proxy mode is active. */
+    public boolean enabled() {
+      return host != null;
+    }
+
+    /**
+     * Whether {@code targetHost} bypasses the proxy (and therefore keeps the full direct guard).
+     */
+    public boolean bypasses(String targetHost) {
+      if (targetHost == null) {
+        return false;
+      }
+      String target = normalize(targetHost);
+      for (String entry : nonProxyHosts) {
+        if (entry.startsWith("*.")
+            ? target.endsWith(entry.substring(1))
+            : target.equals(normalize(entry))) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /** Lower-cases and strips IPv6 brackets and a single trailing root dot. */
+    private static String normalize(String host) {
+      String h = host.toLowerCase(Locale.ROOT);
+      if (h.startsWith("[") && h.endsWith("]")) {
+        h = h.substring(1, h.length() - 1);
+      }
+      return h.endsWith(".") ? h.substring(0, h.length() - 1) : h;
+    }
   }
 }

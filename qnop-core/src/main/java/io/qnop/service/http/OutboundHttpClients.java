@@ -28,6 +28,7 @@ import org.apache.hc.client5.http.classic.ExecChainHandler;
 import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.http.ClassicHttpResponse;
@@ -48,7 +49,10 @@ import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
  *       connected to (no DNS-rebinding window);
  *   <li>never follows redirects — a 3xx is returned to the caller as-is, so a redirect cannot lead
  *       to a destination nobody validated;
- *   <li>ignores proxy system properties — a proxy would resolve the name itself, outside the guard;
+ *   <li>ignores proxy system properties — a proxy would resolve the name itself, outside the guard.
+ *       Only the explicit deployment opt-in {@code qnop.http-client.proxy.*} routes through a proxy
+ *       (issue #940), and then under the weaker model documented on {@link
+ *       OutboundProxyRoutePlanner};
  *   <li>is bounded in time: the configured connect/read timeouts, and a connection-pool lease wait
  *       no longer than the connect timeout, so a slow backend cannot queue request threads behind a
  *       full pool;
@@ -80,6 +84,34 @@ public final class OutboundHttpClients {
   /** A guarded Apache client resolving through {@code resolver} (tests inject one). */
   public static CloseableHttpClient create(
       HttpClientProperties properties, boolean allowPrivate, HostResolver resolver) {
+    return create(properties, allowPrivate, resolver, HostResolver.SYSTEM);
+  }
+
+  /**
+   * A guarded Apache client resolving destinations through {@code resolver} and, in proxy mode, the
+   * proxy host through {@code proxyResolver} (tests inject both).
+   */
+  static CloseableHttpClient create(
+      HttpClientProperties properties,
+      boolean allowPrivate,
+      HostResolver resolver,
+      HostResolver proxyResolver) {
+    HttpClientBuilder builder = baseBuilder(properties, allowPrivate, resolver);
+    HttpClientProperties.Proxy proxy = properties.proxy();
+    if (proxy.enabled()) {
+      // Proxy mode (issue #940): the weaker trust model is explicit here, not accidental — see
+      // OutboundProxyRoutePlanner. Proxied requests get the lexical guard per request; non-proxy
+      // hosts stay direct and keep the connection-time guard of GuardedDnsResolver.
+      builder
+          .setRoutePlanner(new OutboundProxyRoutePlanner(proxy, proxyResolver))
+          .addExecInterceptorFirst(
+              "proxy-lexical-guard", OutboundProxyRoutePlanner.lexicalGuard(allowPrivate));
+    }
+    return builder.build();
+  }
+
+  private static HttpClientBuilder baseBuilder(
+      HttpClientProperties properties, boolean allowPrivate, HostResolver resolver) {
     return HttpClients.custom()
         .setConnectionManager(
             PoolingHttpClientConnectionManagerBuilder.create()
@@ -97,8 +129,7 @@ public final class OutboundHttpClients {
         .disableContentCompression()
         .disableRedirectHandling()
         .disableAutomaticRetries()
-        .disableCookieManagement()
-        .build();
+        .disableCookieManagement();
   }
 
   /**

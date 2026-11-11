@@ -46,7 +46,7 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 class OidcDiscoveryClientTest {
 
   private static final HttpClientProperties DEFAULTS =
-      new HttpClientProperties(null, null, null, null, null);
+      new HttpClientProperties(null, null, null, null, null, null);
   private static final HostResolver TO_LOOPBACK =
       host -> new InetAddress[] {InetAddress.getLoopbackAddress()};
 

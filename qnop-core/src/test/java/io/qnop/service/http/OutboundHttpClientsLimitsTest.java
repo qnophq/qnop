@@ -54,7 +54,8 @@ import org.junit.jupiter.api.Test;
 class OutboundHttpClientsLimitsTest {
 
   private static final HttpClientProperties SHORT =
-      new HttpClientProperties(Duration.ofMillis(500), Duration.ofMillis(500), null, null, null);
+      new HttpClientProperties(
+          Duration.ofMillis(500), Duration.ofMillis(500), null, null, null, null);
 
   private HttpServer server;
   private ExecutorService serverThreads;
