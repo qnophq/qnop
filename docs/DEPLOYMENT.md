@@ -36,25 +36,48 @@ All configuration is `QNOP_`-prefixed. The server **fails fast at startup** when
 
 Rotating `QNOP_AUTH_JWT_SECRET` invalidates all sessions. The encryption key can be rotated without losing stored secrets — see [Rotating the encryption key](#rotating-the-encryption-key).
 
-### Rotating the encryption key
+`QNOP_AUTH_JWT_SECRET` and `QNOP_AUTH_ENCRYPTION_KEY` must contain **at least 8 distinct characters** besides being ≥ 32 characters long (since #927). Generated secrets (`openssl rand …`) always pass; a degenerate value such as one repeated character now **fails at startup** — check yours before upgrading.
 
-Stored secrets (the SMTP password and other sensitive settings, OIDC client secrets) are encrypted with AES-256-GCM under a key derived from `QNOP_AUTH_ENCRYPTION_KEY` + `QNOP_AUTH_ENCRYPTION_SALT`, and every value records which key wrote it (ADR-0022, amendment #927). Two optional variables are accepted **for decryption only**:
+### Stored secrets at rest
+
+Stored secrets (the SMTP password and other sensitive settings, OIDC client secrets) are encrypted with AES-256-GCM under a key derived from `QNOP_AUTH_ENCRYPTION_KEY` + `QNOP_AUTH_ENCRYPTION_SALT`, and every value records which key wrote it (ADR-0022, amendment #927). Related optional variables:
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` | *(blank)* | The key being rotated out (same strength rule as the current key) |
-| `QNOP_AUTH_ENCRYPTION_SALT_PREVIOUS` | *(blank = same as current salt)* | The salt that belonged to the previous key, if it differed |
+| `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` | *(blank)* | A second key, accepted **for decryption only** — used while rotating (same strength rule as the current key) |
+| `QNOP_AUTH_ENCRYPTION_SALT_PREVIOUS` | *(blank = same as current salt)* | The salt belonging to that second key, if it differs |
+| `QNOP_AUTH_SECRETS_WRITE_FORMAT` | `v2` | `v2`: write the current format and re-encrypt older values on start. `legacy`: keep writing the pre-#927 format and skip the re-encryption (staged upgrades, see below) |
 
-On every start qnop re-encrypts any stored secret that is in the old (pre-#927) format or was written under a key other than the current one, and records a **Secrets re-encrypted** entry in the audit trail. To rotate:
+With `v2`, every start re-encrypts any stored secret that is in the pre-#927 format or was written under a key other than the current one, and records a **Secrets re-encrypted** entry in the audit trail.
 
-1. Generate a new key (`openssl rand -base64 48`; optionally a new salt with `openssl rand -hex 32`).
+If a stored secret cannot be decrypted with any configured key (the old key was dropped too early, or the value was altered), qnop still starts: the secret is treated as **unset**, an error is logged, an OIDC provider with such a secret is not offered for login, and a **Secrets unreadable** audit entry names the setting or OIDC provider (never the value; recorded again only when that list changes). The stored ciphertext is kept, so setting the right key as `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` and restarting recovers it; otherwise an administrator enters the secret again. A failure of the re-encryption pass itself (e.g. a database hiccup) never stops the instance either: it is logged, audited as **Secret re-encryption failed**, and retried on the next start.
+
+### Upgrading to a release with versioned secrets (#927)
+
+Releases before #927 **cannot read** the new format. Once a stored secret has been re-encrypted, an older instance reads it as missing (OIDC logins through that provider fail; an older instance with a stored SMTP password fails at its next startup). Plan the upgrade accordingly:
+
+- **Single instance.** Take a **database backup**, then upgrade as usual. It just works: existing secrets are read in the old format and re-encrypted on the first start. From then on the change is **one-way** — rolling back to an earlier release requires restoring that backup (or re-entering the stored secrets after the rollback).
+- **Several instances (rolling upgrade), or if you want to keep a rollback window:**
+  1. Take a database backup.
+  2. Roll out the new release with `QNOP_AUTH_SECRETS_WRITE_FORMAT=legacy` on **every** instance. New and old instances now write and read the same old format; nothing is re-encrypted, and rolling back is still possible.
+  3. Once no instance of an earlier release is left and you no longer need the rollback, roll out `QNOP_AUTH_SECRETS_WRITE_FORMAT=v2` (or remove the variable). The first instance to start re-encrypts; instances still on `legacy` read the new values fine. From here on, rollback again means restoring the backup.
+
+### Rotating the encryption key
+
+Generate a new key (`openssl rand -base64 48`; optionally a new salt with `openssl rand -hex 32`). Then use one of the two procedures.
+
+**All at once** (you can stop every instance):
+
+1. Stop all instances.
 2. Set `QNOP_AUTH_ENCRYPTION_KEY` (and `QNOP_AUTH_ENCRYPTION_SALT`) to the new values, and move the old values to `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` (and `QNOP_AUTH_ENCRYPTION_SALT_PREVIOUS`, if the salt changed).
-3. Restart **every** instance with that configuration. The first instance to start re-encrypts all stored secrets; the others find nothing to do. Check the audit trail (or the log line `Re-encrypted … under the current encryption key`) and confirm there is no **Secrets unreadable** entry.
-4. Remove the two `*_PREVIOUS` variables and restart again.
+3. Start the instances. The first one re-encrypts all stored secrets; check the audit trail (or the log line `Re-encrypted … under the current encryption key`) and confirm there is no **Secrets unreadable** entry.
+4. Remove the two `*_PREVIOUS` variables and restart.
 
-Upgrading from a release before #927 needs no action: existing secrets are read in their old format and re-encrypted on the first start.
+**Rolling** (no downtime; every phase is a normal rolling restart, finish each before starting the next):
 
-If a stored secret cannot be decrypted with any configured key (the old key was dropped too early, or the value was altered), qnop still starts: the secret is treated as **unset**, an error is logged, and a **Secrets unreadable** audit entry names the setting or OIDC provider (never the value). The stored ciphertext is kept, so setting the right key as `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` and restarting recovers it; otherwise an administrator enters the secret again.
+1. **Introduce the new key as the previous one** — keep `QNOP_AUTH_ENCRYPTION_KEY` = old key, set `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` = new key (and `…_SALT_PREVIOUS` = new salt if it differs). Every instance can now read both keys; nothing is rewritten.
+2. **Swap** — set `QNOP_AUTH_ENCRYPTION_KEY` = new key and `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` = old key (salts likewise). The first restarted instance re-encrypts under the new key; instances still in phase 1 read the new values. Check the audit trail as above.
+3. **Drop the old key** — remove the `*_PREVIOUS` variables.
 
 ### Common optional
 

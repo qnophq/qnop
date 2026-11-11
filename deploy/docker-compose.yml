@@ -36,9 +36,11 @@ services:
       QNOP_AUTH_JWT_SECRET: ${QNOP_AUTH_JWT_SECRET:?generate with `openssl rand -base64 48`}
       QNOP_AUTH_ENCRYPTION_KEY: ${QNOP_AUTH_ENCRYPTION_KEY:?generate with `openssl rand -base64 48`}
       QNOP_AUTH_ENCRYPTION_SALT: ${QNOP_AUTH_ENCRYPTION_SALT:?generate with `openssl rand -hex 32`}
-      # Encryption-key rotation only (docs/DEPLOYMENT.md): the old key/salt, decrypt-only.
+      # Encryption-key rotation only (docs/DEPLOYMENT.md): a second key/salt, decrypt-only.
       QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS: ${QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS:-}
       QNOP_AUTH_ENCRYPTION_SALT_PREVIOUS: ${QNOP_AUTH_ENCRYPTION_SALT_PREVIOUS:-}
+      # Staged upgrade from a pre-#927 release (docs/DEPLOYMENT.md): legacy | v2.
+      QNOP_AUTH_SECRETS_WRITE_FORMAT: ${QNOP_AUTH_SECRETS_WRITE_FORMAT:-v2}
       # Behind a TLS-terminating reverse proxy, uncomment so X-Forwarded-*
       # headers drive scheme/host:
       # QNOP_HTTP_FORWARD_HEADERS_STRATEGY: framework
