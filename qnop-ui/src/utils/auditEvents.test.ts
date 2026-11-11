@@ -78,6 +78,14 @@ describe('auditEventMeta', () => {
     expect(auditEventMeta('review.archived').tone).toBe('neutral');
   });
 
+  it('knows the secrets-at-rest maintenance events, and flags unreadable secrets in red', () => {
+    expect(AUDIT_EVENT_TYPES).toEqual(
+      expect.arrayContaining(['secrets.reencrypted', 'secrets.unreadable']),
+    );
+    expect(english(auditEventMeta('secrets.unreadable').labelKey)).toBe('Secrets unreadable');
+    expect(auditEventMeta('secrets.unreadable').tone).toBe('red');
+  });
+
   it('falls back to the raw type and a neutral tone for an unknown event', () => {
     const meta = auditEventMeta('some.future.event');
     expect(meta.labelKey).toBe('events.fallback.label');

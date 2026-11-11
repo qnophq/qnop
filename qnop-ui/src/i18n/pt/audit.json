@@ -122,6 +122,14 @@
       "label": "Revisões excluídas definitivamente",
       "description": "Revisões arquivadas ultrapassaram o período de retenção para limpeza e foram excluídas permanentemente, junto com os objetos de armazenamento não referenciados por nenhum outro documento (issue #577). Este é o único registro que resta delas — a própria trilha de auditoria delas foi excluída junto; os detalhes listam o que foi removido."
     },
+    "secretsReencrypted": {
+      "label": "Segredos recriptografados",
+      "description": "Segredos armazenados (configurações sensíveis, segredos de cliente OIDC) em um formato antigo ou sob uma chave retirada foram criptografados novamente com a chave atual na inicialização (issue #927). Os detalhes mostram as contagens e o identificador da chave atual — nunca um valor."
+    },
+    "secretsUnreadable": {
+      "label": "Segredos ilegíveis",
+      "description": "Na inicialização, segredos armazenados não puderam ser descriptografados com nenhuma chave configurada e são tratados como não definidos (issue #927). Os detalhes nomeiam as configurações e os provedores OIDC afetados — restaure como chave anterior a chave que os gravou ou informe os segredos novamente."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "Um evento de revisão registrado."

@@ -122,6 +122,14 @@
       "label": "Revisiones depuradas",
       "description": "Unas revisiones archivadas superaron el periodo de conservación para la depuración y se eliminaron de forma permanente, junto con los objetos de almacenamiento a los que no hacía referencia ningún otro documento (issue #577). Este es el único registro que queda de ellas — su propio registro de auditoría se eliminó con ellas; los detalles indican qué se eliminó."
     },
+    "secretsReencrypted": {
+      "label": "Secretos recifrados",
+      "description": "Secretos almacenados (ajustes sensibles, secretos de cliente OIDC) en un formato antiguo o bajo una clave retirada se volvieron a cifrar con la clave actual al arrancar (issue #927). Los detalles indican los recuentos y el identificador de la clave actual, nunca un valor."
+    },
+    "secretsUnreadable": {
+      "label": "Secretos ilegibles",
+      "description": "Al arrancar, algunos secretos almacenados no pudieron descifrarse con ninguna clave configurada y se consideran sin definir (issue #927). Los detalles nombran los ajustes y proveedores OIDC afectados: restaure como clave anterior la clave que los escribió o vuelva a introducir los secretos."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "Un evento de revisión registrado."
