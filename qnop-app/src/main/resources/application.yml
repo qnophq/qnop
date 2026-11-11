@@ -118,9 +118,12 @@ management:
     health:
       probes:
         enabled: true
-      # Anonymous callers (k8s probes) see only UP/DOWN; the job-queue counts and staleness
-      # details are revealed only to an authenticated admin.
+      # Anonymous callers (k8s probes) and non-admin users see only UP/DOWN; the component
+      # status, job-queue counts and staleness details are revealed only to an authenticated
+      # admin (issue #923). `roles` is matched against the ROLE_-prefixed authority the JWT
+      # converter grants, so ADMIN here means ROLE_ADMIN.
       show-details: when_authorized
+      roles: ADMIN
 
 # Security & crypto foundation (issue #10, ADR-0022). Secrets come from the
 # QNOP_AUTH_* environment namespace — no secure default is baked in; the

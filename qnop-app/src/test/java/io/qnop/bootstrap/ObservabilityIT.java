@@ -23,6 +23,7 @@ package io.qnop.bootstrap;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.qnop.testsupport.SeededIntegrationTest;
@@ -31,7 +32,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 /**
  * Actuator observability wiring (issue #348): {@code /actuator/health} is public (probes), the
- * Prometheus scrape is admin-only, and it publishes the job-queue depth gauges.
+ * Prometheus scrape is admin-only, and it publishes the job-queue depth gauges. Health details
+ * (component status, job-queue counts) are reserved to administrators (issue #923): any other
+ * caller, signed in or not, sees the aggregate status only.
  */
 class ObservabilityIT extends SeededIntegrationTest {
 
@@ -43,6 +46,32 @@ class ObservabilityIT extends SeededIntegrationTest {
   @Test
   void healthIsPublic() throws Exception {
     mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
+  }
+
+  @Test
+  void anonymousHealthShowsStatusOnly() throws Exception {
+    mockMvc
+        .perform(get("/actuator/health"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").exists())
+        .andExpect(jsonPath("$.components").doesNotExist());
+  }
+
+  @Test
+  void memberHealthShowsStatusOnly() throws Exception {
+    mockMvc
+        .perform(asUser(get("/actuator/health"), token(MEMBER_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").exists())
+        .andExpect(jsonPath("$.components").doesNotExist());
+  }
+
+  @Test
+  void adminHealthShowsComponentDetails() throws Exception {
+    mockMvc
+        .perform(asUser(get("/actuator/health"), token(ADMIN_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.components.db").exists());
   }
 
   @Test
