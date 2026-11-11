@@ -114,6 +114,7 @@ class ReviewNotificationServiceTest {
             identity),
         new io.qnop.service.mail.MailLocaleResolver(
             userSettings, settings, new io.qnop.service.mail.MailTemplateDefaults()),
+        new ReviewAudience(documents, annotations, comments, participants, users),
         List.of(sinks));
   }
 
@@ -169,6 +170,78 @@ class ReviewNotificationServiceTest {
     service(broken, healthy).dispatch(commentEvent());
 
     assertThat(healthy.types()).containsExactly(NotificationType.MENTION);
+  }
+
+  @Test
+  @DisplayName("a follower who no longer belongs to the review is told nothing (#919)")
+  void formerParticipantIsNotNotified() {
+    seedMentionedFollower();
+    when(participants.existsAccessibleParticipant(DOCUMENT_ID, FOLLOWER_ID)).thenReturn(false);
+    RecordingSink sink = new RecordingSink();
+
+    ReviewNotificationService service = service(sink);
+    service.dispatch(commentEvent());
+    service.dispatch(new ReviewEvent.AnnotationDecided(DOCUMENT_ID, ACTOR_ID, ANNOTATION_ID, true));
+    service.dispatch(
+        new ReviewEvent.WorkflowChanged(DOCUMENT_ID, ACTOR_ID, "IN_REVIEW", "FINALIZED", true));
+
+    assertThat(sink.delivered).isEmpty();
+  }
+
+  @Test
+  @DisplayName(
+      "PRIVATE thread: author, owner and a participating admin hear of a reply; others do not")
+  void privateThreadReachesItsAudienceOnly() {
+    UUID owner = UUID.randomUUID();
+    UUID author = UUID.randomUUID();
+    UUID admin = UUID.randomUUID();
+    UUID bystander = UUID.randomUUID();
+    Document document = org.mockito.Mockito.mock(Document.class);
+    when(document.getId()).thenReturn(DOCUMENT_ID);
+    when(document.getTitle()).thenReturn("Contract");
+    when(document.getOwnerId()).thenReturn(owner);
+    when(document.getThreadParticipation()).thenReturn(io.qnop.entity.ThreadParticipation.PRIVATE);
+    when(documents.findById(DOCUMENT_ID)).thenReturn(Optional.of(document));
+    Annotation annotation = org.mockito.Mockito.mock(Annotation.class);
+    when(annotation.getId()).thenReturn(ANNOTATION_ID);
+    when(annotation.getAuthorId()).thenReturn(author);
+    when(annotations.findById(ANNOTATION_ID)).thenReturn(Optional.of(annotation));
+    // Everyone below commented at some point; the bystander is a current participant
+    // who no longer sees the thread, the admin is not a participant at all.
+    List<Comment> thread = new ArrayList<>();
+    for (UUID writer : List.of(author, owner, admin, bystander, ACTOR_ID)) {
+      Comment comment = org.mockito.Mockito.mock(Comment.class);
+      when(comment.getId()).thenReturn(writer == ACTOR_ID ? COMMENT_ID : UUID.randomUUID());
+      when(comment.getAuthorId()).thenReturn(writer);
+      when(comment.getBody()).thenReturn("text");
+      thread.add(comment);
+    }
+    when(comments.findByAnnotationIdOrderByCreatedAtAsc(ANNOTATION_ID)).thenReturn(thread);
+    when(participants.existsAccessibleParticipant(DOCUMENT_ID, author)).thenReturn(true);
+    when(participants.existsAccessibleParticipant(DOCUMENT_ID, bystander)).thenReturn(true);
+    List<User> people = new ArrayList<>();
+    for (UUID id : List.of(author, owner, admin, bystander)) {
+      User user = org.mockito.Mockito.mock(User.class);
+      when(user.getId()).thenReturn(id);
+      when(user.isEnabled()).thenReturn(true);
+      when(user.getDisplayName()).thenReturn("Someone");
+      when(user.getRole())
+          .thenReturn(id == admin ? io.qnop.entity.UserRole.ADMIN : io.qnop.entity.UserRole.MEMBER);
+      when(users.findById(id)).thenReturn(Optional.of(user));
+      people.add(user);
+    }
+    when(users.findAllById(any())).thenReturn(people);
+    ReviewIdentityResolver.ReviewIdentities identities =
+        org.mockito.Mockito.mock(ReviewIdentityResolver.ReviewIdentities.class);
+    when(identities.displayName(any())).thenReturn("Ada Actor");
+    when(identity.forDocument(any(), any())).thenReturn(identities);
+    RecordingSink sink = new RecordingSink();
+
+    service(sink).dispatch(commentEvent());
+
+    assertThat(sink.delivered)
+        .extracting(intent -> intent.recipient().getId())
+        .containsExactlyInAnyOrder(author, owner, admin);
   }
 
   @Test
@@ -316,7 +389,10 @@ class ReviewNotificationServiceTest {
     when(documents.findById(DOCUMENT_ID)).thenReturn(Optional.of(document));
 
     Annotation annotation = org.mockito.Mockito.mock(Annotation.class);
+    when(annotation.getId()).thenReturn(ANNOTATION_ID);
     when(annotation.getAuthorId()).thenReturn(FOLLOWER_ID);
+    // The follower is a current participant unless a test revokes it (issue #919).
+    when(participants.existsAccessibleParticipant(DOCUMENT_ID, FOLLOWER_ID)).thenReturn(true);
     when(annotations.findById(ANNOTATION_ID)).thenReturn(Optional.of(annotation));
 
     Comment reply = org.mockito.Mockito.mock(Comment.class);

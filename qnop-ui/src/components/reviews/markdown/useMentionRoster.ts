@@ -38,8 +38,21 @@ import type { MentionCandidate } from './mentionToken';
  * <p>Registered mention contributors (issue #598) append their candidates —
  * e.g. a team the composer may ping — after the user roster; anonymity
  * disables them along with everything else.
+ *
+ * <p>PRIVATE thread participation (issue #921): only the owner and the
+ * thread's author can open a thread, so only they are offered — the server
+ * would not turn a token for anyone else into a mention either. Contributor
+ * candidates are left out there, since they would expand to people the
+ * thread is hidden from.
+ *
+ * @param threadAuthorId the author of the thread being written in; omit it
+ *   for a composer that starts a NEW thread (the caller is its author), pass
+ *   null when the author is not known (then only the owner is offered).
  */
-export function useMentionRoster(documentId: string | null | undefined): MentionCandidate[] {
+export function useMentionRoster(
+  documentId: string | null | undefined,
+  threadAuthorId?: string | null,
+): MentionCandidate[] {
   const review = useDocument(documentId ?? '').data;
   const participantsQuery = useParticipants(documentId ?? '', Boolean(documentId));
   const selfId = useAuthStore((s) => s.userId);
@@ -72,6 +85,12 @@ export function useMentionRoster(documentId: string | null | undefined): Mention
     ) {
       roster.unshift({ id: review.ownerId, name: review.ownerDisplayName, slug: review.ownerSlug });
     }
+    if (review.threadParticipation === 'PRIVATE') {
+      const author = threadAuthorId === undefined ? selfId : threadAuthorId;
+      return roster.filter(
+        (candidate) => candidate.id === review.ownerId || (author && candidate.id === author),
+      );
+    }
     if (documentId) {
       for (const contributor of contributors) {
         for (const principal of contributor.candidatesFor(documentId)) {
@@ -90,5 +109,5 @@ export function useMentionRoster(documentId: string | null | undefined): Mention
       }
     }
     return roster;
-  }, [contributors, documentId, participantsQuery.data, review, selfId]);
+  }, [contributors, documentId, participantsQuery.data, review, selfId, threadAuthorId]);
 }
