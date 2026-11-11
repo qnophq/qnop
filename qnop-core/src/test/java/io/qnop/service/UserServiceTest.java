@@ -23,7 +23,10 @@ package io.qnop.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.qnop.entity.User;
@@ -34,6 +37,7 @@ import io.qnop.repository.UserRepository;
 import io.qnop.service.UserService.UserProfileView;
 import io.qnop.service.limits.InstanceLimitProperties;
 import io.qnop.service.limits.InstanceLimitService;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -120,29 +124,32 @@ class UserServiceTest {
 
   @Test
   @DisplayName(
-      "applyPasswordReset re-hashes, clears the forced-change flag and invalidates sessions")
+      "applyPasswordReset re-hashes and invalidates sessions through atomic updates (#61, #897)")
   void applyPasswordResetInvalidatesSessions() {
     UUID id = UUID.randomUUID();
-    User user = User.internal("Bob", "bob@example.com", "bob", "old-hash");
-    user.setPasswordChangeRequired(true);
-    when(users.findById(id)).thenReturn(Optional.of(user));
+    User fresh = User.internal("Bob", "bob@example.com", "bob", "new-hash");
+    when(users.existsById(id)).thenReturn(true);
+    when(users.findById(id)).thenReturn(Optional.of(fresh));
     when(passwordEncoder.encode("new-password")).thenReturn("new-hash");
 
     User result = service.applyPasswordReset(id, "new-password");
 
-    assertThat(result.getPasswordHash()).isEqualTo("new-hash");
-    assertThat(result.isPasswordChangeRequired()).isFalse();
-    assertThat(result.getPasswordInvalidatedBefore()).isNotNull();
+    // The hash write also clears password_change_required; the bump revokes access tokens.
+    verify(users).updatePasswordHash(id, "new-hash");
+    verify(users).bumpPasswordInvalidatedBefore(eq(id), any(Instant.class));
+    verify(users, never()).save(any());
+    assertThat(result).isSameAs(fresh);
   }
 
   @Test
   @DisplayName("applyPasswordReset throws for an unknown user")
   void applyPasswordResetRejectsUnknownUser() {
     UUID id = UUID.randomUUID();
-    when(users.findById(id)).thenReturn(Optional.empty());
+    when(users.existsById(id)).thenReturn(false);
 
     assertThatThrownBy(() -> service.applyPasswordReset(id, "new-password"))
         .isInstanceOf(UserNotFoundException.class);
+    verify(users, never()).updatePasswordHash(any(), any());
   }
 
   /**

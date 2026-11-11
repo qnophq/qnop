@@ -155,15 +155,19 @@ public class UserService {
 
   /**
    * Applies a reset/new password: re-hashes, clears any forced-change flag, and stamps {@code
-   * password_invalidated_before} so previously issued access tokens are rejected (issue #17).
+   * password_invalidated_before} so previously issued access tokens are rejected (issue #17). Both
+   * writes are atomic, version-bumping updates (issue #61) rather than a dirty entity, so a later
+   * bulk update in the same transaction (the refresh-token revocation of issue #897, which clears
+   * the persistence context) can never discard them. Returns the freshly re-read user.
    */
   @Transactional
   public User applyPasswordReset(UUID id, String rawPassword) {
-    User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
-    user.setPasswordHash(passwordEncoder.encode(rawPassword));
-    user.setPasswordChangeRequired(false);
-    user.setPasswordInvalidatedBefore(Instant.now());
-    return user;
+    if (!users.existsById(id)) {
+      throw new UserNotFoundException(id);
+    }
+    users.updatePasswordHash(id, passwordEncoder.encode(rawPassword));
+    users.bumpPasswordInvalidatedBefore(id, Instant.now());
+    return users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
   }
 
   /** Whether an internal user with the given username exists (bootstrap idempotency). */
