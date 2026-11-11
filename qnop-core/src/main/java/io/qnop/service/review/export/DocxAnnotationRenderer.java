@@ -20,15 +20,14 @@
  */
 package io.qnop.service.review.export;
 
+import io.qnop.service.image.ImageHeaderProbe;
 import io.qnop.service.review.AnnotationService.AnnotationView;
 import io.qnop.service.review.AnnotationService.CommentView;
-import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import javax.imageio.ImageIO;
 import org.apache.poi.util.Units;
 import org.apache.poi.xwpf.model.XWPFHeaderFooterPolicy;
 import org.apache.poi.xwpf.usermodel.Borders;
@@ -176,14 +175,15 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
   }
 
   /** The logo at {@link #LOGO_WIDTH_PT}, keeping its aspect ratio. */
-  private static Dimension scaled(byte[] png) throws IOException {
-    BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
-    if (image == null || image.getWidth() <= 0) {
+  private static Dimension scaled(byte[] png) {
+    // Header-only (#907): the size is all this needs, so nothing is decoded.
+    ImageHeaderProbe.Dimensions image = ImageHeaderProbe.probe(png).orElse(null);
+    if (image == null || image.width() <= 0) {
       // A square is a poor guess, but a logo that will not decode has already
       // failed; this only decides how the failure looks if Word accepts it anyway.
       return new Dimension(LOGO_WIDTH_PT, LOGO_WIDTH_PT);
     }
-    double ratio = (double) image.getHeight() / image.getWidth();
+    double ratio = (double) image.height() / image.width();
     return new Dimension(LOGO_WIDTH_PT, Math.max(1, (int) Math.round(LOGO_WIDTH_PT * ratio)));
   }
 
@@ -692,18 +692,19 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
   }
 
   /** Shrinks an image to the text column's width; smaller images keep their size. */
-  private static Dimension fitToColumn(byte[] bytes, int indent) throws IOException {
+  private static Dimension fitToColumn(byte[] bytes, int indent) {
     // Twips to points: the indent eats into the column the picture may occupy.
     int available = TEXT_COLUMN_PT - indent / 20;
-    BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
-    if (image == null || image.getWidth() <= 0) {
+    // Header-only (#907): the size is all this needs, so nothing is decoded.
+    ImageHeaderProbe.Dimensions image = ImageHeaderProbe.probe(bytes).orElse(null);
+    if (image == null || image.width() <= 0) {
       return new Dimension(available, available * 3 / 4);
     }
     // Screens are ~96dpi and Word measures in 72dpi points, so a screenshot's
     // pixel width would otherwise render a third too large.
-    int naturalPt = (int) Math.round(image.getWidth() * 72.0 / 96.0);
+    int naturalPt = (int) Math.round(image.width() * 72.0 / 96.0);
     int width = Math.min(available, Math.max(1, naturalPt));
-    double ratio = (double) image.getHeight() / image.getWidth();
+    double ratio = (double) image.height() / image.width();
     return new Dimension(width, Math.max(1, (int) Math.round(width * ratio)));
   }
 

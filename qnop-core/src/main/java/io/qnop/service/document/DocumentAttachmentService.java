@@ -24,12 +24,15 @@ import io.qnop.entity.DocumentAttachment;
 import io.qnop.repository.DocumentAttachmentRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.image.ImageHeaderProbe;
+import io.qnop.service.image.PixelBudget;
 import io.qnop.service.storage.StagedObject;
 import io.qnop.service.storage.StorageQuotaExceededException;
 import io.qnop.service.storage.StorageService;
 import io.qnop.spi.storage.StorageContent;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -60,6 +63,14 @@ public class DocumentAttachmentService {
   public static final String PDF = "application/pdf";
 
   public static final String BINARY = "application/octet-stream";
+
+  /**
+   * The largest raster an image attachment may declare (issue #907): about 16.7 megapixels, at most
+   * 16384 px per side. Every export that embeds an attachment decodes it to {@code width × height ×
+   * 4} bytes, so this bounds that memory at roughly 64 MiB per image regardless of the file's size
+   * on disk. The export path re-checks the same budget for attachments stored before it existed.
+   */
+  public static final PixelBudget PIXEL_BUDGET = new PixelBudget(16_384, 4096L * 4096L);
 
   private static final int SNIFF_LENGTH = 12;
   private static final int MAX_FILE_NAME_LENGTH = 200;
@@ -105,6 +116,9 @@ public class DocumentAttachmentService {
       throw DocumentValidationException.tooLarge("attachment exceeds " + maxBytes + " bytes");
     }
     String contentType = resolveContentType(upload);
+    if (isInlineImage(contentType)) {
+      enforcePixelBudget(upload);
+    }
     String fileName = sanitizeFileName(declaredFileName);
 
     StagedObject staged = stageUpload(upload, contentType, maxBytes);
@@ -186,6 +200,32 @@ public class DocumentAttachmentService {
       return PDF;
     }
     return BINARY;
+  }
+
+  /**
+   * Rejects an image whose header-declared raster exceeds {@link #PIXEL_BUDGET} (issue #907). Only
+   * the header is read — nothing is decoded — so the check costs the same for any declared size. An
+   * image whose header cannot be read is rejected too: it could never be embedded or previewed
+   * reliably, and its real size would be unknown to every later consumer.
+   */
+  private static void enforcePixelBudget(UploadSource upload) {
+    Optional<ImageHeaderProbe.Dimensions> dimensions;
+    try (InputStream in = upload.open()) {
+      dimensions = ImageHeaderProbe.probe(in);
+    } catch (IOException e) {
+      throw DocumentValidationException.invalidRequest("upload could not be read");
+    }
+    if (dimensions.isEmpty()) {
+      throw DocumentValidationException.invalidRequest("image dimensions could not be read");
+    }
+    if (!PIXEL_BUDGET.admits(dimensions.get())) {
+      throw DocumentValidationException.invalidRequest(
+          "image exceeds "
+              + PIXEL_BUDGET.maxPixels()
+              + " pixels or "
+              + PIXEL_BUDGET.maxSide()
+              + " pixels per side");
+    }
   }
 
   /** Streams the upload into storage under the authoritative size cap, mapping its errors. */
