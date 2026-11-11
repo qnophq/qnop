@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -56,7 +57,8 @@ import org.springframework.stereotype.Component;
  * step, so nothing that existed before — a planted file or a symbolic link — is ever followed or
  * reused, and there is no window in which the file is readable by others. Wherever that cannot be
  * guaranteed (a non-POSIX file system, any I/O error) no file is written and the stderr output
- * remains the only surface. Idempotent on later starts.
+ * remains the only surface. Once the generated password has been changed the file is deleted.
+ * Idempotent on later starts.
  */
 @Component
 public class AdminInitializationRunner implements ApplicationRunner {
@@ -66,6 +68,9 @@ public class AdminInitializationRunner implements ApplicationRunner {
   static final String PASSWORD_FILE_NAME = "admin-password.txt";
   static final String PASSWORD_DIR_PREFIX = "qnop-bootstrap-";
   static final int MIN_SUPPLIED_PASSWORD_LENGTH = 12;
+
+  /** Rejects long-but-trivial values such as one character repeated (issue #905). */
+  static final int MIN_DISTINCT_CHARACTERS = 8;
 
   /** BCrypt only looks at the first 72 bytes; anything longer would be silently truncated. */
   static final int MAX_SUPPLIED_PASSWORD_BYTES = 72;
@@ -79,6 +84,9 @@ public class AdminInitializationRunner implements ApplicationRunner {
   private final UserService userService;
   private final Supplier<String> suppliedPassword;
   private final Path tempRoot;
+
+  /** The password file this instance wrote, until it is removed after the first change. */
+  private volatile Path writtenFile;
 
   @Autowired
   public AdminInitializationRunner(UserService userService) {
@@ -126,9 +134,10 @@ public class AdminInitializationRunner implements ApplicationRunner {
    * Rejects a weak {@code QNOP_ADMIN_PASSWORD} (issue #905). That value is a long-lived ADMIN
    * credential with no forced change, so it must be at least {@value #MIN_SUPPLIED_PASSWORD_LENGTH}
    * characters, at most {@value #MAX_SUPPLIED_PASSWORD_BYTES} UTF-8 bytes (BCrypt's limit), not
-   * contain the admin username, and either mix three character classes (lower case, upper case,
-   * digits, other) or be a passphrase of 20 characters or more. Fails the startup with a message
-   * that never echoes the value.
+   * contain the admin username, use at least {@value #MIN_DISTINCT_CHARACTERS} different
+   * characters, and either mix three character classes (lower case, upper case, digits, other) or
+   * be a passphrase of 20 characters or more. Fails the startup with a message that never echoes
+   * the value.
    */
   static void checkSuppliedPassword(String password) {
     String problem = weaknessOf(password);
@@ -151,6 +160,9 @@ public class AdminInitializationRunner implements ApplicationRunner {
     if (password.toLowerCase(java.util.Locale.ROOT).contains(ADMIN_USERNAME)) {
       return "it must not contain the username";
     }
+    if (password.chars().distinct().count() < MIN_DISTINCT_CHARACTERS) {
+      return "it must contain at least " + MIN_DISTINCT_CHARACTERS + " different characters";
+    }
     if (characterClasses(password) < 3 && password.length() < 20) {
       return "it must mix at least three of lower case, upper case, digits and symbols"
           + " (or be 20 characters or longer)";
@@ -168,6 +180,7 @@ public class AdminInitializationRunner implements ApplicationRunner {
 
   private void surfaceGeneratedPassword(String password) {
     Path file = writePasswordFile(password);
+    writtenFile = file;
     System.err.printf(
         "%n=== qnop initial admin ===%nusername: %s%npassword: %s%nChange it on first login.%s%n"
             + "================================%n",
@@ -175,6 +188,22 @@ public class AdminInitializationRunner implements ApplicationRunner {
     if (file != null) {
       log.info("Initial admin password written to {} (owner-only).", file);
     }
+  }
+
+  /**
+   * Removes the password file once the bootstrap admin has replaced the generated password (issue
+   * #905): from then on it is a stale copy of a dead credential and only an exposure. Checked every
+   * minute while this instance holds such a file; a no-op otherwise.
+   */
+  @Scheduled(fixedDelayString = "PT1M", initialDelayString = "PT1M")
+  public void removePasswordFileOnceChanged() {
+    Path file = writtenFile;
+    if (file == null || userService.internalPasswordChangeStillRequired(ADMIN_USERNAME)) {
+      return;
+    }
+    writtenFile = null;
+    deleteQuietly(file.getParent());
+    log.info("Removed the initial admin password file: the password has been changed.");
   }
 
   /**

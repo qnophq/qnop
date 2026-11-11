@@ -116,6 +116,8 @@ class AdminInitializationRunnerTest {
         "short1!A", // too short
         "alllowercaseletters", // one class, under 20
         "MyAdminPassw0rd!", // contains the username
+        "aaaaaaaaaaaaaaaaaaaaaaaa", // a long run of one character
+        "abababababababababababab", // long, but only two different characters
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1A!" // > 72
       })
   @DisplayName("a weak QNOP_ADMIN_PASSWORD stops the startup and creates no admin")
@@ -145,6 +147,33 @@ class AdminInitializationRunnerTest {
 
     verify(userService, never())
         .createAdmin(anyString(), anyString(), anyString(), anyString(), anyBoolean());
+  }
+
+  @Test
+  @DisplayName("the password file is removed once the bootstrap admin changed the password")
+  void passwordFileIsRemovedAfterTheChange() throws IOException {
+    AdminInitializationRunner runner = runner(null);
+    runner.run(null);
+    Path dir = onlyChild(tempRoot);
+
+    when(userService.internalPasswordChangeStillRequired("admin")).thenReturn(true);
+    runner.removePasswordFileOnceChanged();
+    assertThat(dir.resolve("admin-password.txt")).exists();
+
+    when(userService.internalPasswordChangeStillRequired("admin")).thenReturn(false);
+    runner.removePasswordFileOnceChanged();
+    assertThat(dir).doesNotExist();
+
+    // Nothing left to do afterwards.
+    runner.removePasswordFileOnceChanged();
+  }
+
+  @Test
+  @DisplayName("the clean-up is a no-op on an instance that wrote no file")
+  void cleanUpWithoutFileIsNoOp() {
+    runner("Str0ng-Bootstrap!").removePasswordFileOnceChanged();
+
+    verify(userService, never()).internalPasswordChangeStillRequired(anyString());
   }
 
   private static Path onlyChild(Path dir) throws IOException {
