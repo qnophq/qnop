@@ -134,7 +134,7 @@
         "share": "Partagez la charge de travail",
         "rise": "Gravissez les échelons"
       },
-      "hint": "Un responsable d’équipe ou un administrateur peut vous ajouter — vos équipes apparaîtront ici dès que ce sera fait.",
+      "hint": "Un responsable d’équipe ou un administrateur peut vous inviter — acceptez l’invitation ici et l’équipe apparaîtra.",
       "illustration": "Une place libre qui attend dans une équipe"
     }
   },
@@ -143,6 +143,7 @@
     "publicProfile": "Profil public",
     "editTeam": "Modifier l’équipe",
     "addMember": "Ajouter un membre",
+    "inviteMember": "Inviter un membre",
     "columns": {
       "member": "Membre",
       "role": "Rôle",
@@ -197,6 +198,34 @@
     "cancel": "Annuler",
     "submit": "Ajouter",
     "submitCount": "Ajouter ({{number}})",
-    "failed": "Impossible d’ajouter : {{names}}."
+    "failed": "Impossible d’ajouter : {{names}}.",
+    "inviteTitle": "Inviter des membres",
+    "inviteHint": "Chaque personne reçoit une invitation et rejoint l’équipe comme membre dès qu’elle l’accepte. Seul un administrateur peut nommer un responsable.",
+    "invite": "Envoyer l’invitation",
+    "inviteCount": "Envoyer {{number}} invitations"
+  },
+  "invitations": {
+    "title_one": "Invitation d’équipe",
+    "title_many": "{{count}} invitations d’équipe",
+    "title_other": "{{count}} invitations d’équipe",
+    "hint": "Vous ne rejoignez une équipe — et ne voyez ses révisions — qu’après avoir accepté.",
+    "invitedBy": "Invité par {{name}} · {{date}}",
+    "invited": "Invité le {{date}}",
+    "accept": "Accepter",
+    "decline": "Refuser",
+    "acceptAria": "Accepter l’invitation à {{team}}",
+    "declineAria": "Refuser l’invitation à {{team}}",
+    "failed": "Impossible de répondre à l’invitation."
+  },
+  "pendingInvitations": {
+    "title_one": "Invitation en attente",
+    "title_many": "{{count}} invitations en attente",
+    "title_other": "{{count}} invitations en attente",
+    "hint": "Les personnes invitées n’ont aucun accès à l’équipe tant qu’elles n’ont pas accepté.",
+    "status": "Invité",
+    "invitedAt": "Invité le {{date}}",
+    "revoke": "Retirer",
+    "revokeAria": "Retirer l’invitation de {{name}}",
+    "revokeFailed": "Impossible de retirer l’invitation."
   }
 }

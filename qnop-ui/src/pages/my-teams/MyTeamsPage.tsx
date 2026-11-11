@@ -37,6 +37,7 @@ import { TeamRoleBadge } from '../../components/admin/teams/TeamRoleBadge';
 import { TeamAvatar } from '../../components/shell/TeamAvatar';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { MyTeamsEmptyState } from './MyTeamsEmptyState';
+import { MyTeamInvitations } from '../../components/my-teams/MyTeamInvitations';
 import {
   computeAchievements,
   leadershipStats,
@@ -84,6 +85,9 @@ export function MyTeamsPage() {
   return (
     <Stack spacing={4}>
       <PageHeader title={t('myTeams.title')} description={t('myTeams.description')} />
+
+      {/* Invitations a team lead sent, awaiting the caller's consent (issue #936). */}
+      <MyTeamInvitations />
 
       {data.items.length === 0 && <MyTeamsEmptyState />}
 
