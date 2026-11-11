@@ -128,26 +128,64 @@ class TrackingForwardIT extends SeededIntegrationTest {
   }
 
   @Test
-  @DisplayName("a measurement arrives at the backend with the id and the title removed")
+  @DisplayName("a measurement arrives at the backend with the id removed")
   void forwardsSanitizedMeasurement() throws Exception {
-    String body =
-        "{\"type\":\"event\",\"payload\":{\"website\":\"site-1\",\"title\":\"Vendor agreement\","
-            + "\"url\":\"/reviews/"
-            + DOC
-            + "/tasks?filter=open\"}}";
-
     mockMvc
-        .perform(post("/t/c/api/send").contentType(MediaType.APPLICATION_JSON).content(body))
+        .perform(
+            post("/t/c/api/send")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Sec-Fetch-Site", "same-origin")
+                .content(umami("/reviews/" + DOC + "/tasks?filter=open", "")))
         .andExpect(status().isNoContent());
 
     String arrived = received.poll(5, TimeUnit.SECONDS);
     assertThat(arrived).as("the backend received a measurement").isNotNull();
-    // Three things had to happen on the way, and all three are about the same
-    // risk: the id of a customer's document must not end up in a report.
+    // Both are about the same risk: the id of a customer's document must not
+    // end up in a report, even when a stale client sends the real path.
     assertThat(arrived).doesNotContain(DOC);
-    assertThat(arrived).doesNotContain("Vendor agreement");
     assertThat(arrived).doesNotContain("filter=open");
     assertThat(arrived).contains("/reviews/:id/tasks").contains("site-1");
+  }
+
+  @Test
+  @DisplayName("a measurement carrying fields qnop never sends is not forwarded (#910)")
+  void refusesForeignFields() throws Exception {
+    mockMvc
+        .perform(
+            post("/t/c/api/send")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(umami("/reviews/:id", ",\"title\":\"Vendor agreement\"")))
+        .andExpect(status().isNoContent());
+
+    assertThat(received.poll(1, TimeUnit.SECONDS))
+        .as("nothing should have been forwarded")
+        .isNull();
+  }
+
+  @Test
+  @DisplayName("a measurement another site's page sends is not forwarded (#910)")
+  void refusesCrossSiteRequests() throws Exception {
+    mockMvc
+        .perform(
+            post("/t/c/api/send")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Sec-Fetch-Site", "cross-site")
+                .content(umami("/reviews/:id", "")))
+        .andExpect(status().isNoContent());
+
+    assertThat(received.poll(1, TimeUnit.SECONDS))
+        .as("nothing should have been forwarded")
+        .isNull();
+  }
+
+  /** An Umami page view in the shape qnop's client builds, with optional extra payload fields. */
+  private static String umami(String url, String extra) {
+    return "{\"type\":\"event\",\"payload\":{\"website\":\"site-1\",\"hostname\":\"qnop.example\","
+        + "\"language\":\"en\",\"screen\":\"1440x900\",\"url\":\""
+        + url
+        + "\",\"referrer\":\"\""
+        + extra
+        + "}}";
   }
 
   @Test

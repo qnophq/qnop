@@ -9,3 +9,6 @@ dist
 
 # Generated API client (typescript-axios) — not source.
 src/api/generated
+
+# Golden tracking beacons (issue #910) — written by vitest, read by the server tests.
+src/tracking/__fixtures__

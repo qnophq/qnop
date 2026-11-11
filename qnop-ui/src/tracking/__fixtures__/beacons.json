@@ -1,0 +1,76 @@
+[
+  {
+    "provider": "matomo",
+    "kind": "pageview",
+    "method": "GET",
+    "path": "/matomo.php?idsite=site-1&rec=1&apiv=1&send_image=0&url=https%3A%2F%2Fqnop.example%2Freviews%2F%3AdocumentId%2Ftasks&res=1440x900&rand=1700000000000"
+  },
+  {
+    "provider": "matomo",
+    "kind": "event",
+    "method": "GET",
+    "path": "/matomo.php?idsite=site-1&rec=1&apiv=1&send_image=0&url=https%3A%2F%2Fqnop.example%2Freviews%2F%3AdocumentId%2Ftasks&res=1440x900&e_c=qnop&e_a=review_created&rand=1700000000000"
+  },
+  {
+    "provider": "plausible",
+    "kind": "pageview",
+    "method": "POST",
+    "path": "/api/event",
+    "body": "{\"name\":\"pageview\",\"url\":\"https://qnop.example/reviews/:documentId/tasks\",\"domain\":\"site-1\",\"referrer\":null}",
+    "contentType": "text/plain;charset=UTF-8"
+  },
+  {
+    "provider": "plausible",
+    "kind": "event",
+    "method": "POST",
+    "path": "/api/event",
+    "body": "{\"name\":\"review_created\",\"url\":\"https://qnop.example/reviews/:documentId/tasks\",\"domain\":\"site-1\",\"referrer\":null}",
+    "contentType": "text/plain;charset=UTF-8"
+  },
+  {
+    "provider": "umami",
+    "kind": "pageview",
+    "method": "POST",
+    "path": "/api/send",
+    "body": "{\"type\":\"event\",\"payload\":{\"website\":\"site-1\",\"hostname\":\"qnop.example\",\"language\":\"en-GB\",\"screen\":\"1440x900\",\"url\":\"/reviews/:documentId/tasks\",\"referrer\":\"\"}}",
+    "contentType": "application/json"
+  },
+  {
+    "provider": "umami",
+    "kind": "event",
+    "method": "POST",
+    "path": "/api/send",
+    "body": "{\"type\":\"event\",\"payload\":{\"website\":\"site-1\",\"hostname\":\"qnop.example\",\"language\":\"en-GB\",\"screen\":\"1440x900\",\"url\":\"/reviews/:documentId/tasks\",\"referrer\":\"\",\"name\":\"review_created\"}}",
+    "contentType": "application/json"
+  },
+  {
+    "provider": "posthog",
+    "kind": "pageview",
+    "method": "POST",
+    "path": "/i/v0/e/",
+    "body": "{\"api_key\":\"site-1\",\"event\":\"$pageview\",\"distinct_id\":\"visit-1\",\"properties\":{\"$current_url\":\"https://qnop.example/reviews/:documentId/tasks\",\"$process_person_profile\":false,\"$lib\":\"qnop\"}}",
+    "contentType": "application/json"
+  },
+  {
+    "provider": "posthog",
+    "kind": "event",
+    "method": "POST",
+    "path": "/i/v0/e/",
+    "body": "{\"api_key\":\"site-1\",\"event\":\"review_created\",\"distinct_id\":\"visit-1\",\"properties\":{\"$current_url\":\"https://qnop.example/reviews/:documentId/tasks\",\"$process_person_profile\":false,\"$lib\":\"qnop\"}}",
+    "contentType": "application/json"
+  },
+  {
+    "provider": "pirsch",
+    "kind": "pageview",
+    "method": "GET",
+    "path": "/hit?nc=1700000000000&code=site-1&url=https%3A%2F%2Fqnop.example%2Freviews%2F%3AdocumentId%2Ftasks&t=&ref=&w=1440&h=900"
+  },
+  {
+    "provider": "pirsch",
+    "kind": "event",
+    "method": "POST",
+    "path": "/event",
+    "body": "{\"identification_code\":\"site-1\",\"url\":\"https://qnop.example/reviews/:documentId/tasks\",\"title\":\"\",\"referrer\":\"\",\"screen_width\":1440,\"screen_height\":900,\"tags\":{},\"event_name\":\"review_created\",\"event_duration\":0,\"event_meta\":{},\"non_interactive\":false}",
+    "contentType": "text/plain;charset=UTF-8"
+  }
+]

@@ -20,6 +20,7 @@
  */
 package io.qnop.web;
 
+import io.qnop.service.tracking.TrackingCollectService;
 import io.qnop.service.tracking.TrackingProxyService;
 import io.qnop.web.security.ratelimit.HttpClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
@@ -55,11 +56,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Controller
 public class TrackingProxyController {
 
-  private final TrackingProxyService proxy;
+  private final TrackingCollectService collector;
   private final HttpClientIpResolver clientIp;
 
-  public TrackingProxyController(TrackingProxyService proxy, HttpClientIpResolver clientIp) {
-    this.proxy = proxy;
+  public TrackingProxyController(TrackingCollectService collector, HttpClientIpResolver clientIp) {
+    this.collector = collector;
     this.clientIp = clientIp;
   }
 
@@ -70,6 +71,11 @@ public class TrackingProxyController {
    * with GET, Umami, Plausible and PostHog post a JSON body. A proxy that took only one of them
    * would work for half the providers — which is exactly how this was found.
    *
+   * <p>Only a measurement in the exact shape qnop's own client builds is forwarded, rebuilt from
+   * the validated values (issue #910) — and never one a browser marks as sent from another site:
+   * the endpoint is unauthenticated, and a cross-site page must not be able to write into this
+   * deployment's analytics through it.
+   *
    * <p>Answers 204 whatever the backend said. The browser can do nothing useful with an analytics
    * error, and a page that reports its own measurement failures to the user is a page that has its
    * priorities backwards — the server logs what went wrong instead.
@@ -79,6 +85,11 @@ public class TrackingProxyController {
       method = {RequestMethod.GET, RequestMethod.POST})
   @ResponseBody
   public ResponseEntity<Void> collect(HttpServletRequest request) throws IOException {
+    if ("cross-site".equalsIgnoreCase(request.getHeader("Sec-Fetch-Site"))) {
+      // qnop's client always sends same-origin. A browser saying otherwise is
+      // another site's page posting here; it gets the same silent 204.
+      return ResponseEntity.noContent().build();
+    }
     // Everything up to the first '?': a servlet container keeps the query out of
     // getRequestURI(), but not every caller of this method is a servlet
     // container, and a path carrying a query would never match the provider's
@@ -95,12 +106,11 @@ public class TrackingProxyController {
     // Resolved through the same trusted-proxy rules the rate limiters use
     // (ADR-0027): behind a load balancer getRemoteAddr() is the balancer, and
     // truncating that address would tell the backend nothing at all.
-    proxy.forward(
+    collector.collect(
         request.getMethod(),
         path,
         request.getQueryString(),
         body,
-        request.getContentType(),
         clientIp.resolve(request),
         request.getHeader("User-Agent"));
     return ResponseEntity.noContent().build();

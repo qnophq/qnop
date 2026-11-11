@@ -50,37 +50,42 @@ function bodyOf(beacon: Beacon): Record<string, unknown> {
 }
 
 /**
- * The paths each backend is allowed to receive — mirrored from the server's TrackingProvider
- * allowlist. A beacon to anything else would be dropped by the proxy.
+ * The golden beacons: exactly what this client sends, one page view and one event per backend.
+ *
+ * The same file is read by the server's TrackingMeasurementValidatorTest, which asserts that every
+ * entry is accepted and that the paths per backend equal TrackingProvider's allowlist — so the
+ * client and the server cannot drift apart without one of the two test suites failing. Regenerate
+ * with `vitest run -u` after a deliberate change to a request shape, and review the diff.
  */
-const SERVER_ALLOWLIST: Record<string, string[]> = {
-  matomo: ['/matomo.php'],
-  plausible: ['/api/event'],
-  umami: ['/api/send'],
-  posthog: ['/i/v0/e/'],
-  pirsch: ['/hit', '/event'],
-};
+const FIXTURE = './__fixtures__/beacons.json';
+const FIXED_NOW = 1_700_000_000_000;
+
+function goldenBeacons(): Array<Beacon & { provider: string; kind: string }> {
+  return Object.entries(ADAPTERS).flatMap(([provider, adapter]) => [
+    { provider, kind: 'pageview', ...adapter.pageview(ctx, PATTERN) },
+    { provider, kind: 'event', ...adapter.event(ctx, 'review_created', PATTERN) },
+  ]);
+}
 
 describe('tracker adapters (issue #910)', () => {
-  it.each(Object.keys(SERVER_ALLOWLIST))(
-    '%s sends only to paths the proxy forwards, and never a title or referrer',
-    (provider) => {
-      const adapter = ADAPTERS[provider];
-      const beacons = [
-        adapter.pageview(ctx, PATTERN),
-        adapter.event(ctx, 'review_created', PATTERN),
-      ];
-      for (const beacon of beacons) {
-        const path = beacon.path.split('?')[0];
-        expect(SERVER_ALLOWLIST[provider]).toContain(path);
-        const serialized = `${beacon.path} ${beacon.body ?? ''}`;
-        // The route pattern travels; nothing from the real location does.
-        expect(decodeURIComponent(serialized)).toContain(PATTERN);
-        expect(serialized).not.toMatch(/action_name|"\$title"|"title":"[^"]/);
-        expect(serialized).not.toMatch(/"referrer":"[^"]|ref=[^&]/);
-      }
-    },
-  );
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('matches the golden beacons the server validates against', async () => {
+    vi.useFakeTimers({ now: FIXED_NOW });
+    await expect(`${JSON.stringify(goldenBeacons(), null, 2)}\n`).toMatchFileSnapshot(FIXTURE);
+  });
+
+  it('never sends a title, a referrer or anything from the real location', () => {
+    for (const beacon of goldenBeacons()) {
+      const serialized = `${beacon.path} ${beacon.body ?? ''}`;
+      // The route pattern travels; nothing from the real location does.
+      expect(decodeURIComponent(serialized)).toContain(PATTERN);
+      expect(serialized).not.toMatch(/action_name|"\$title"|"title":"[^"]/);
+      expect(serialized).not.toMatch(/"referrer":"[^"]|ref=[^&]/);
+    }
+  });
 
   it('builds Matomo tracking-API requests without cookies or a title', () => {
     const pageview = ADAPTERS.matomo.pageview(ctx, PATTERN);
