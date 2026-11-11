@@ -71,7 +71,9 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
     try {
       return encryptor.decrypt(dbData);
     } catch (IllegalStateException e) {
-      // Never log the value; the message names only the failure kind and key id.
+      // The cipher signals an undecryptable value with SecretDecryptionException, an
+      // IllegalStateException (the entity layer may not depend on io.qnop.security); a broken
+      // crypto provider is a different type and still propagates. Never log the value.
       log.error(
           "An encrypted column could not be decrypted with any configured encryption key and is"
               + " treated as unset: {}",

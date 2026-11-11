@@ -22,6 +22,7 @@ package io.qnop.security;
 
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.ProviderException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -31,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import javax.crypto.AEADBadTagException;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -88,7 +90,10 @@ public final class SecretCipher implements TextEncryptor {
   private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
   private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
 
-  private final SecureRandom random = new SecureRandom();
+  private static final Pattern KEY_ID = Pattern.compile("[0-9a-f]{8}");
+
+  private final SecureRandom random;
+  private final SecretWriteFormat writeFormat;
   private final KeyEntry current;
 
   /** Every key that may decrypt, current first, keyed by key id. */
@@ -99,6 +104,26 @@ public final class SecretCipher implements TextEncryptor {
    * @param previous an optional older key accepted for decryption only, or {@code null}
    */
   public SecretCipher(KeyMaterial current, KeyMaterial previous) {
+    this(current, previous, SecretWriteFormat.V2);
+  }
+
+  /**
+   * @param current the key all new values are encrypted with
+   * @param previous an optional older key accepted for decryption only, or {@code null}
+   * @param writeFormat the format new values are written in
+   */
+  public SecretCipher(KeyMaterial current, KeyMaterial previous, SecretWriteFormat writeFormat) {
+    this(current, previous, writeFormat, new SecureRandom());
+  }
+
+  /** Test seam: a caller-supplied nonce source, for fixed-vector tests of the wire format. */
+  SecretCipher(
+      KeyMaterial current,
+      KeyMaterial previous,
+      SecretWriteFormat writeFormat,
+      SecureRandom random) {
+    this.random = Objects.requireNonNull(random, "random");
+    this.writeFormat = Objects.requireNonNull(writeFormat, "writeFormat");
     this.current = KeyEntry.of(Objects.requireNonNull(current, "current key"));
     Map<String, KeyEntry> keys = new LinkedHashMap<>();
     keys.put(this.current.id(), this.current);
@@ -114,6 +139,11 @@ public final class SecretCipher implements TextEncryptor {
     this.decryptionKeys = Collections.unmodifiableMap(keys);
   }
 
+  /** The format new values are written in. */
+  public SecretWriteFormat writeFormat() {
+    return writeFormat;
+  }
+
   /** The id of the key new values are written with. */
   public String currentKeyId() {
     return current.id();
@@ -122,6 +152,9 @@ public final class SecretCipher implements TextEncryptor {
   @Override
   public String encrypt(String plaintext) {
     Objects.requireNonNull(plaintext, "plaintext");
+    if (writeFormat == SecretWriteFormat.LEGACY) {
+      return current.legacy().encrypt(plaintext);
+    }
     byte[] nonce = new byte[NONCE_LENGTH_BYTES];
     random.nextBytes(nonce);
     try {
@@ -135,7 +168,9 @@ public final class SecretCipher implements TextEncryptor {
       System.arraycopy(sealed, 0, payload, nonce.length, sealed.length);
       return PREFIX + current.id() + SEPARATOR + ENCODER.encodeToString(payload);
     } catch (GeneralSecurityException e) {
-      throw new IllegalStateException("AES-256-GCM is required but unavailable", e);
+      // Deliberately not an IllegalStateException: callers that treat an undecryptable value as
+      // unset must not silently do the same for a broken crypto provider.
+      throw new ProviderException("AES-256-GCM is required but unavailable", e);
     }
   }
 
@@ -152,10 +187,11 @@ public final class SecretCipher implements TextEncryptor {
 
   /**
    * Whether a stored value should be rewritten: it is in the legacy format, or it was written under
-   * a key other than the current one. A pure format check — it does not decrypt.
+   * a key other than the current one. A pure format check — it does not decrypt. Always {@code
+   * false} while writing the {@link SecretWriteFormat#LEGACY legacy} format.
    */
   public boolean needsReEncryption(String stored) {
-    if (stored == null || stored.isEmpty()) {
+    if (stored == null || stored.isEmpty() || writeFormat == SecretWriteFormat.LEGACY) {
       return false;
     }
     if (!stored.startsWith(PREFIX)) {
@@ -171,6 +207,10 @@ public final class SecretCipher implements TextEncryptor {
       throw new SecretDecryptionException("Stored secret is malformed (no key id).");
     }
     String keyId = stored.substring(PREFIX.length(), end);
+    if (!KEY_ID.matcher(keyId).matches()) {
+      // Never echo an unvalidated substring of stored data into a (logged) message.
+      throw new SecretDecryptionException("Stored secret is malformed (bad key id).");
+    }
     KeyEntry key = decryptionKeys.get(keyId);
     if (key == null) {
       throw new SecretDecryptionException(
@@ -201,7 +241,9 @@ public final class SecretCipher implements TextEncryptor {
       throw new SecretDecryptionException(
           "Stored secret failed its integrity check (key id '" + keyId + "').", e);
     } catch (GeneralSecurityException e) {
-      throw new IllegalStateException("AES-256-GCM is required but unavailable", e);
+      // Deliberately not an IllegalStateException: callers that treat an undecryptable value as
+      // unset must not silently do the same for a broken crypto provider.
+      throw new ProviderException("AES-256-GCM is required but unavailable", e);
     }
   }
 

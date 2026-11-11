@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.qnop.security.SecretCipher.KeyMaterial;
+import java.security.SecureRandom;
 import java.util.Base64;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.encrypt.Encryptors;
@@ -37,6 +38,21 @@ class SecretCipherTest {
       new KeyMaterial("new-encryption-key-9876543210-zyxwvuts", "fedcba9876543210fedcba9876543210");
 
   private static final String SECRET = "smtp-password-Ünïcode-✓";
+
+  /** A nonce source that yields 0x00, 0x01, 0x02 … so the ciphertext is reproducible. */
+  private static final SecureRandom FIXED_NONCE =
+      new SecureRandom() {
+        @Override
+        public void nextBytes(byte[] bytes) {
+          for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) i;
+          }
+        }
+      };
+
+  /** {@code "kat-plaintext"} under {@link #NEW} with the {@link #FIXED_NONCE} nonce. */
+  private static final String KAT_CIPHERTEXT =
+      "v2:c831ea1b:AAECAwQFBgcICQoLmyuV1OP2BbUBBUzQ-1BVdFqAP1-y3HcJMS7PUMk";
 
   @Test
   void encryptsToVersionedKeyIdentifiedFormatAndRoundTrips() {
@@ -167,6 +183,45 @@ class SecretCipherTest {
     SecretCipher cipher = new SecretCipher(NEW, NEW);
 
     assertThat(cipher.decrypt(cipher.encrypt(SECRET))).isEqualTo(SECRET);
+  }
+
+  /**
+   * Known-answer test pinning the wire format (review of #941): HKDF labels, key-id derivation, AAD
+   * layout and nonce/tag split. If this changes, every stored secret in the field becomes
+   * unreadable — do not "fix" the expected value, fix the change.
+   */
+  @Test
+  void fixedVectorPinsTheWireFormat() {
+    SecretCipher cipher = new SecretCipher(NEW, null, SecretWriteFormat.V2, FIXED_NONCE);
+
+    assertThat(cipher.encrypt("kat-plaintext")).isEqualTo(KAT_CIPHERTEXT);
+  }
+
+  @Test
+  void committedV2ValueStillDecrypts() {
+    assertThat(new SecretCipher(NEW, null).decrypt(KAT_CIPHERTEXT)).isEqualTo("kat-plaintext");
+  }
+
+  @Test
+  void legacyWriteFormatWritesValuesEarlierReleasesCanRead() {
+    SecretCipher legacyWriter = new SecretCipher(NEW, null, SecretWriteFormat.LEGACY);
+
+    String stored = legacyWriter.encrypt(SECRET);
+
+    assertThat(stored).doesNotStartWith("v2:");
+    assertThat(Encryptors.delux(NEW.key(), NEW.saltHex()).decrypt(stored)).isEqualTo(SECRET);
+    assertThat(legacyWriter.needsReEncryption(stored)).isFalse();
+    // A legacy-mode instance still reads values a v2 instance already wrote (staged upgrade).
+    assertThat(legacyWriter.decrypt(new SecretCipher(NEW, null).encrypt(SECRET))).isEqualTo(SECRET);
+  }
+
+  @Test
+  void neverEchoesAMalformedKeyIdIntoTheMessage() {
+    SecretCipher cipher = new SecretCipher(NEW, null);
+
+    assertThatThrownBy(() -> cipher.decrypt("v2:line\nbreak-and-more:AAAA"))
+        .isInstanceOf(SecretDecryptionException.class)
+        .hasMessage("Stored secret is malformed (bad key id).");
   }
 
   @Test

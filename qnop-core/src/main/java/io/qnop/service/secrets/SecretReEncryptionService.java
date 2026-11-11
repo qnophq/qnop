@@ -27,6 +27,8 @@ import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.OidcProviderRepository;
 import io.qnop.repository.OidcProviderRepository.StoredClientSecret;
 import io.qnop.security.SecretCipher;
+import io.qnop.security.SecretDecryptionException;
+import io.qnop.security.SecretWriteFormat;
 import io.qnop.service.ApplicationSettingKey;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,7 +62,17 @@ import tools.jackson.databind.node.ObjectNode;
  * <p><b>Unreadable values.</b> A value no configured key can decrypt is left untouched (restoring
  * the right key recovers it) and reported: a loud error log and a {@value #AUDIT_UNREADABLE} SYSTEM
  * audit event naming the setting or provider — never the value. The instance still starts; the
- * secret reads as unset until the key is restored or an administrator enters it again.
+ * secret reads as unset until the key is restored or an administrator enters it again. The event is
+ * recorded only when the set of unreadable secrets differs from the last one reported, so a
+ * deployment restarting in a loop does not bury the audit trail; the error log repeats each start.
+ *
+ * <p><b>Never fatal.</b> The pass runs inside application start-up, so any failure (a transient
+ * database error, say) is logged and audited as {@value #AUDIT_FAILED} rather than propagated — the
+ * next start simply tries again.
+ *
+ * <p><b>Legacy write format.</b> With {@code qnop.auth.secrets.write-format=legacy} the pass is
+ * skipped entirely: that mode exists so a staged upgrade keeps every stored value readable by the
+ * previous release.
  */
 @Service
 public class SecretReEncryptionService {
@@ -73,6 +85,9 @@ public class SecretReEncryptionService {
 
   /** SYSTEM audit event: stored secrets could not be decrypted with any configured key. */
   static final String AUDIT_UNREADABLE = "secrets.unreadable";
+
+  /** SYSTEM audit event: the start-up pass itself failed (it is retried on the next start). */
+  static final String AUDIT_FAILED = "secrets.reencryption_failed";
 
   private static final Logger log = LoggerFactory.getLogger(SecretReEncryptionService.class);
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
@@ -100,7 +115,26 @@ public class SecretReEncryptionService {
   @EventListener(ApplicationReadyEvent.class)
   @SchedulerLock(name = LOCK_NAME, lockAtMostFor = "PT10M")
   public void reEncryptOnStartup() {
-    reEncryptAll();
+    if (cipher.writeFormat() == SecretWriteFormat.LEGACY) {
+      log.info(
+          "Secrets are written in the legacy format (qnop.auth.secrets.write-format=legacy);"
+              + " skipping the start-up re-encryption.");
+      return;
+    }
+    try {
+      reEncryptAll();
+    } catch (RuntimeException e) {
+      log.error(
+          "The start-up re-encryption of stored secrets failed; it is retried next start.", e);
+      ObjectNode detail = MAPPER.createObjectNode();
+      // The exception type only: a message may quote database content.
+      detail.put("error", e.getClass().getSimpleName());
+      try {
+        saveAudit(AUDIT_FAILED, detail);
+      } catch (RuntimeException auditFailure) {
+        log.error("Could not record the re-encryption failure in the audit trail.", auditFailure);
+      }
+    }
   }
 
   /**
@@ -115,8 +149,8 @@ public class SecretReEncryptionService {
         new Result(
             settingsTally.rewritten,
             oidcTally.rewritten,
-            List.copyOf(settingsTally.unreadable),
-            List.copyOf(oidcTally.unreadable));
+            settingsTally.unreadable.stream().sorted().toList(),
+            oidcTally.unreadable.stream().sorted().toList());
     report(result);
     return result;
   }
@@ -161,7 +195,7 @@ public class SecretReEncryptionService {
     String plaintext;
     try {
       plaintext = cipher.decrypt(stored);
-    } catch (IllegalStateException e) {
+    } catch (SecretDecryptionException e) {
       tally.unreadable.add(name);
       return;
     }
@@ -190,7 +224,7 @@ public class SecretReEncryptionService {
       log.error(
           "Stored secrets could not be decrypted with any configured encryption key and are treated"
               + " as unset: settings={}, oidcProviders={}. Restore the key that wrote them (as"
-              + " qnop.auth.previous-encryption-key) or enter the secrets again.",
+              + " qnop.auth.encryption-key-previous) or enter the secrets again.",
           result.unreadableSettings(),
           result.unreadableOidcProviders());
       ObjectNode detail = MAPPER.createObjectNode();
@@ -198,8 +232,18 @@ public class SecretReEncryptionService {
       result.unreadableSettings().forEach(settingKeys::add);
       ArrayNode providers = detail.putArray("oidcProviders");
       result.unreadableOidcProviders().forEach(providers::add);
-      saveAudit(AUDIT_UNREADABLE, detail);
+      if (!sameAsLastReported(detail)) {
+        saveAudit(AUDIT_UNREADABLE, detail);
+      }
     }
+  }
+
+  private boolean sameAsLastReported(ObjectNode detail) {
+    return auditEvents
+        .findFirstByEventTypeOrderByCreatedAtDesc(AUDIT_UNREADABLE)
+        .map(AuditEvent::getDetail)
+        .map(previous -> MAPPER.readTree(previous).equals(detail))
+        .orElse(false);
   }
 
   private void saveAudit(String eventType, ObjectNode detail) {

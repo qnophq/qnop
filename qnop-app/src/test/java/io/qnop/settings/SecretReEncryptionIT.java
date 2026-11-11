@@ -162,6 +162,29 @@ class SecretReEncryptionIT extends SeededIntegrationTest {
   }
 
   @Test
+  @DisplayName("an unchanged set of unreadable secrets is audited once, a changed set again")
+  void deduplicatesTheUnreadableReport() {
+    storeSmtpPassword(foreignCiphertext());
+
+    reEncryption.reEncryptAll();
+    reEncryption.reEncryptAll();
+    assertThat(count("secrets.unreadable")).isEqualTo(1);
+
+    jdbc.update(
+        "UPDATE oidc_provider SET client_secret_encrypted = ? WHERE id = ?",
+        foreignCiphertext(),
+        SEEDED_PROVIDER);
+    reEncryption.reEncryptAll();
+    assertThat(count("secrets.unreadable")).isEqualTo(2);
+  }
+
+  private static String foreignCiphertext() {
+    return new SecretCipher(
+            new SecretCipher.KeyMaterial("some-other-deployments-key-0123456789", SALT), null)
+        .encrypt("unrecoverable");
+  }
+
+  @Test
   @DisplayName("an administrator's write is stored in the current format")
   void writesUseTheCurrentFormat() {
     settings.update(Map.of("smtp.password", "fresh-password"), ADMIN_ID);

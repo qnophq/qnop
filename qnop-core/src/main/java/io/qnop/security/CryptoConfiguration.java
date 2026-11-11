@@ -59,20 +59,20 @@ public class CryptoConfiguration {
     SecretCipher.KeyMaterial current =
         new SecretCipher.KeyMaterial(auth.encryptionKey(), auth.encryptionSalt());
     SecretCipher.KeyMaterial previous = null;
-    if (auth.hasPreviousEncryptionKey()) {
-      if (!SecretValidator.isStrong(auth.previousEncryptionKey())) {
+    if (auth.hasEncryptionKeyPrevious()) {
+      if (!SecretValidator.isStrong(auth.encryptionKeyPrevious())) {
         throw new IllegalStateException(
-            "qnop.auth.previous-encryption-key must be blank or a strong, non-default secret of at"
+            "qnop.auth.encryption-key-previous must be blank or a strong, non-default secret of at"
                 + " least "
                 + SecretValidator.MIN_LENGTH
                 + " characters");
       }
       String salt =
-          auth.previousEncryptionSalt().isEmpty()
+          auth.encryptionSaltPrevious().isEmpty()
               ? auth.encryptionSalt()
-              : auth.previousEncryptionSalt();
-      previous = new SecretCipher.KeyMaterial(auth.previousEncryptionKey(), salt);
+              : auth.encryptionSaltPrevious();
+      previous = new SecretCipher.KeyMaterial(auth.encryptionKeyPrevious(), salt);
     }
-    return new SecretCipher(current, previous);
+    return new SecretCipher(current, previous, auth.secrets().writeFormat());
   }
 }

@@ -70,6 +70,57 @@ class DbClientRegistrationRepositoryTest {
     assertThat(repository).isEmpty();
   }
 
+  @Test
+  @DisplayName("skips a provider whose stored client secret cannot be decrypted (issue #927)")
+  void skipsProviderWithUnreadableSecret() {
+    OidcProvider github = enabledGithubProvider(null);
+    when(providers.findAll()).thenReturn(List.of(github));
+    when(providers.findStoredClientSecrets()).thenReturn(List.of(stored(github.getId())));
+
+    repository.refresh();
+
+    assertThat(repository).isEmpty();
+  }
+
+  @Test
+  @DisplayName("registers a provider that simply has no client secret")
+  void registersProviderWithoutSecret() {
+    OidcProvider github = enabledGithubProvider(null);
+    when(providers.findAll()).thenReturn(List.of(github));
+    when(providers.findStoredClientSecrets()).thenReturn(List.of());
+
+    repository.refresh();
+
+    assertThat(repository.findByRegistrationId(OidcRegistrationIds.of(github.getId()))).isNotNull();
+  }
+
+  private static OidcProviderRepository.StoredClientSecret stored(UUID id) {
+    return new OidcProviderRepository.StoredClientSecret() {
+      @Override
+      public UUID getId() {
+        return id;
+      }
+
+      @Override
+      public String getName() {
+        return "github";
+      }
+
+      @Override
+      public String getCiphertext() {
+        return "v2:00000000:AAAA";
+      }
+    };
+  }
+
+  private static OidcProvider enabledGithubProvider(String secret) {
+    OidcProvider provider = new OidcProvider("github", OidcProviderType.GITHUB, "client-id");
+    ReflectionTestUtils.setField(provider, "id", UUID.randomUUID());
+    provider.setEnabled(true);
+    provider.setClientSecret(secret);
+    return provider;
+  }
+
   private static OidcProvider enabledOidcProvider(String issuerUri) {
     OidcProvider provider = new OidcProvider("internal", OidcProviderType.OIDC, "client-id");
     // The id is Hibernate-assigned at persist time; set it here so OidcRegistrationIds.of works.

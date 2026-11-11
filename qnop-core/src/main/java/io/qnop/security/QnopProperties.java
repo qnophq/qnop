@@ -46,7 +46,7 @@ public record QnopProperties(@Valid Auth auth, @Valid Cors cors) {
    * Authentication secrets. {@code jwtSecret} is the HKDF input keying material for
    * domain-separated JWT keys; {@code encryptionKey} + {@code encryptionSalt} key the {@link
    * SecretCipher} for secrets at rest (e.g. OIDC client secrets, the SMTP password). The optional
-   * {@code previousEncryptionKey} + {@code previousEncryptionSalt} are accepted for decryption
+   * {@code encryptionKeyPrevious} + {@code encryptionSaltPrevious} are accepted for decryption
    * only, so the encryption key can be rotated (issue #927, ADR-0022 amendment).
    *
    * @param jwtSecret HKDF input keying material; must be a strong, non-default secret
@@ -60,10 +60,11 @@ public record QnopProperties(@Valid Auth auth, @Valid Cors cors) {
    * @param cookieSecure whether the refresh cookie carries {@code Secure} (default true; set false
    *     only for local HTTP dev — browsers drop {@code Secure} cookies on plain HTTP)
    * @param oidc OIDC/OAuth2 login settings (post-login redirect base, issue #178)
-   * @param previousEncryptionKey the encryption key being rotated out, accepted for decryption
+   * @param encryptionKeyPrevious the encryption key being rotated out, accepted for decryption
    *     only; blank (the default) when no rotation is in progress (issue #927)
-   * @param previousEncryptionSalt hex-encoded salt belonging to the previous encryption key; blank
+   * @param encryptionSaltPrevious hex-encoded salt belonging to the previous encryption key; blank
    *     means it shares the current salt (issue #927)
+   * @param secrets secrets-at-rest behaviour (write format for staged upgrades, issue #927)
    */
   public record Auth(
       @ValidSecret String jwtSecret,
@@ -79,13 +80,14 @@ public record QnopProperties(@Valid Auth auth, @Valid Cors cors) {
       String issuer,
       Boolean cookieSecure,
       @Valid Oidc oidc,
-      String previousEncryptionKey,
+      String encryptionKeyPrevious,
       @Pattern(
               regexp = "^([0-9a-fA-F]{16,})?$",
               message =
-                  "qnop.auth.previous-encryption-salt must be blank or a hex-encoded string of at"
+                  "qnop.auth.encryption-salt-previous must be blank or a hex-encoded string of at"
                       + " least 16 characters")
-          String previousEncryptionSalt) {
+          String encryptionSaltPrevious,
+      Secrets secrets) {
 
     /** The pre-#927 shape, with no previous (rotation) key configured. */
     public Auth(
@@ -107,6 +109,7 @@ public record QnopProperties(@Valid Auth auth, @Valid Cors cors) {
           cookieSecure,
           oidc,
           null,
+          null,
           null);
     }
 
@@ -118,13 +121,30 @@ public record QnopProperties(@Valid Auth auth, @Valid Cors cors) {
       issuer = (issuer == null || issuer.isBlank()) ? "qnop" : issuer;
       cookieSecure = cookieSecure == null ? Boolean.TRUE : cookieSecure;
       oidc = oidc != null ? oidc : new Oidc(null);
-      previousEncryptionKey = previousEncryptionKey == null ? "" : previousEncryptionKey.trim();
-      previousEncryptionSalt = previousEncryptionSalt == null ? "" : previousEncryptionSalt.trim();
+      encryptionKeyPrevious = encryptionKeyPrevious == null ? "" : encryptionKeyPrevious.trim();
+      encryptionSaltPrevious = encryptionSaltPrevious == null ? "" : encryptionSaltPrevious.trim();
+      secrets = secrets != null ? secrets : new Secrets(null);
     }
 
     /** Whether a previous (rotation) encryption key is configured. */
-    public boolean hasPreviousEncryptionKey() {
-      return !previousEncryptionKey.isEmpty();
+    public boolean hasEncryptionKeyPrevious() {
+      return !encryptionKeyPrevious.isEmpty();
+    }
+  }
+
+  /**
+   * Secrets-at-rest behaviour (issue #927, ADR-0022 amendment).
+   *
+   * @param writeFormat the format new secrets are written in. {@link SecretWriteFormat#V2} (the
+   *     default) writes the versioned, key-identified format and re-encrypts older values at
+   *     start-up. {@link SecretWriteFormat#LEGACY} keeps writing the pre-#927 format and skips the
+   *     start-up re-encryption — the first stage of a staged multi-instance upgrade, while a
+   *     rollback to an earlier release must stay possible.
+   */
+  public record Secrets(SecretWriteFormat writeFormat) {
+
+    public Secrets {
+      writeFormat = writeFormat != null ? writeFormat : SecretWriteFormat.V2;
     }
   }
 

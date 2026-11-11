@@ -24,6 +24,7 @@ import io.qnop.entity.ApplicationSetting;
 import io.qnop.entity.AuditEvent;
 import io.qnop.repository.ApplicationSettingRepository;
 import io.qnop.repository.AuditEventRepository;
+import io.qnop.security.SecretDecryptionException;
 import io.qnop.service.limits.FeatureDisabledException;
 import io.qnop.service.limits.FeatureToggleProperties;
 import jakarta.annotation.PostConstruct;
@@ -389,7 +390,7 @@ public class ApplicationSettingsService {
     if (key.isSensitive() && value != null && !value.isBlank()) {
       try {
         return textEncryptor.decrypt(value);
-      } catch (IllegalStateException e) {
+      } catch (SecretDecryptionException e) {
         log.error(
             "Setting '{}' could not be decrypted with any configured encryption key and is treated"
                 + " as unset: {}",
