@@ -1927,17 +1927,19 @@ paths:
       summary: Verify a registered email address
       description: |
         Confirms a self-registration and activates the account (issue #900). Public.
-        Requires the single-use token from the emailed link **and** the password chosen
-        in the registration that link belongs to: the account is activated with exactly
-        that registration's credentials, and every other link of the address is spent.
+        The link proves control of the mailbox, and for an account nobody has verified
+        yet mailbox control is account control — the same trust a password-reset link
+        carries. With `setNew` false (default) the request confirms the registration the
+        link belongs to: `password` must be its password and the account gets exactly
+        its credentials; a mismatch is `VERIFICATION_PASSWORD_MISMATCH` and leaves the
+        link usable. With `setNew` true the holder sets new credentials instead:
+        `password` (8–200 characters) and `username` (default: the registration's)
+        become the account's, the username also its display name. Either way every
+        other link of the address is spent. A username of another account is
+        `VERIFICATION_USERNAME_TAKEN` (the link stays usable); an unknown, expired or
+        used link, or an account no longer pending, is `INVALID_VERIFICATION_TOKEN`.
         Only an account still pending verification can be activated — never one an
-        administrator has disabled. A wrong password leaves
-        the token usable (`VERIFICATION_PASSWORD_MISMATCH`) up to five times; the fifth
-        spends it. An unknown, expired, used or spent token, or an account no longer
-        pending, is `INVALID_VERIFICATION_TOKEN` — the registrant registers again. If
-        the registration's username was taken by another account in the meantime, the
-        link is spent and the answer is `VERIFICATION_USERNAME_TAKEN`.
-        Rate-limited per client IP.
+        administrator has disabled. Rate-limited per client IP.
       operationId: verifyEmail
       security: []
       requestBody:
@@ -1954,7 +1956,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/VerifyEmailResponse'
         '400':
-          description: Invalid token, or a password that does not match the registration
+          description: Invalid link, password mismatch, taken username or invalid new credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /auth/verify-email/registration:
+    post:
+      tags:
+        - AuthRegistration
+      summary: Read the username a verification link registered
+      description: |
+        Returns the username the registration behind a still-usable verification link
+        asked for, so the verify page can offer it when the link holder sets new
+        credentials (issue #900). Public; holding the link is the authority, exactly as
+        for `/auth/verify-email`. Rate-limited per client IP.
+      operationId: getVerificationRegistration
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificationTokenRequest'
+      responses:
+        '200':
+          description: The registration's username
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationRegistration'
+        '400':
+          description: Unknown, expired or used link, or an account no longer pending
           content:
             application/json:
               schema:
@@ -6702,7 +6737,9 @@ components:
         - message
     VerifyEmailRequest:
       type: object
-      description: The emailed verification token plus the password chosen at registration.
+      description: |
+        The emailed verification token plus either the password of the registration it
+        belongs to (`setNew` false) or new credentials (`setNew` true).
       properties:
         token:
           type: string
@@ -6713,9 +6750,34 @@ components:
           format: password
           minLength: 1
           maxLength: 200
+        setNew:
+          type: boolean
+          default: false
+          description: Set `password` (and `username`) as new credentials instead of confirming.
+        username:
+          type: string
+          minLength: 3
+          maxLength: 64
+          description: With `setNew`, the username to use; defaults to the registration's.
       required:
         - token
         - password
+    VerificationTokenRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 512
+      required:
+        - token
+    VerificationRegistration:
+      type: object
+      properties:
+        username:
+          type: string
+      required:
+        - username
     VerifyEmailResponse:
       type: object
       properties:

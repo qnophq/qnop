@@ -24,14 +24,17 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { renderWithProviders } from '../../test/renderWithProviders';
-import { verifyEmail } from '../../api/auth';
+import { fetchVerificationUsername, verifyEmail } from '../../api/auth';
 import { useConfig } from '../../api/hooks/useConfig';
 import { VerifyEmailPage } from './VerifyEmailPage';
 
-vi.mock('../../api/auth', () => ({ verifyEmail: vi.fn() }));
+vi.mock('../../api/auth', () => ({ verifyEmail: vi.fn(), fetchVerificationUsername: vi.fn() }));
 vi.mock('../../api/hooks/useConfig', () => ({ useConfig: vi.fn() }));
 const verifyEmailFn = vi.mocked(verifyEmail);
+const fetchUsernameFn = vi.mocked(fetchVerificationUsername);
 const useConfigMock = vi.mocked(useConfig);
+
+const STRONG = 'brand-new-strong-pw';
 
 function mockConfig(selfRegistrationEnabled: boolean) {
   useConfigMock.mockReturnValue({
@@ -55,6 +58,11 @@ async function submitPassword(password: string) {
   const user = userEvent.setup();
   await user.type(screen.getByLabelText(/^password/i), password);
   await user.click(screen.getByRole('button', { name: /confirm and activate/i }));
+  return user;
+}
+
+function renderPage(token = 'good-token') {
+  renderWithProviders(<VerifyEmailPage />, { initialEntries: [`/verify-email?token=${token}`] });
 }
 
 beforeEach(() => {
@@ -63,11 +71,9 @@ beforeEach(() => {
 });
 
 describe('VerifyEmailPage', () => {
-  it('verifies the token with the registration password and confirms success', async () => {
+  it('confirms the registration with its password', async () => {
     verifyEmailFn.mockResolvedValue();
-    renderWithProviders(<VerifyEmailPage />, {
-      initialEntries: ['/verify-email?token=good-token'],
-    });
+    renderPage();
 
     // Nothing is sent before the password is entered.
     expect(verifyEmailFn).not.toHaveBeenCalled();
@@ -77,39 +83,51 @@ describe('VerifyEmailPage', () => {
     expect(verifyEmailFn).toHaveBeenCalledWith('good-token', 'my-password-1');
   });
 
-  it('keeps the form and explains a password that does not match', async () => {
-    verifyEmailFn.mockRejectedValue(apiError('VERIFICATION_PASSWORD_MISMATCH'));
-    renderWithProviders(<VerifyEmailPage />, {
-      initialEntries: ['/verify-email?token=good-token'],
-    });
+  it('on a mismatch offers to set own credentials, prefilled with the registration username', async () => {
+    verifyEmailFn.mockRejectedValueOnce(apiError('VERIFICATION_PASSWORD_MISMATCH'));
+    fetchUsernameFn.mockResolvedValue('squatter');
+    renderPage();
 
-    await submitPassword('wrong');
-
+    const user = await submitPassword('mine-1234');
     expect(await screen.findByText(/doesn't match the one chosen at sign-up/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /confirm and activate/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /set my own username and password/i }));
+
+    const username = await screen.findByLabelText(/^username/i);
+    expect(username).toHaveValue('squatter');
+    await user.clear(username);
+    await user.type(username, 'owner');
+    await user.type(screen.getByLabelText(/^new password/i), STRONG);
+    await user.type(screen.getByLabelText(/^confirm password/i), STRONG);
+    verifyEmailFn.mockResolvedValueOnce();
+    await user.click(screen.getByRole('button', { name: /activate with these details/i }));
+
+    expect(await screen.findByText(/your email address is confirmed/i)).toBeInTheDocument();
+    expect(verifyEmailFn).toHaveBeenLastCalledWith('good-token', STRONG, {
+      setNew: true,
+      username: 'owner',
+    });
   });
 
-  it('asks to register again when the sign-up username was taken meanwhile', async () => {
-    verifyEmailFn.mockRejectedValue(apiError('VERIFICATION_USERNAME_TAKEN'));
-    renderWithProviders(<VerifyEmailPage />, {
-      initialEntries: ['/verify-email?token=good-token'],
-    });
+  it('asks for another username when it is taken', async () => {
+    verifyEmailFn.mockRejectedValueOnce(apiError('VERIFICATION_USERNAME_TAKEN'));
+    fetchUsernameFn.mockResolvedValue('wanted');
+    renderPage();
 
     await submitPassword('my-password-1');
 
-    expect(await screen.findByText(/has been taken in the meantime/i)).toBeInTheDocument();
+    expect(await screen.findByText(/already taken/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^username/i)).toHaveValue('wanted');
   });
 
   it('shows the dead-link error when the token is rejected', async () => {
     verifyEmailFn.mockRejectedValue(apiError('INVALID_VERIFICATION_TOKEN'));
-    renderWithProviders(<VerifyEmailPage />, { initialEntries: ['/verify-email?token=stale'] });
+    renderPage('stale');
 
     await submitPassword('my-password-1');
 
     expect(await screen.findByText(/link is invalid or expired/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /confirm and activate/i })).toBeNull();
-    // A dead link (expired, used, or spent by wrong passwords) points to registering again.
-    expect(screen.getByText(/stop working after five wrong passwords/i)).toBeInTheDocument();
+    expect(screen.getByText(/stop working once the account is activated/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /register again/i })).toHaveAttribute(
       'href',
       '/register',

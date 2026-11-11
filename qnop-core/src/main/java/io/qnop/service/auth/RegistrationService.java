@@ -26,7 +26,6 @@ import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.InvalidTextException;
 import io.qnop.service.UserService;
-import io.qnop.service.UserService.ActivationOutcome;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
 import io.qnop.service.auth.EmailVerificationTokenService.PendingVerification;
 import io.qnop.service.mail.MailLocaleResolver;
@@ -52,14 +51,12 @@ import org.springframework.transaction.annotation.Transactional;
  * <ul>
  *   <li>A new account is <em>pending verification</em> — a state of its own, distinct from an
  *       administrator-disabled account — and {@link #verify} activates only a pending account.
- *   <li>The credentials a registration asks for are bound to <em>its</em> verification token, not
- *       to the account row. Registering an address that is still pending issues one more token and
- *       leaves the others valid; verifying a token with its password activates the account with
- *       exactly that token's credentials and spends all other tokens. Nobody can block or
- *       invalidate somebody else's registration, and only the mailbox owner, who receives the
- *       links, can complete any of them.
- *   <li>Each link allows a capped number of password attempts, reserved atomically before the
- *       comparison.
+ *   <li><em>Mailbox control is account control</em> for an account nobody has verified yet — the
+ *       same trust a password-reset link carries. Each registration's credentials ride on its own
+ *       verification link; whoever uses a link either confirms that registration (its password) or
+ *       sets new credentials. So the owner of an address can always claim the account with any link
+ *       that reaches their mailbox, whoever triggered it, and a registration by somebody else can
+ *       never complete or block anything.
  *   <li>A registration that collides with an existing account sends a neutral notice to the entered
  *       address instead of nothing; the response stays uniform either way.
  *   <li>Every branch encodes the password once and every mail is sent after commit off the request
@@ -70,12 +67,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class RegistrationService {
 
   /**
-   * At most one new verification link (and mail) per pending address in this window (issue #900).
-   * With the cap of {@value EmailVerificationTokenService#MAX_OUTSTANDING_TOKENS} outstanding
-   * links, displacing an existing link takes at least that many windows; per-address register rate
-   * limits come on top.
+   * At most one new verification link (and mail) per pending address in this window (issue #900) —
+   * purely mail-volume protection: inside the window the address has just received a link, and any
+   * link lets its owner claim the account.
    */
   static final Duration ISSUE_THROTTLE = Duration.ofMinutes(5);
+
+  // The self-registration policy, as in the OpenAPI RegisterRequest (issue #900).
+  static final int MIN_PASSWORD_LENGTH = 8;
+  static final int MAX_PASSWORD_LENGTH = 200;
+  static final int MIN_USERNAME_LENGTH = 3;
+  static final int MAX_USERNAME_LENGTH = 64;
 
   private final UserService userService;
   private final EmailVerificationTokenService verificationTokens;
@@ -165,26 +167,34 @@ public class RegistrationService {
   }
 
   /**
-   * Verifies an address and activates its account (issue #900) with the credentials of the
-   * registration this token belongs to. The token must be usable, the account must still be pending
-   * verification, and {@code password} must be that registration's password. One attempt is
-   * reserved atomically before the comparison, so no more than {@value
-   * EmailVerificationTokenService#MAX_FAILED_ATTEMPTS} passwords are ever compared against one
-   * link, concurrency included; the attempt that uses up the allowance spends the link. On success
-   * all other links of the address are spent.
+   * Verifies an address and activates its account (issue #900). The verification link proves
+   * control of the mailbox, and for an account nobody has verified yet mailbox control is account
+   * control — the same trust a password-reset link carries. So whoever uses the link decides the
+   * credentials:
    *
-   * @throws InvalidVerificationTokenException for an unknown, expired, used or spent token, or an
-   *     account that is no longer pending verification (e.g. an administrator disabled it)
-   * @throws VerificationPasswordMismatchException when the password does not match
-   * @throws VerificationUsernameTakenException when the registration's username was taken meanwhile
-   *     (the link is spent)
+   * <ul>
+   *   <li>{@code setNew = false} confirms the registration this link belongs to: {@code password}
+   *       must be its password, and the account gets exactly its username, display name and
+   *       password. A mismatch changes nothing and leaves the link usable.
+   *   <li>{@code setNew = true} sets new credentials instead: {@code password} becomes the
+   *       password, {@code username} (default: the registration's) the username and the display
+   *       name. This is how the owner of an address claims an account somebody else registered with
+   *       it — no registration by anybody else can prevent that.
+   * </ul>
+   *
+   * <p>Either way every other link of the address is spent. There is no attempt cap: a link holder
+   * gains nothing by guessing the registration's password, since they may simply set a new one;
+   * request volume is bounded by the per-IP rate limit of the endpoint.
+   *
+   * @throws InvalidVerificationTokenException for an unknown, expired or used token, or an account
+   *     that is no longer pending verification (e.g. an administrator decided about it)
+   * @throws VerificationPasswordMismatchException when confirming with another password
+   * @throws VerificationUsernameTakenException when the username belongs to another account (the
+   *     link stays usable; set new credentials with another username)
+   * @throws VerificationInputException when new credentials violate the account policy
    */
-  @Transactional(
-      noRollbackFor = {
-        VerificationPasswordMismatchException.class,
-        VerificationUsernameTakenException.class
-      })
-  public void verify(String rawToken, String password) {
+  @Transactional
+  public void verify(String rawToken, String password, boolean setNew, String username) {
     PendingVerification pending = verificationTokens.peek(rawToken);
     if (!pending.accountPending()) {
       throw new InvalidVerificationTokenException("Verification token is no longer valid");
@@ -192,28 +202,31 @@ public class RegistrationService {
     // Account row first, then the token: every verify and every registration of this address
     // takes the locks in this order.
     userService.lockForUpdate(pending.userId());
-    if (!verificationTokens.reserveAttempt(pending.tokenId())) {
-      throw new InvalidVerificationTokenException("Verification token is no longer valid");
-    }
-    if (password == null
-        || pending.passwordHash() == null
-        || !passwordEncoder.matches(password, pending.passwordHash())) {
-      // Committed despite the exception (noRollbackFor): the reserved attempt stays counted.
-      throw new VerificationPasswordMismatchException(
-          verificationTokens.spendIfExhausted(pending.tokenId()));
+    String chosenUsername;
+    String displayName;
+    String passwordHash;
+    if (setNew) {
+      chosenUsername = username == null || username.isBlank() ? pending.username() : username;
+      requireValidNewCredentials(chosenUsername, password);
+      // The display name of a claimed account is its username: nothing the registrations wrote
+      // survives into it. The owner can change it in the profile.
+      displayName = chosenUsername;
+      passwordHash = passwordEncoder.encode(password);
+    } else {
+      if (password == null
+          || pending.passwordHash() == null
+          || !passwordEncoder.matches(password, pending.passwordHash())) {
+        throw new VerificationPasswordMismatchException();
+      }
+      chosenUsername = pending.username();
+      displayName = pending.displayName();
+      passwordHash = pending.passwordHash();
     }
     // Conditional on the pending flag in the database, so an administrator's decision or another
-    // link verified concurrently still wins; that throw rolls everything back.
-    ActivationOutcome outcome =
-        userService.activateVerifiedRegistration(
-            pending.userId(), pending.username(), pending.displayName(), pending.passwordHash());
-    switch (outcome) {
-      case USERNAME_TAKEN -> {
-        // This link can never succeed: spend it (committed, noRollbackFor) instead of letting
-        // every retry cost another password comparison.
-        verificationTokens.consume(pending.tokenId());
-        throw new VerificationUsernameTakenException();
-      }
+    // link verified concurrently still wins.
+    switch (userService.activateVerifiedRegistration(
+        pending.userId(), chosenUsername, displayName, passwordHash)) {
+      case USERNAME_TAKEN -> throw new VerificationUsernameTakenException();
       case NOT_PENDING ->
           throw new InvalidVerificationTokenException("Verification token is no longer valid");
       case ACTIVATED -> {
@@ -221,6 +234,43 @@ public class RegistrationService {
         verificationTokens.consumeAllForUser(pending.userId());
       }
     }
+  }
+
+  /**
+   * The username the registration behind a still-usable link asked for (issue #900), so the verify
+   * page can offer it when its holder sets new credentials. Holding the link is the authority here,
+   * exactly as for {@link #verify}.
+   */
+  @Transactional(readOnly = true)
+  public String registrationUsername(String rawToken) {
+    PendingVerification pending = verificationTokens.peek(rawToken);
+    if (!pending.accountPending()) {
+      throw new InvalidVerificationTokenException("Verification token is no longer valid");
+    }
+    return pending.username();
+  }
+
+  /** The self-registration policy for credentials chosen at verification (same as register). */
+  private static void requireValidNewCredentials(String username, String password) {
+    if (password == null
+        || password.length() < MIN_PASSWORD_LENGTH
+        || password.length() > MAX_PASSWORD_LENGTH) {
+      throw new VerificationInputException(
+          "The password must be "
+              + MIN_PASSWORD_LENGTH
+              + " to "
+              + MAX_PASSWORD_LENGTH
+              + " characters long.");
+    }
+    if (username.length() < MIN_USERNAME_LENGTH || username.length() > MAX_USERNAME_LENGTH) {
+      throw new VerificationInputException(
+          "The username must be "
+              + MIN_USERNAME_LENGTH
+              + " to "
+              + MAX_USERNAME_LENGTH
+              + " characters long.");
+    }
+    InvalidTextException.requireNoControlCharacters("username", username);
   }
 
   /**
@@ -283,25 +333,21 @@ public class RegistrationService {
    */
   public static class VerificationUsernameTakenException extends RuntimeException {
     public VerificationUsernameTakenException() {
-      super("The username of this registration is no longer available; please register again");
+      super("This username is already taken; choose another one");
     }
   }
 
   /** The password presented at verification is not the one chosen at registration (issue #900). */
   public static class VerificationPasswordMismatchException extends RuntimeException {
-    private final boolean linkSpent;
-
-    public VerificationPasswordMismatchException(boolean linkSpent) {
-      super(
-          linkSpent
-              ? "Too many wrong passwords; this verification link can no longer be used"
-              : "The password does not match the one chosen at registration");
-      this.linkSpent = linkSpent;
+    public VerificationPasswordMismatchException() {
+      super("The password does not match the one chosen at registration");
     }
+  }
 
-    /** Whether this attempt used up the allowance and spent the verification link. */
-    public boolean linkSpent() {
-      return linkSpent;
+  /** New credentials chosen at verification violate the account policy (issue #900). */
+  public static class VerificationInputException extends RuntimeException {
+    public VerificationInputException(String message) {
+      super(message);
     }
   }
 }

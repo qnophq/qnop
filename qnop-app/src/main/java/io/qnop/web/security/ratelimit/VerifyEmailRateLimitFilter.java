@@ -25,18 +25,17 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Rate-limits {@code POST /api/v1/auth/verify-email} per client IP (issue #900). Each request with
- * a usable token costs one password-hash comparison, so an unthrottled endpoint would be a cheap
- * way to burn server CPU; the per-token attempt cap in the service bounds guessing on one link,
- * this bounds the volume from one source. Configured under {@code
- * qnop.auth.rate-limit.verify-email.*} (default 10 per 15 minutes) without a {@link
- * RateLimitProperties} component, so the limiter can later be folded into that catalogue without a
- * breaking change.
+ * Rate-limits {@code POST /api/v1/auth/verify-email} and its {@code /registration} lookup per
+ * client IP (issue #900), in one bucket. A verification costs a password-hash comparison (and, when
+ * new credentials are set, a hash computation), so an unthrottled endpoint would be a cheap way to
+ * burn server CPU. Configured under {@code qnop.auth.rate-limit.verify-email.*} (default 10 per 15
+ * minutes).
  */
 @Component
 public class VerifyEmailRateLimitFilter extends AbstractRateLimitFilter {
 
   static final String PATH = "/api/v1/auth/verify-email";
+  static final String REGISTRATION_PATH = "/api/v1/auth/verify-email/registration";
 
   private final HttpClientIpResolver clientIpResolver;
   private final int maxAttempts;
@@ -55,7 +54,9 @@ public class VerifyEmailRateLimitFilter extends AbstractRateLimitFilter {
 
   @Override
   protected boolean handles(HttpServletRequest request) {
-    return "POST".equalsIgnoreCase(request.getMethod()) && PATH.equals(request.getRequestURI());
+    String uri = request.getRequestURI();
+    return "POST".equalsIgnoreCase(request.getMethod())
+        && (PATH.equals(uri) || REGISTRATION_PATH.equals(uri));
   }
 
   @Override

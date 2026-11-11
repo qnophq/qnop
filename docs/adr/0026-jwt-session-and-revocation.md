@@ -129,38 +129,54 @@ comes into being without an authenticated session. Both are hardened:
   insert) and holding an unconsumed verification token. Every other disabled
   account stays administrator-disabled: when in doubt the account is **not**
   reopened for self-service verification.
-- **A password becomes a credential only once the mailbox owner confirms it.**
-  `POST /auth/verify-email` takes the token **and** the password chosen at
-  registration (the former `GET ?token=` is gone).
-- **Credentials are bound to the verification token, not to the account row.**
-  Every (re)registration of a pending address issues a token that carries that
-  registration's candidate username, display name and password hash
-  (`email_verification_token.candidate_*`, migration 0039, all set or all null by
-  check constraint); it does not invalidate the other outstanding tokens. The
-  account row of a pending registration holds no registrant password at all (an
-  unmatchable placeholder). Verifying a token with its own password activates the
-  account with exactly that token's credentials (one conditional, version-bumping
-  update; the profile slug follows the verified display name) and spends every
-  other token of the address. Every update that spends a link also nulls its
-  candidate columns. A third party who registers somebody else's address can
-  therefore never complete or hijack the account — only the mailbox owner, who
-  receives the links, can complete one — and leaves the owner's link working.
-  What it *can* do is bounded: at most three links per address are outstanding
-  (registering beyond that spends the oldest, in one targeted update) and at most
-  one new link and mail is issued per address per five minutes (the newest
-  token's `created_at`; within the window a registration is a uniform no-op that
-  still pays the BCrypt cost). Displacing an owner's link therefore takes at
-  least three windows (≥ 15 minutes), after which the owner simply registers
-  again; the per-e-mail register buckets of #931 bound the volume further. The
-  cap check and insert run under a lock on the account row, so concurrent
-  registrations cannot overshoot it. A candidate username reserves nothing: if
-  another account takes it before verification, the link is spent and the answer
-  is `VERIFICATION_USERNAME_TAKEN` (also for the unique-index race), and the
-  registrant registers again with another username. Tokens issued before this
-  change carry no candidate and fall back to the account row. An earlier draft
-  let the newest registration replace the account row's credentials (and then a
-  cool-down to stop it from killing fresh links); both let a third party
-  interfere far more cheaply.
+- **Principle: for an account nobody has verified yet, mailbox control is account
+  control** — the same trust level as a password-reset link, which already lets
+  whoever reads the mailbox set the password of a verified account. The
+  verification link proves mailbox control, so whoever uses it decides the
+  credentials. `POST /auth/verify-email` (the former `GET ?token=` is gone) takes
+  the token and a password and works in one of two ways:
+  - *confirm* (`setNew` false, the normal case): the password must be the one of
+    the registration the link belongs to, and the account gets exactly that
+    registration's username, display name and password. A mismatch
+    (`VERIFICATION_PASSWORD_MISMATCH`) changes nothing and leaves the link usable.
+  - *set new* (`setNew` true): the link holder's password (registration policy,
+    8–200 characters) and username (default: the registration's; uniqueness
+    checked) become the account's; the username is also the display name, so no
+    text a registration wrote survives. `POST /auth/verify-email/registration`
+    returns the registration's username so the page can pre-fill it.
+
+  Either way every other link of the address is spent. Consequences: a registration
+  by somebody who does not own the address can never complete, hijack or block the
+  account. Any link that reaches the mailbox — including one the other person's
+  registration triggered — lets the owner claim it with their own credentials. This
+  ends the earlier back-and-forth (newest registration replaces the row → cool-down
+  → per-token credentials with eviction → throttle), all of which still let a
+  password chosen by someone without the mailbox matter.
+- **Registration credentials ride on the link.** Every (re)registration of a pending
+  address issues a token carrying that registration's candidate username, display
+  name and password hash (`email_verification_token.candidate_*`, migration 0039;
+  all set or all null by check constraint); it does not invalidate the other
+  links. The account row of a pending registration holds no registrant password
+  (an unmatchable placeholder). Every update that spends a link nulls its candidate
+  columns. Tokens issued before this change carry no candidate and fall back to the
+  account row.
+- **No attempt cap.** The holder of a link gains nothing by guessing the
+  registration's password, since they may simply set a new one; so wrong passwords
+  never spend a link. CPU cost per source is bounded by the per-IP rate limit on
+  both verify endpoints (default 10 per 15 minutes,
+  `qnop.auth.rate-limit.verify-email.*`).
+- **Mail volume.** At most three links per address are outstanding (the oldest is
+  spent, in one targeted update) and at most one new link and mail is issued per
+  address per five minutes (newest token's `created_at`; inside the window a
+  registration is a uniform no-op that still pays the BCrypt cost). This is volume
+  protection only: inside the window the address has just received a link, and any
+  link lets its owner claim the account. The per-e-mail register buckets of #931
+  bound the volume further. The cap check and insert run under a lock on the
+  account row.
+- **A candidate username reserves nothing.** If another account takes it before
+  verification, the answer is `VERIFICATION_USERNAME_TAKEN` (also for the
+  unique-index race, never a 500) and the link stays usable: its holder sets new
+  credentials with another username.
 - **The verification mail greets the address, not the request.** The greeting is
   the local part of the address; no text from the registration request appears in
   any registration mail.
@@ -172,15 +188,6 @@ comes into being without an authenticated session. Both are hardened:
 - **Lock order.** Verify and further registrations of one address both lock the
   account row first and its tokens second, so they serialise per address and
   cannot deadlock each other.
-- **Guessing is bounded.** One attempt is reserved atomically **before** the
-  password comparison (`UPDATE … SET failed_attempts = failed_attempts + 1 WHERE
-  consumed_at IS NULL AND failed_attempts < 5`); no reservation, no comparison.
-  So even concurrent requests compare at most five passwords against one link,
-  and the attempt that uses up the allowance spends it. A mistyped password does
-  not burn the link before that (`VERIFICATION_PASSWORD_MISMATCH` vs.
-  `INVALID_VERIFICATION_TOKEN`). The endpoint is also rate-limited per client IP
-  (default 10 per 15 minutes, `qnop.auth.rate-limit.verify-email.*`; the auth
-  rate-limit catalogue may absorb it later).
 - **Duplicate registration sends a neutral notice** (`auth.registration_attempt`)
   to the entered address when the address or username belongs to any other
   account; nothing is created or changed and the response stays uniform.
@@ -207,9 +214,8 @@ comes into being without an authenticated session. Both are hardened:
   character passphrase); otherwise the startup fails. The password file is deleted
   once the generated password has been changed.
 
-Accepted consequences: the verify step now asks for a password, so a user who
-forgot the password chosen minutes earlier registers again and uses the new link
-(a separate one; the forgotten one simply expires). An admin edit that decides the enabled
+Accepted consequences: the verify step asks for a password; a user who forgot the
+one chosen minutes earlier simply sets a new one on the same page. An admin edit that decides the enabled
 state of a pending account turns it into an ordinary (possibly disabled) account
 the link can no longer activate. The admin user list does not yet show the pending
 state separately (follow-up).

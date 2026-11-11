@@ -32,11 +32,25 @@ export async function register(input: {
 }
 
 /**
- * Activates an account from an email-verification token plus the password chosen at
- * registration (issue #900) — the password only becomes a credential once confirmed here.
+ * Verifies an address (issue #900): confirms the registration with its password, or, with
+ * `setNew`, sets the link holder's own password and username instead.
  */
-export async function verifyEmail(token: string, password: string): Promise<void> {
-  await authRegistrationApi.verifyEmail({ verifyEmailRequest: { token, password } });
+export async function verifyEmail(
+  token: string,
+  password: string,
+  options: { setNew?: boolean; username?: string } = {},
+): Promise<void> {
+  await authRegistrationApi.verifyEmail({
+    verifyEmailRequest: { token, password, setNew: options.setNew, username: options.username },
+  });
+}
+
+/** The username the registration behind a verification link asked for (issue #900). */
+export async function fetchVerificationUsername(token: string): Promise<string> {
+  const response = await authRegistrationApi.getVerificationRegistration({
+    verificationTokenRequest: { token },
+  });
+  return response.data.username;
 }
 
 /** Requests a password-reset email. Uniform ack regardless of whether the account exists. */

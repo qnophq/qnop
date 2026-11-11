@@ -172,27 +172,6 @@ class EmailVerificationTokenServiceTest {
   }
 
   @Test
-  @DisplayName("reserveAttempt is the conditional update against the cap")
-  void reserveAttemptUsesTheCap() {
-    UUID id = UUID.randomUUID();
-    when(tokens.reserveAttempt(id, EmailVerificationTokenService.MAX_FAILED_ATTEMPTS))
-        .thenReturn(1, 0);
-
-    assertThat(service.reserveAttempt(id)).isTrue();
-    assertThat(service.reserveAttempt(id)).isFalse();
-  }
-
-  @Test
-  @DisplayName("spendIfExhausted reports whether this call spent the link")
-  void spendIfExhausted() {
-    UUID id = UUID.randomUUID();
-    when(tokens.consumeIfAttemptsExhausted(eq(id), eq(5), any())).thenReturn(0, 1);
-
-    assertThat(service.spendIfExhausted(id)).isFalse();
-    assertThat(service.spendIfExhausted(id)).isTrue();
-  }
-
-  @Test
   @DisplayName("consume rejects a token consumed concurrently (atomic guard, issue #61)")
   void consumeLosesRace() {
     UUID id = UUID.randomUUID();

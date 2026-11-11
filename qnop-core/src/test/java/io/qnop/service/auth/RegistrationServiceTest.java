@@ -39,6 +39,7 @@ import io.qnop.service.UserService;
 import io.qnop.service.UserService.ActivationOutcome;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
 import io.qnop.service.auth.EmailVerificationTokenService.PendingVerification;
+import io.qnop.service.auth.RegistrationService.VerificationInputException;
 import io.qnop.service.auth.RegistrationService.VerificationPasswordMismatchException;
 import io.qnop.service.auth.RegistrationService.VerificationUsernameTakenException;
 import io.qnop.service.mail.MailLocaleResolver;
@@ -289,22 +290,20 @@ class RegistrationServiceTest {
 
   @Test
   @DisplayName(
-      "verify reserves an attempt, checks the token's own password, consumes it, activates with"
-          + " the token's credentials and spends the other links")
-  void verifyActivatesWithTheTokensCredentials() {
+      "confirming: the token's own password activates the account with exactly the token's"
+          + " credentials and spends the other links")
+  void verifyConfirmsTheRegistration() {
     UUID userId = UUID.randomUUID();
     PendingVerification pending = pendingVerification(userId, true);
     when(verificationTokens.peek("tok")).thenReturn(pending);
-    when(verificationTokens.reserveAttempt(pending.tokenId())).thenReturn(true);
     when(passwordEncoder.matches("password1", "CAND-HASH")).thenReturn(true);
     when(userService.activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH"))
         .thenReturn(ActivationOutcome.ACTIVATED);
 
-    service.verify("tok", "password1");
+    service.verify("tok", "password1", false, null);
 
     var order = org.mockito.Mockito.inOrder(verificationTokens, passwordEncoder, userService);
     order.verify(userService).lockForUpdate(userId);
-    order.verify(verificationTokens).reserveAttempt(pending.tokenId());
     order.verify(passwordEncoder).matches("password1", "CAND-HASH");
     order.verify(userService).activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH");
     order.verify(verificationTokens).consume(pending.tokenId());
@@ -312,67 +311,79 @@ class RegistrationServiceTest {
   }
 
   @Test
-  @DisplayName("a username taken meanwhile spends the link and reports its own outcome")
-  void verifySpendsTheLinkWhenTheUsernameIsTaken() {
-    UUID userId = UUID.randomUUID();
-    PendingVerification pending = pendingVerification(userId, true);
-    when(verificationTokens.peek("tok")).thenReturn(pending);
-    when(verificationTokens.reserveAttempt(pending.tokenId())).thenReturn(true);
-    when(passwordEncoder.matches("password1", "CAND-HASH")).thenReturn(true);
-    when(userService.activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH"))
-        .thenReturn(ActivationOutcome.USERNAME_TAKEN);
-
-    assertThatThrownBy(() -> service.verify("tok", "password1"))
-        .isInstanceOf(VerificationUsernameTakenException.class);
-
-    verify(verificationTokens).consume(pending.tokenId());
-    verify(verificationTokens, never()).consumeAllForUser(any());
-  }
-
-  @Test
-  @DisplayName("without an attempt left, no password is compared at all")
-  void verifyComparesNothingWhenAttemptsAreGone() {
-    PendingVerification pending = pendingVerification(UUID.randomUUID(), true);
-    when(verificationTokens.peek("tok")).thenReturn(pending);
-    when(verificationTokens.reserveAttempt(pending.tokenId())).thenReturn(false);
-
-    assertThatThrownBy(() -> service.verify("tok", "password1"))
-        .isInstanceOf(InvalidVerificationTokenException.class);
-
-    verify(passwordEncoder, never()).matches(any(), any());
-    verify(userService, never()).activateVerifiedRegistration(any(), any(), any(), any());
-  }
-
-  @Test
-  @DisplayName("a wrong password neither consumes the token nor activates")
+  @DisplayName("confirming with another password changes nothing and keeps the link usable")
   void verifyRejectsWrongPassword() {
     PendingVerification pending = pendingVerification(UUID.randomUUID(), true);
     when(verificationTokens.peek("tok")).thenReturn(pending);
-    when(verificationTokens.reserveAttempt(pending.tokenId())).thenReturn(true);
     when(passwordEncoder.matches("guess", "CAND-HASH")).thenReturn(false);
 
-    assertThatThrownBy(() -> service.verify("tok", "guess"))
-        .isInstanceOf(VerificationPasswordMismatchException.class)
-        .satisfies(
-            e -> assertThat(((VerificationPasswordMismatchException) e).linkSpent()).isFalse());
+    assertThatThrownBy(() -> service.verify("tok", "guess", false, null))
+        .isInstanceOf(VerificationPasswordMismatchException.class);
 
     verify(verificationTokens, never()).consume(any());
     verify(userService, never()).activateVerifiedRegistration(any(), any(), any(), any());
   }
 
   @Test
-  @DisplayName("the wrong password that uses up the allowance reports the link as spent")
-  void verifyReportsSpentLinkAtTheCap() {
-    PendingVerification pending = pendingVerification(UUID.randomUUID(), true);
+  @DisplayName(
+      "setting new credentials: the link holder's own password and username win over whatever"
+          + " the registration asked for; the username is also the display name")
+  void verifySetsNewCredentials() {
+    UUID userId = UUID.randomUUID();
+    PendingVerification pending = pendingVerification(userId, true);
     when(verificationTokens.peek("tok")).thenReturn(pending);
-    when(verificationTokens.reserveAttempt(pending.tokenId())).thenReturn(true);
-    when(passwordEncoder.matches("guess", "CAND-HASH")).thenReturn(false);
-    when(verificationTokens.spendIfExhausted(pending.tokenId())).thenReturn(true);
+    when(passwordEncoder.encode("owner-pass-1")).thenReturn("OWNER-HASH");
+    when(userService.activateVerifiedRegistration(userId, "owner", "owner", "OWNER-HASH"))
+        .thenReturn(ActivationOutcome.ACTIVATED);
 
-    assertThatThrownBy(() -> service.verify("tok", "guess"))
-        .isInstanceOf(VerificationPasswordMismatchException.class)
-        .satisfies(
-            e -> assertThat(((VerificationPasswordMismatchException) e).linkSpent()).isTrue());
+    service.verify("tok", "owner-pass-1", true, "owner");
+
+    verify(passwordEncoder, never()).matches(any(), any());
+    verify(verificationTokens).consume(pending.tokenId());
+    verify(verificationTokens).consumeAllForUser(userId);
+  }
+
+  @Test
+  @DisplayName("setting new credentials keeps the registration's username when none is given")
+  void verifySetNewDefaultsTheUsername() {
+    UUID userId = UUID.randomUUID();
+    PendingVerification pending = pendingVerification(userId, true);
+    when(verificationTokens.peek("tok")).thenReturn(pending);
+    when(passwordEncoder.encode("owner-pass-1")).thenReturn("OWNER-HASH");
+    when(userService.activateVerifiedRegistration(userId, "jane", "jane", "OWNER-HASH"))
+        .thenReturn(ActivationOutcome.ACTIVATED);
+
+    service.verify("tok", "owner-pass-1", true, "  ");
+
+    verify(userService).activateVerifiedRegistration(userId, "jane", "jane", "OWNER-HASH");
+  }
+
+  @Test
+  @DisplayName("new credentials follow the registration policy")
+  void verifySetNewEnforcesThePolicy() {
+    when(verificationTokens.peek("tok")).thenReturn(pendingVerification(UUID.randomUUID(), true));
+
+    assertThatThrownBy(() -> service.verify("tok", "short", true, "owner"))
+        .isInstanceOf(VerificationInputException.class);
+    assertThatThrownBy(() -> service.verify("tok", "long-enough-1", true, "ab"))
+        .isInstanceOf(VerificationInputException.class);
+    verify(userService, never()).activateVerifiedRegistration(any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("a taken username is reported and the link stays usable")
+  void verifyReportsATakenUsername() {
+    UUID userId = UUID.randomUUID();
+    PendingVerification pending = pendingVerification(userId, true);
+    when(verificationTokens.peek("tok")).thenReturn(pending);
+    when(passwordEncoder.matches("password1", "CAND-HASH")).thenReturn(true);
+    when(userService.activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH"))
+        .thenReturn(ActivationOutcome.USERNAME_TAKEN);
+
+    assertThatThrownBy(() -> service.verify("tok", "password1", false, null))
+        .isInstanceOf(VerificationUsernameTakenException.class);
+
+    verify(verificationTokens, never()).consume(any());
   }
 
   @Test
@@ -380,10 +391,9 @@ class RegistrationServiceTest {
   void verifyRejectsAdminDisabledAccount() {
     when(verificationTokens.peek("tok")).thenReturn(pendingVerification(UUID.randomUUID(), false));
 
-    assertThatThrownBy(() -> service.verify("tok", "password1"))
+    assertThatThrownBy(() -> service.verify("tok", "password1", true, "owner"))
         .isInstanceOf(InvalidVerificationTokenException.class);
 
-    verify(verificationTokens, never()).reserveAttempt(any());
     verify(userService, never()).activateVerifiedRegistration(any(), any(), any(), any());
   }
 
@@ -393,13 +403,23 @@ class RegistrationServiceTest {
     UUID userId = UUID.randomUUID();
     PendingVerification pending = pendingVerification(userId, true);
     when(verificationTokens.peek("tok")).thenReturn(pending);
-    when(verificationTokens.reserveAttempt(pending.tokenId())).thenReturn(true);
     when(passwordEncoder.matches("password1", "CAND-HASH")).thenReturn(true);
     when(userService.activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH"))
         .thenReturn(ActivationOutcome.NOT_PENDING);
 
-    assertThatThrownBy(() -> service.verify("tok", "password1"))
+    assertThatThrownBy(() -> service.verify("tok", "password1", false, null))
         .isInstanceOf(InvalidVerificationTokenException.class);
     verify(verificationTokens, never()).consumeAllForUser(any());
+  }
+
+  @Test
+  @DisplayName("the registration lookup returns the username of a usable link's registration")
+  void registrationUsername() {
+    when(verificationTokens.peek("tok")).thenReturn(pendingVerification(UUID.randomUUID(), true));
+    assertThat(service.registrationUsername("tok")).isEqualTo("jane");
+
+    when(verificationTokens.peek("dead")).thenReturn(pendingVerification(UUID.randomUUID(), false));
+    assertThatThrownBy(() -> service.registrationUsername("dead"))
+        .isInstanceOf(InvalidVerificationTokenException.class);
   }
 }

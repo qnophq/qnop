@@ -50,29 +50,6 @@ public interface EmailVerificationTokenRepository
           + " WHERE t.id = :id AND t.consumedAt IS NULL")
   int markConsumed(@Param("id") UUID id, @Param("at") Instant at);
 
-  /**
-   * Reserves one password attempt on a still-usable token BEFORE the password is compared (issue
-   * #900): atomic and conditional, so concurrent requests can never compare more than {@code max}
-   * passwords against one link. Returns 0 when the token is spent, consumed or out of attempts.
-   */
-  @Modifying(clearAutomatically = true)
-  @Query(
-      "UPDATE EmailVerificationToken t SET t.failedAttempts = t.failedAttempts + 1"
-          + " WHERE t.id = :id AND t.consumedAt IS NULL AND t.failedAttempts < :max")
-  int reserveAttempt(@Param("id") UUID id, @Param("max") int max);
-
-  /**
-   * Spends a token whose reserved attempts reached {@code max} (issue #900). Returns 1 when this
-   * call spent it.
-   */
-  @Modifying(clearAutomatically = true)
-  @Query(
-      "UPDATE EmailVerificationToken t SET t.consumedAt = :at, t.candidateUsername = NULL, t.candidateDisplayName = NULL,"
-          + " t.candidatePasswordHash = NULL"
-          + " WHERE t.id = :id AND t.consumedAt IS NULL AND t.failedAttempts >= :max")
-  int consumeIfAttemptsExhausted(
-      @Param("id") UUID id, @Param("max") int max, @Param("at") Instant at);
-
   /** Ids of a user's unconsumed tokens, oldest first — to cap outstanding links (#900). */
   @Query(
       "SELECT t.id FROM EmailVerificationToken t WHERE t.user.id = :userId"

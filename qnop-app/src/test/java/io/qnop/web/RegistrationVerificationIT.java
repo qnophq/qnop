@@ -88,7 +88,7 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
   }
 
   @Test
-  @DisplayName("a registration stays pending until verified with its own password")
+  @DisplayName("a registration stays pending until verified; a mistyped password keeps the link")
   void verificationRequiresTheRegistrationPassword() throws Exception {
     register("newbie", "newbie@qnop.test", PASSWORD).andExpect(status().isOk());
 
@@ -174,52 +174,6 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
   }
 
   @Test
-  @DisplayName(
-      "concurrent wrong passwords against one link: never more than five are compared, the"
-          + " link ends spent")
-  void concurrentAttemptsRespectTheCap() throws Exception {
-    register("racer", "racer@qnop.test", PASSWORD).andExpect(status().isOk());
-    String token = lastVerificationToken("racer@qnop.test");
-
-    int requests = 12;
-    java.util.concurrent.ExecutorService pool =
-        java.util.concurrent.Executors.newFixedThreadPool(requests);
-    java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
-    List<java.util.concurrent.Future<String>> codes = new java.util.ArrayList<>();
-    try {
-      for (int i = 0; i < requests; i++) {
-        String guess = "Wrong-Pass-" + i;
-        codes.add(
-            pool.submit(
-                () -> {
-                  start.await();
-                  String body =
-                      verifyEmail(token, guess).andReturn().getResponse().getContentAsString();
-                  return com.jayway.jsonpath.JsonPath.read(body, "$.code");
-                }));
-      }
-      start.countDown();
-      List<String> results = new java.util.ArrayList<>();
-      for (java.util.concurrent.Future<String> code : codes) {
-        results.add(code.get(60, java.util.concurrent.TimeUnit.SECONDS));
-      }
-      // Four plain mismatches; the fifth reserved attempt spends the link, every other request
-      // finds no attempt left and is rejected without a comparison.
-      assertThat(results).filteredOn("VERIFICATION_PASSWORD_MISMATCH"::equals).hasSize(4);
-      assertThat(results).filteredOn("INVALID_VERIFICATION_TOKEN"::equals).hasSize(requests - 4);
-    } finally {
-      pool.shutdownNow();
-    }
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT max(failed_attempts) FROM email_verification_token t JOIN qnop_user u"
-                    + " ON u.id = t.user_id WHERE u.username = 'racer'",
-                Integer.class))
-        .isEqualTo(5);
-    verifyEmail(token, PASSWORD).andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
-  }
-
-  @Test
   @DisplayName("a registration for a known address sends a neutral notice and changes nothing")
   void duplicateRegistrationSendsANotice() throws Exception {
     User member = users.findById(MEMBER_ID).orElseThrow();
@@ -237,25 +191,6 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
             eq(MailTemplateKey.REGISTRATION_VERIFICATION), any(), anyMap(), any());
     assertThat(users.findByUsernameAndSource("someone-new", UserSource.INTERNAL)).isEmpty();
     assertThat(users.findById(MEMBER_ID).orElseThrow().getPasswordHash()).isEqualTo(hashBefore);
-  }
-
-  @Test
-  @DisplayName("five wrong passwords spend the link; the right one does not help afterwards")
-  void wrongPasswordsSpendTheLink() throws Exception {
-    register("guessed", "guessed@qnop.test", PASSWORD).andExpect(status().isOk());
-    String token = lastVerificationToken("guessed@qnop.test");
-
-    for (int attempt = 1; attempt < 5; attempt++) {
-      verifyEmail(token, "Wrong-Pass-" + attempt)
-          .andExpect(jsonPath("$.code").value("VERIFICATION_PASSWORD_MISMATCH"));
-    }
-    verifyEmail(token, "Wrong-Pass-5")
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
-    verifyEmail(token, PASSWORD)
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
-    assertThat(internal("guessed").isEnabled()).isFalse();
   }
 
   @Test
@@ -369,9 +304,9 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
 
   @Test
   @DisplayName(
-      "a registration whose username another account took meanwhile cannot be verified; the link"
-          + " is spent and the code says why")
-  void usernameTakenMeanwhileSpendsTheLink() throws Exception {
+      "a registration whose username another account took meanwhile cannot be confirmed; the link"
+          + " stays usable and its holder sets another username")
+  void usernameTakenMeanwhileKeepsTheLink() throws Exception {
     register("first-name", "late@qnop.test", "First-Pass-1234!").andExpect(status().isOk());
     ageVerificationTokens(java.time.Duration.ofMinutes(6));
     clearInvocations(mail);
@@ -384,15 +319,65 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
     verifyEmail(token, PASSWORD)
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VERIFICATION_USERNAME_TAKEN"));
-    verifyEmail(token, PASSWORD)
+    setNewCredentials(token, PASSWORD, "wanted-too").andExpect(status().isOk());
+
+    User account =
+        users.findByEmailIgnoreCaseAndSource("late@qnop.test", UserSource.INTERNAL).orElseThrow();
+    assertThat(account.isEnabled()).isTrue();
+    assertThat(account.getUsername()).isEqualTo("wanted-too");
+  }
+
+  @Test
+  @DisplayName(
+      "the owner of an address claims it with a link somebody else's registration triggered:"
+          + " own password, own username — the throttle never stands in the way")
+  void ownerClaimsTheAccountWithASquatterTriggeredLink() throws Exception {
+    // Only the squatter registers, repeatedly; the owner never gets a link of their own.
+    register("squatter", "claimed@qnop.test", "Squat-Pass-1234!").andExpect(status().isOk());
+    ageVerificationTokens(java.time.Duration.ofMinutes(6));
+    register("squatter", "claimed@qnop.test", "Squat-Pass-1234!").andExpect(status().isOk());
+    String squatterTriggered = lastVerificationToken("claimed@qnop.test");
+    clearInvocations(mail);
+
+    // The owner's own registration falls into the throttle window: no new mail ...
+    register("owner", "claimed@qnop.test", PASSWORD).andExpect(status().isOk());
+    verify(mail, never()).sendMailFromTemplateAfterCommit(any(), any(), anyMap(), any());
+
+    // ... but the link already in the mailbox is enough. The verify page offers the
+    // registration's username and the owner sets their own credentials.
+    mockMvc
+        .perform(
+            post(VERIFY + "/registration")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"%s\"}".formatted(squatterTriggered)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.username").value("squatter"));
+    verifyEmail(squatterTriggered, PASSWORD)
+        .andExpect(jsonPath("$.code").value("VERIFICATION_PASSWORD_MISMATCH"));
+    setNewCredentials(squatterTriggered, PASSWORD, "owner").andExpect(status().isOk());
+
+    User account =
+        users
+            .findByEmailIgnoreCaseAndSource("claimed@qnop.test", UserSource.INTERNAL)
+            .orElseThrow();
+    assertThat(account.isEnabled()).isTrue();
+    assertThat(account.getUsername()).isEqualTo("owner");
+    assertThat(account.getDisplayName()).isEqualTo("owner");
+    assertThat(passwordEncoder.matches(PASSWORD, account.getPasswordHash())).isTrue();
+    assertThat(passwordEncoder.matches("Squat-Pass-1234!", account.getPasswordHash())).isFalse();
+    assertThat(outstandingLinks("claimed@qnop.test")).isZero();
+  }
+
+  @Test
+  @DisplayName("new credentials follow the registration policy")
+  void setNewEnforcesThePolicy() throws Exception {
+    register("policy", "policy@qnop.test", PASSWORD).andExpect(status().isOk());
+    String token = lastVerificationToken("policy@qnop.test");
+
+    setNewCredentials(token, "short", "policy")
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
-    assertThat(
-            users
-                .findByEmailIgnoreCaseAndSource("late@qnop.test", UserSource.INTERNAL)
-                .orElseThrow()
-                .isEnabled())
-        .isFalse();
+        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    assertThat(internal("policy").isEnabled()).isFalse();
   }
 
   @Test
@@ -486,6 +471,16 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
             .content(
                 "{\"username\":\"%s\",\"email\":\"%s\",\"password\":\"%s\"}"
                     .formatted(username, email, password)));
+  }
+
+  private ResultActions setNewCredentials(String token, String password, String username)
+      throws Exception {
+    return mockMvc.perform(
+        post(VERIFY)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(
+                "{\"token\":\"%s\",\"password\":\"%s\",\"setNew\":true,\"username\":\"%s\"}"
+                    .formatted(token, password, username)));
   }
 
   private ResultActions verifyEmail(String token, String password) throws Exception {

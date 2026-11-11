@@ -24,11 +24,14 @@ import io.qnop.api.v1.endpoint.AuthRegistrationApi;
 import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.RegisterRequest;
 import io.qnop.api.v1.model.RegisterResponse;
+import io.qnop.api.v1.model.VerificationRegistration;
+import io.qnop.api.v1.model.VerificationTokenRequest;
 import io.qnop.api.v1.model.VerifyEmailRequest;
 import io.qnop.api.v1.model.VerifyEmailResponse;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
 import io.qnop.service.auth.RegistrationService;
+import io.qnop.service.auth.RegistrationService.VerificationInputException;
 import io.qnop.service.auth.RegistrationService.VerificationPasswordMismatchException;
 import io.qnop.service.auth.RegistrationService.VerificationUsernameTakenException;
 import java.time.OffsetDateTime;
@@ -79,7 +82,11 @@ public class AuthRegistrationController implements AuthRegistrationApi {
   @Override
   public ResponseEntity<VerifyEmailResponse> verifyEmail(VerifyEmailRequest request) {
     try {
-      registrationService.verify(request.getToken(), request.getPassword());
+      registrationService.verify(
+          request.getToken(),
+          request.getPassword(),
+          Boolean.TRUE.equals(request.getSetNew()),
+          request.getUsername());
     } catch (DataIntegrityViolationException e) {
       // The only unique value a verification writes is the username: another account claimed it
       // between the check and the update (issue #900). Same answer as the checked case, no 500.
@@ -87,6 +94,14 @@ public class AuthRegistrationController implements AuthRegistrationApi {
     }
     return ResponseEntity.ok(
         new VerifyEmailResponse().verified(true).message("Email verified. You can now sign in."));
+  }
+
+  @Override
+  public ResponseEntity<VerificationRegistration> getVerificationRegistration(
+      VerificationTokenRequest request) {
+    return ResponseEntity.ok(
+        new VerificationRegistration()
+            .username(registrationService.registrationUsername(request.getToken())));
   }
 
   @ExceptionHandler(InvalidVerificationTokenException.class)
@@ -97,11 +112,13 @@ public class AuthRegistrationController implements AuthRegistrationApi {
   /** Its own code, so the SPA can tell a mistyped password from a dead link (issue #900). */
   @ExceptionHandler(VerificationPasswordMismatchException.class)
   ResponseEntity<ErrorResponse> passwordMismatch(VerificationPasswordMismatchException e) {
-    // The attempt that reaches the cap spent the link: from here on it is a dead link like any
-    // other, and the remedy is the same — register again (issue #900).
-    return verificationError(
-        e.linkSpent() ? "INVALID_VERIFICATION_TOKEN" : "VERIFICATION_PASSWORD_MISMATCH",
-        e.getMessage());
+    return verificationError("VERIFICATION_PASSWORD_MISMATCH", e.getMessage());
+  }
+
+  /** New credentials outside the account policy: the uniform validation code. */
+  @ExceptionHandler(VerificationInputException.class)
+  ResponseEntity<ErrorResponse> invalidInput(VerificationInputException e) {
+    return verificationError("VALIDATION_ERROR", e.getMessage());
   }
 
   @ExceptionHandler(VerificationUsernameTakenException.class)

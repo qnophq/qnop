@@ -75,10 +75,6 @@ public class EmailVerificationToken {
   @Column(name = "consumed_at")
   private Instant consumedAt;
 
-  /** Wrong passwords presented with this token (issue #900); capped, then the token is spent. */
-  @Column(name = "failed_attempts", nullable = false)
-  private int failedAttempts;
-
   /*
    * The credentials the registration behind this token asked for (issue #900). Verifying THIS
    * token applies exactly these to the account, so two registrations of one pending address can
@@ -153,10 +149,6 @@ public class EmailVerificationToken {
 
   public Instant getConsumedAt() {
     return consumedAt;
-  }
-
-  public int getFailedAttempts() {
-    return failedAttempts;
   }
 
   public void setConsumedAt(Instant consumedAt) {

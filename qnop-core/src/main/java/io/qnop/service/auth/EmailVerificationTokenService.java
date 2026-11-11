@@ -54,9 +54,6 @@ public class EmailVerificationTokenService {
   static final int TOKEN_BYTES = 32;
   static final Duration TOKEN_TTL = Duration.ofHours(24);
 
-  /** Password attempts a verification link allows before it is spent (#900). */
-  public static final int MAX_FAILED_ATTEMPTS = 5;
-
   /** Verification links one pending address may have outstanding at once (#900). */
   public static final int MAX_OUTSTANDING_TOKENS = 3;
 
@@ -126,22 +123,6 @@ public class EmailVerificationTokenService {
         legacy ? user.getUsername() : token.getCandidateUsername(),
         legacy ? user.getDisplayName() : token.getCandidateDisplayName(),
         legacy ? user.getPasswordHash() : token.getCandidatePasswordHash());
-  }
-
-  /**
-   * Reserves one password attempt BEFORE the comparison (issue #900): atomic and conditional, so
-   * concurrent requests can never compare more than {@value #MAX_FAILED_ATTEMPTS} passwords against
-   * one link. {@code false} when the token is spent, consumed or out of attempts.
-   */
-  @Transactional
-  public boolean reserveAttempt(UUID tokenId) {
-    return tokens.reserveAttempt(tokenId, MAX_FAILED_ATTEMPTS) == 1;
-  }
-
-  /** Spends a token whose attempts are used up; returns whether it is spent now (issue #900). */
-  @Transactional
-  public boolean spendIfExhausted(UUID tokenId) {
-    return tokens.consumeIfAttemptsExhausted(tokenId, MAX_FAILED_ATTEMPTS, Instant.now()) == 1;
   }
 
   /** Consumes the token atomically (issue #61); throws if another request consumed it first. */

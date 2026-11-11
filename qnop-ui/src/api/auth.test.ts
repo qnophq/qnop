@@ -60,7 +60,12 @@ describe('auth API wrappers', () => {
     await verifyEmail('tok-123', 'pw-123');
 
     expect(verifyEmailFn).toHaveBeenCalledWith({
-      verifyEmailRequest: { token: 'tok-123', password: 'pw-123' },
+      verifyEmailRequest: {
+        token: 'tok-123',
+        password: 'pw-123',
+        setNew: undefined,
+        username: undefined,
+      },
     });
   });
 
