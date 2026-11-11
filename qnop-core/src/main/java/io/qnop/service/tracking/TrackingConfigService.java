@@ -88,7 +88,12 @@ public class TrackingConfigService {
       // this deployment's policy, and the request path must never be the first
       // place that question is asked.
       OutboundUriGuard.requireAllowedHttpUri(collectBase, "tracking.host", true, allowPrivateHost);
-      requireHttpsUnlessPrivate(collectBase);
+      // Also refused when the setting is saved; checked here too because a value
+      // saved before the rule existed must not keep measuring over plain http.
+      if (!TrackingHostPolicy.hasAcceptableTransport(collectBase)) {
+        throw new IllegalArgumentException(
+            "tracking.host must use https unless it is a private address");
+      }
     } catch (IllegalArgumentException e) {
       log.warn("Usage tracking is disabled: {}", e.getMessage());
       return Optional.empty();
@@ -104,37 +109,6 @@ public class TrackingConfigService {
             settings.getBoolean(ApplicationSettingKey.TRACKING_PRIVILEGED_ROLES),
             ClientIpForwarding.parse(
                 settings.getString(ApplicationSettingKey.TRACKING_FORWARD_CLIENT_IP))));
-  }
-
-  /**
-   * Plain http only for a host that is lexically private (issue #910).
-   *
-   * <p>Every forwarded measurement carries the visitor's user agent and — truncated or, by opt-in,
-   * exact — address. Across the public internet that travels encrypted or not at all. A self-hosted
-   * backend on {@code 10.0.0.5} or {@code matomo.internal} may stay on http: that traffic never
-   * leaves the operator's network, and reaching it already needs the deployment's private-host
-   * opt-in. "Private" is decided by the same lexical policy the SSRF guard uses — a public name
-   * that happens to resolve to a private address must still use https.
-   */
-  static void requireHttpsUnlessPrivate(String baseUrl) {
-    if (baseUrl.regionMatches(true, 0, "https://", 0, "https://".length())) {
-      return;
-    }
-    if (!isLexicallyPrivate(baseUrl)) {
-      throw new IllegalArgumentException(
-          "tracking.host must use https unless it is a private address");
-    }
-  }
-
-  private static boolean isLexicallyPrivate(String baseUrl) {
-    try {
-      OutboundUriGuard.requireAllowedHttpUri(baseUrl, "tracking.host", true, false);
-      return false;
-    } catch (IllegalArgumentException blocked) {
-      // Refused under the strict policy — which, for a URI the permissive check
-      // already accepted, means a private, loopback or internal host.
-      return true;
-    }
   }
 
   private static String trimTrailingSlash(String value) {

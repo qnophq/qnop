@@ -6948,8 +6948,8 @@ components:
             the failure in the user's language: `REQUIRED`, `NOT_AN_INTEGER`,
             `NOT_A_BOOLEAN`, `NOT_AN_OPTION`, `TOO_LONG`, `TOO_SHORT`,
             `LENGTH_OUT_OF_RANGE`, `TOO_SMALL`, `TOO_LARGE`, `INVALID_EMAIL`,
-            `INVALID_URL`, `INVALID_TIMEZONE`, `INVALID_LANGUAGE`,
-            `INVALID_FORMAT`, `UNKNOWN_SETTING`. Null when the failure has no
+            `INVALID_URL`, `REQUIRES_HTTPS`, `INVALID_TIMEZONE`,
+            `INVALID_LANGUAGE`, `INVALID_FORMAT`, `UNKNOWN_SETTING`. Null when the failure has no
             stable reason (e.g. a custom constraint message, or a size limit on
             a list); new codes may be added, so a client falls back to `message`
             for one it does not know.

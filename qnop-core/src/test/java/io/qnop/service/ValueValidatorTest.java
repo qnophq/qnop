@@ -247,4 +247,38 @@ class ValueValidatorTest {
                 .getCode())
         .isEqualTo(FieldErrorCode.NOT_A_BOOLEAN);
   }
+
+  @Test
+  void trackingHostMustUseHttpsUnlessPrivate() {
+    // Refused when saved, not only when measuring (issue #910): a public host
+    // over plain http would otherwise save fine and then measure nothing.
+    SettingValidationException publicHttp =
+        assertThrows(
+            SettingValidationException.class,
+            () ->
+                ValueValidator.validate(
+                    ApplicationSettingKey.TRACKING_HOST, "http://matomo.example.com"));
+    assertThat(publicHttp.getCode()).isEqualTo(FieldErrorCode.REQUIRES_HTTPS);
+    assertThat(publicHttp.getSettingKey()).isEqualTo("tracking.host");
+
+    assertDoesNotThrow(
+        () ->
+            ValueValidator.validate(
+                ApplicationSettingKey.TRACKING_HOST, "https://matomo.example.com"));
+    assertDoesNotThrow(
+        () -> ValueValidator.validate(ApplicationSettingKey.TRACKING_HOST, "http://10.0.0.5:8080"));
+    assertDoesNotThrow(
+        () ->
+            ValueValidator.validate(
+                ApplicationSettingKey.TRACKING_HOST, "http://umami.internal:3000"));
+    // Empty stays valid: the hosted providers need no host at all.
+    assertDoesNotThrow(() -> ValueValidator.validate(ApplicationSettingKey.TRACKING_HOST, ""));
+    // Not a URL at all is still the URL error, not the https one.
+    assertThat(
+            assertThrows(
+                    SettingValidationException.class,
+                    () -> ValueValidator.validate(ApplicationSettingKey.TRACKING_HOST, "ftp://x"))
+                .getCode())
+        .isEqualTo(FieldErrorCode.INVALID_URL);
+  }
 }

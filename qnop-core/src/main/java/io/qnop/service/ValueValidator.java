@@ -21,6 +21,7 @@
 package io.qnop.service;
 
 import io.qnop.entity.SettingValueType;
+import io.qnop.service.tracking.TrackingHostPolicy;
 import java.net.URI;
 import java.time.DateTimeException;
 import java.time.ZoneId;
@@ -133,6 +134,7 @@ public final class ValueValidator {
         case URL -> requireHttpUrl(keyForError, value);
         case TIMEZONE -> requireTimezone(keyForError, value);
         case LANGUAGE -> requireLanguage(keyForError, value);
+        case HTTPS_URL_UNLESS_PRIVATE -> requireHttpsUnlessPrivate(keyForError, value);
       }
     }
   }
@@ -169,6 +171,16 @@ public final class ValueValidator {
           keyForError,
           "must be a two-letter ISO 639-1 language code",
           FieldErrorCode.INVALID_LANGUAGE);
+    }
+  }
+
+  private static void requireHttpsUnlessPrivate(String keyForError, String value) {
+    requireHttpUrl(keyForError, value);
+    if (!TrackingHostPolicy.hasAcceptableTransport(value)) {
+      throw new SettingValidationException(
+          keyForError,
+          "must use https unless the host is a private address",
+          FieldErrorCode.REQUIRES_HTTPS);
     }
   }
 

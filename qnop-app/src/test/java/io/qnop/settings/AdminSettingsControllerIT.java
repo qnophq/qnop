@@ -129,6 +129,21 @@ class AdminSettingsControllerIT extends io.qnop.testsupport.SeededIntegrationTes
 
   @Test
   @WithMockUser(username = ADMIN_PRINCIPAL, roles = "ADMIN")
+  void patchRejectsPublicTrackingHostOverPlainHttp() throws Exception {
+    // Issue #910: refused when saved, with a field error the admin sees — not
+    // accepted and then silently measuring nothing.
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/settings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"values\":{\"tracking.host\":\"http://analytics.example.com\"}}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.fieldErrors[0].field").value("tracking.host"))
+        .andExpect(jsonPath("$.fieldErrors[0].code").value("REQUIRES_HTTPS"));
+  }
+
+  @Test
+  @WithMockUser(username = ADMIN_PRINCIPAL, roles = "ADMIN")
   void patchReportsEveryInvalidFieldAtOnce() throws Exception {
     mockMvc
         .perform(
