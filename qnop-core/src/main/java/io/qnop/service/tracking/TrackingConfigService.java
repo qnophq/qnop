@@ -34,8 +34,8 @@ import org.springframework.stereotype.Service;
  *
  * <p>Nothing is the common answer and the safe one. Tracking has to be switched on, name a backend,
  * carry a site id, and — for the self-hosted backends — point at a host that this deployment is
- * allowed to call. Any gap and the whole feature stays dark: no script tag, no endpoint, no
- * half-configured measurement quietly failing in the console.
+ * allowed to call. Any gap and the whole feature stays dark: nothing measured, nothing forwarded,
+ * no half-configured measurement quietly failing in the console.
  *
  * <p>Whether a private address may be called at all is a deployment property, not a setting. A
  * self-hosted Matomo usually lives on one, and that is legitimate — but "an admin can point this
@@ -82,14 +82,13 @@ public class TrackingConfigService {
       return Optional.empty();
     }
     String collectBase = trimTrailingSlash(host.isEmpty() ? backend.defaultHost() : host);
-    String scriptBase = trimTrailingSlash(host.isEmpty() ? backend.defaultScriptHost() : host);
 
     try {
       // Checked here rather than only on save: the setting may predate a change to
       // this deployment's policy, and the request path must never be the first
       // place that question is asked.
       OutboundUriGuard.requireAllowedHttpUri(collectBase, "tracking.host", true, allowPrivateHost);
-      OutboundUriGuard.requireAllowedHttpUri(scriptBase, "tracking.host", true, allowPrivateHost);
+      requireHttpsUnlessPrivate(collectBase);
     } catch (IllegalArgumentException e) {
       log.warn("Usage tracking is disabled: {}", e.getMessage());
       return Optional.empty();
@@ -99,13 +98,43 @@ public class TrackingConfigService {
         new TrackingRuntimeConfig(
             backend,
             siteId,
-            scriptBase + backend.scriptPath(),
             collectBase,
             settings.getBoolean(ApplicationSettingKey.TRACKING_CONSENT_REQUIRED),
             settings.getBoolean(ApplicationSettingKey.TRACKING_RESPECT_DNT),
             settings.getBoolean(ApplicationSettingKey.TRACKING_PRIVILEGED_ROLES),
             ClientIpForwarding.parse(
                 settings.getString(ApplicationSettingKey.TRACKING_FORWARD_CLIENT_IP))));
+  }
+
+  /**
+   * Plain http only for a host that is lexically private (issue #910).
+   *
+   * <p>Every forwarded measurement carries the visitor's user agent and — truncated or, by opt-in,
+   * exact — address. Across the public internet that travels encrypted or not at all. A self-hosted
+   * backend on {@code 10.0.0.5} or {@code matomo.internal} may stay on http: that traffic never
+   * leaves the operator's network, and reaching it already needs the deployment's private-host
+   * opt-in. "Private" is decided by the same lexical policy the SSRF guard uses — a public name
+   * that happens to resolve to a private address must still use https.
+   */
+  static void requireHttpsUnlessPrivate(String baseUrl) {
+    if (baseUrl.regionMatches(true, 0, "https://", 0, "https://".length())) {
+      return;
+    }
+    if (!isLexicallyPrivate(baseUrl)) {
+      throw new IllegalArgumentException(
+          "tracking.host must use https unless it is a private address");
+    }
+  }
+
+  private static boolean isLexicallyPrivate(String baseUrl) {
+    try {
+      OutboundUriGuard.requireAllowedHttpUri(baseUrl, "tracking.host", true, false);
+      return false;
+    } catch (IllegalArgumentException blocked) {
+      // Refused under the strict policy — which, for a URI the permissive check
+      // already accepted, means a private, loopback or internal host.
+      return true;
+    }
   }
 
   private static String trimTrailingSlash(String value) {

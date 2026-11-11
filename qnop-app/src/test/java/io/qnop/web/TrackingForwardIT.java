@@ -23,7 +23,6 @@ package io.qnop.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sun.net.httpserver.HttpServer;
@@ -39,6 +38,7 @@ import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -67,6 +67,7 @@ class TrackingForwardIT extends SeededIntegrationTest {
 
   private HttpServer backend;
   private final BlockingQueue<String> received = new ArrayBlockingQueue<>(8);
+  private final AtomicInteger scriptRequests = new AtomicInteger();
 
   @BeforeEach
   void startBackendAndConfigure() throws IOException {
@@ -74,6 +75,7 @@ class TrackingForwardIT extends SeededIntegrationTest {
     backend.createContext(
         "/script.js",
         exchange -> {
+          scriptRequests.incrementAndGet();
           byte[] body = "window.umami={};".getBytes(StandardCharsets.UTF_8);
           exchange.getResponseHeaders().add("Content-Type", "application/javascript");
           exchange.sendResponseHeaders(200, body.length);
@@ -115,14 +117,14 @@ class TrackingForwardIT extends SeededIntegrationTest {
   }
 
   @Test
-  @DisplayName("the vendor script is served from this origin")
-  void servesTheVendorScript() throws Exception {
-    // The whole reason the proxy exists: the browser asks this origin, so the
-    // CSP never has to name the analytics host.
-    mockMvc
-        .perform(get("/t/s.js"))
-        .andExpect(status().isOk())
-        .andExpect(content().string("window.umami={};"));
+  @DisplayName("no analytics vendor code is served from this origin (#910)")
+  void servesNoVendorScript() throws Exception {
+    // A script served from this origin would run with the application's
+    // privileges. The client builds its measurements itself, so the server
+    // neither fetches nor serves the backend's script — even with measurement on.
+    mockMvc.perform(get("/t/s.js")).andExpect(status().isNotFound());
+
+    assertThat(scriptRequests.get()).as("the backend's script was never fetched").isZero();
   }
 
   @Test

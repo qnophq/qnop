@@ -83,7 +83,6 @@ class TrackingProxyServiceTest {
                 new TrackingRuntimeConfig(
                     TrackingProvider.MATOMO,
                     "1",
-                    host + "/matomo.js",
                     host,
                     false,
                     false,
@@ -135,7 +134,6 @@ class TrackingProxyServiceTest {
                 new TrackingRuntimeConfig(
                     TrackingProvider.UMAMI,
                     "site",
-                    "http://127.0.0.1:" + backend.getAddress().getPort() + "/script.js",
                     "http://127.0.0.1:" + backend.getAddress().getPort(),
                     false,
                     false,

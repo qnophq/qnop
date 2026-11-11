@@ -44,7 +44,7 @@ export interface GateInput {
  * <p>Four gates, and each can say no on its own: the operator has to have configured measurement,
  * the browser must not be asking to be left alone, the person must not have opted out on their
  * account, and — where consent is required — they must have said yes. Only `measure` causes a
- * script tag to exist; `ask` shows the question and measures nothing until it is answered.
+ * measurement to be sent; `ask` shows the question and measures nothing until it is answered.
  *
  * <p>A plain function in its own module, so the rules can be read and asserted directly rather than
  * inferred from what turned up in a rendered tree.

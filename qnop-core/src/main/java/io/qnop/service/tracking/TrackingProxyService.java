@@ -27,7 +27,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
@@ -35,8 +34,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
- * Fetches the vendor script and forwards measurements, so the browser never talks to the analytics
- * backend itself (issue #666).
+ * Forwards measurements, so the browser never talks to the analytics backend itself (issue #666).
+ *
+ * <p>It forwards and nothing else: no vendor script is fetched or served (issue #910) — qnop's own
+ * client builds each measurement in the backend's collect format.
  *
  * <p>The SPA's Content-Security-Policy pins scripts and connections to {@code 'self'} (ADR-0040).
  * Rather than weakening that per deployment, this server stands in the middle — which turns a
@@ -52,21 +53,14 @@ public class TrackingProxyService {
 
   private static final Logger log = LoggerFactory.getLogger(TrackingProxyService.class);
 
-  /** The vendor script changes on their release schedule, not ours. */
-  private static final Duration SCRIPT_TTL = Duration.ofHours(1);
-
   /** A measurement is small; anything larger is not one. */
   public static final int MAX_BODY_BYTES = 64 * 1024;
 
   /** Bounds a hung backend: a measurement is never worth holding a request thread for. */
   private static final Duration FORWARD_TIMEOUT = Duration.ofSeconds(3);
 
-  private static final Duration SCRIPT_TIMEOUT = Duration.ofSeconds(10);
-
   private final TrackingConfigService config;
   private final HttpClient http;
-
-  private volatile CachedScript cachedScript;
 
   /**
    * Whether the last forward failed, so a broken backend is reported once instead of once per
@@ -85,48 +79,6 @@ public class TrackingProxyService {
             .connectTimeout(httpProperties.outboundConnectTimeout())
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
-  }
-
-  /** The vendor script, cached; empty when tracking is off or the backend would not answer. */
-  public Optional<Script> script() {
-    Optional<TrackingRuntimeConfig> active = config.current();
-    if (active.isEmpty()) {
-      return Optional.empty();
-    }
-    String url = active.get().scriptUrl();
-    CachedScript cached = cachedScript;
-    if (cached != null && cached.matches(url)) {
-      return Optional.of(cached.script());
-    }
-    try {
-      HttpResponse<byte[]> response =
-          http.send(
-              HttpRequest.newBuilder(URI.create(url))
-                  .timeout(SCRIPT_TIMEOUT)
-                  .header("Accept", "application/javascript, text/javascript, */*")
-                  .GET()
-                  .build(),
-              HttpResponse.BodyHandlers.ofByteArray());
-      if (response.statusCode() != 200) {
-        log.warn("The analytics script at {} answered {}", url, response.statusCode());
-        return Optional.empty();
-      }
-      Script script =
-          new Script(
-              response.body(),
-              response
-                  .headers()
-                  .firstValue("content-type")
-                  .orElse("application/javascript; charset=utf-8"));
-      cachedScript = new CachedScript(url, script, Instant.now());
-      return Optional.of(script);
-    } catch (IOException e) {
-      log.warn("Could not fetch the analytics script from {}: {}", url, e.getMessage());
-      return Optional.empty();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      return Optional.empty();
-    }
   }
 
   /**
@@ -223,15 +175,6 @@ public class TrackingProxyService {
   private void recovered() {
     if (forwardingBroken.compareAndSet(true, false)) {
       log.info("Usage tracking is being recorded again");
-    }
-  }
-
-  /** The vendor script as fetched. */
-  public record Script(byte[] body, String contentType) {}
-
-  private record CachedScript(String url, Script script, Instant fetchedAt) {
-    boolean matches(String candidate) {
-      return url.equals(candidate) && fetchedAt.plus(SCRIPT_TTL).isAfter(Instant.now());
     }
   }
 }

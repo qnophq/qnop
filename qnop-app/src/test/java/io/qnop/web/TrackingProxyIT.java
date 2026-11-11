@@ -59,10 +59,10 @@ class TrackingProxyIT extends SeededIntegrationTest {
   }
 
   @Test
-  @DisplayName("with tracking off there is no script to serve")
-  void scriptIsAbsentWhileOff() throws Exception {
-    // Not 401, not 500: a deployment that measures nothing simply has no script,
-    // and the client asks for none because /config told it so.
+  @DisplayName("there is no script endpoint to serve vendor code from")
+  void noScriptEndpoint() throws Exception {
+    // Not 401, not 500: the client builds its own measurements (#910), so no
+    // analytics script is ever served from this origin.
     mockMvc.perform(get("/t/s.js")).andExpect(status().isNotFound());
   }
 

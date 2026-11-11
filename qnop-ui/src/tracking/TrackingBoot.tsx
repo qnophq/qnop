@@ -19,15 +19,14 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useParams } from 'react-router';
-import type { ServerConfigTracking } from '../api/generated';
 import { useConfig } from '../api/hooks/useConfig';
 import { useUserSettingValue } from '../api/hooks/useUserSettings';
 import { useAuthStore } from '../stores/authStore';
 import { ConsentBar } from './ConsentBar';
 import { readConsent, type ConsentDecision } from './consent';
-import { ADAPTERS, SCRIPT_URL } from './providers';
+import { createTracker } from './providers';
 import { setActiveTracker } from './trackEvent';
 import { OPT_OUT_KEY, resolveGate } from './trackingGate';
 import { anonymizePath } from './trackingPath';
@@ -39,8 +38,10 @@ import { anonymizePath } from './trackingPath';
  * everything else, and every navigation — not only those inside the shell — reports a page view.
  * The decision itself lives in {@link resolveGate}; what happens here is only its consequence.
  *
- * <p>Nothing is fetched, injected or sent until that decision says so. When measurement is off, the
- * script tag does not exist in the page at all.
+ * <p>Nothing is sent until that decision says so, and no analytics vendor script is ever loaded
+ * (issue #910): measurements are built here, in the backend's collect format, and posted to this
+ * origin's proxy. Should the decision change — an opt-out, a withdrawn consent — measuring stops at
+ * once rather than at the next reload.
  */
 export function TrackingBoot() {
   const { data: config } = useConfig();
@@ -49,29 +50,30 @@ export function TrackingBoot() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const optOut = useUserSettingValue(OPT_OUT_KEY) === 'true';
   const [consent, setConsent] = useState<ConsentDecision>(() => readConsent());
-  const [loaded, setLoaded] = useState(false);
   const location = useLocation();
   const params = useParams();
 
   const gate = resolveGate({ tracking, consent, optOut, isAuthenticated, role });
+  const provider = tracking?.provider;
+  const siteId = tracking?.siteId;
+
+  const tracker = useMemo(
+    () => (gate === 'measure' && provider && siteId ? createTracker(provider, siteId) : null),
+    [gate, provider, siteId],
+  );
 
   useEffect(() => {
-    if (gate !== 'measure' || !tracking || loaded) {
-      return;
-    }
-    loadTracker(tracking).then(setLoaded);
-  }, [gate, tracking, loaded]);
+    setActiveTracker(tracker);
+    return () => setActiveTracker(null);
+  }, [tracker]);
 
   useEffect(() => {
-    if (!loaded || !tracking) {
-      return;
-    }
     // The pattern, never the path: /reviews/:documentId, not the id of a
     // customer's contract.
-    ADAPTERS[tracking.provider]?.pageview(anonymizePath(location.pathname, params));
+    tracker?.pageview(anonymizePath(location.pathname, params));
     // `params` is a fresh object every render; the pathname is what changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, tracking, location.pathname]);
+  }, [tracker, location.pathname]);
 
   return (
     <>
@@ -79,30 +81,4 @@ export function TrackingBoot() {
       {gate === 'ask' && <ConsentBar onDecide={setConsent} />}
     </>
   );
-}
-
-/** Injects the proxied vendor script exactly once; resolves false when it will not load. */
-function loadTracker(tracking: ServerConfigTracking): Promise<boolean> {
-  const adapter = ADAPTERS[tracking.provider];
-  if (!adapter || document.querySelector(`script[src="${SCRIPT_URL}"]`)) {
-    return Promise.resolve(Boolean(adapter));
-  }
-  adapter.beforeLoad?.(tracking.siteId);
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = SCRIPT_URL;
-    script.defer = true;
-    for (const [name, value] of Object.entries(adapter.attributes(tracking.siteId))) {
-      script.setAttribute(name, value);
-    }
-    script.onload = () => {
-      adapter.afterLoad?.(tracking.siteId);
-      setActiveTracker(adapter);
-      resolve(true);
-    };
-    // A backend that is down, or a deployment that mistyped its host: measurement
-    // is the one feature allowed to fail in total silence.
-    script.onerror = () => resolve(false);
-    document.head.appendChild(script);
-  });
 }

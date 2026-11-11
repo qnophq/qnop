@@ -65,7 +65,6 @@ class TrackingConfigServiceTest {
         .hasValueSatisfying(
             config -> {
               assertThat(config.provider()).isEqualTo(TrackingProvider.PLAUSIBLE);
-              assertThat(config.scriptUrl()).isEqualTo("https://plausible.io/js/script.manual.js");
               assertThat(config.collectBaseUrl()).isEqualTo("https://plausible.io");
               assertThat(config.forwardClientIp()).isEqualTo(ClientIpForwarding.ANONYMIZED);
             });
@@ -114,10 +113,40 @@ class TrackingConfigServiceTest {
     assertThat(service(false).current()).isEmpty();
     assertThat(service(true).current())
         .hasValueSatisfying(
-            config -> {
-              assertThat(config.collectBaseUrl()).isEqualTo("http://10.0.0.5:8080");
-              assertThat(config.scriptUrl()).isEqualTo("http://10.0.0.5:8080/matomo.js");
-            });
+            config -> assertThat(config.collectBaseUrl()).isEqualTo("http://10.0.0.5:8080"));
+  }
+
+  @Test
+  @DisplayName("a public host must be reached over https (#910)")
+  void publicHostNeedsHttps() {
+    when(settings.getString(ApplicationSettingKey.TRACKING_PROVIDER)).thenReturn("matomo");
+    when(settings.getString(ApplicationSettingKey.TRACKING_SITE_ID)).thenReturn("1");
+    when(settings.getString(ApplicationSettingKey.TRACKING_HOST))
+        .thenReturn("http://matomo.example.com");
+
+    // Every measurement carries a visitor's user agent and (truncated) address;
+    // across the public internet that travels encrypted or not at all — and the
+    // private-host opt-in does not change that for a public name.
+    assertThat(service(false).current()).isEmpty();
+    assertThat(service(true).current()).isEmpty();
+
+    when(settings.getString(ApplicationSettingKey.TRACKING_HOST))
+        .thenReturn("HTTPS://matomo.example.com/");
+    assertThat(service(false).current())
+        .hasValueSatisfying(
+            config -> assertThat(config.collectBaseUrl()).isEqualTo("HTTPS://matomo.example.com"));
+  }
+
+  @Test
+  @DisplayName("plain http stays possible for a private host the deployment allows")
+  void privateHostMayUseHttp() {
+    when(settings.getString(ApplicationSettingKey.TRACKING_PROVIDER)).thenReturn("umami");
+    when(settings.getString(ApplicationSettingKey.TRACKING_SITE_ID)).thenReturn("site");
+    when(settings.getString(ApplicationSettingKey.TRACKING_HOST))
+        .thenReturn("http://umami.internal:3000");
+
+    assertThat(service(true).current()).isPresent();
+    assertThat(service(false).current()).isEmpty();
   }
 
   @Test

@@ -164,7 +164,7 @@ public class SecurityConfiguration {
                     // too, so its proxy cannot require a token. It reaches exactly
                     // one configured backend on exactly the paths that backend
                     // declares, and it is rate-limited per IP.
-                    .requestMatchers("/t/s.js", "/t/c/**")
+                    .requestMatchers("/t/c/**")
                     .permitAll()
                     .requestMatchers("/api/v1/admin/**")
                     .hasRole("ADMIN")
