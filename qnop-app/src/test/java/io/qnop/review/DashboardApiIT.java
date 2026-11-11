@@ -52,6 +52,7 @@ class DashboardApiIT extends SeededIntegrationTest {
   @Autowired private DocumentRepository documents;
   @Autowired private DocumentVersionRepository versions;
   @Autowired private ReviewParticipantRepository participants;
+  @Autowired private io.qnop.repository.AuditEventRepository auditEvents;
 
   private UUID seedDocumentWithVersion() {
     Document document = documents.save(new Document(MEMBER_ID, "Master services agreement"));
@@ -209,6 +210,37 @@ class DashboardApiIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.activity[0].type").value("workflow.transition"))
         .andExpect(jsonPath("$.activity[0].actorId").value(MEMBER_ID.toString()))
         .andExpect(jsonPath("$.activity[0].actorDisplayName").value("Mia Member"));
+  }
+
+  @Test
+  @DisplayName(
+      "PRIVATE threads: every thread-scoped event stays out of other reviewers' feeds (#921)")
+  void privateThreadEventsStayPrivate() throws Exception {
+    // The policy is fixed at creation (the column is not updatable).
+    Document document = new Document(MEMBER_ID, "Private review");
+    document.setThreadParticipation(io.qnop.entity.ThreadParticipation.PRIVATE);
+    UUID documentId = documents.save(document).getId();
+    participants.save(ReviewParticipant.forUser(documentId, AUDITOR_ID));
+    participants.save(ReviewParticipant.forUser(documentId, MEMBER2_ID));
+    String detail = "{\"annotationId\":\"" + UUID.randomUUID() + "\"}";
+    for (String type :
+        java.util.List.of("annotation.created", "placement.confirmed", "placement.reattached")) {
+      auditEvents.save(new io.qnop.entity.AuditEvent(documentId, type, AUDITOR_ID, detail));
+    }
+    auditEvents.save(
+        new io.qnop.entity.AuditEvent(documentId, "workflow.transition", AUDITOR_ID, "{}"));
+
+    // Another reviewer sees the review-wide event only.
+    mockMvc
+        .perform(as(get("/api/v1/dashboard"), MEMBER2_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.activity", hasSize(1)))
+        .andExpect(jsonPath("$.activity[0].type").value("workflow.transition"));
+    // The owner sees every thread.
+    mockMvc
+        .perform(as(get("/api/v1/dashboard"), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.activity", hasSize(4)));
   }
 
   @Test

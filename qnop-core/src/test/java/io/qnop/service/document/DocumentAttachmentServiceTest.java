@@ -64,7 +64,14 @@ class DocumentAttachmentServiceTest {
               return new StagedObject("staging/key", "hash", bytes.length);
             });
     when(repository.save(any(DocumentAttachment.class))).thenAnswer(i -> i.getArgument(0));
-    service = new DocumentAttachmentService(access, repository, storage, settings, 16);
+    service =
+        new DocumentAttachmentService(
+            access,
+            repository,
+            storage,
+            settings,
+            mock(io.qnop.repository.CommentRepository.class),
+            16);
   }
 
   @Test
@@ -103,7 +110,13 @@ class DocumentAttachmentServiceTest {
   void theBudgetIsConfigurableInMegapixels() {
     assertThat(service.pixelBudget().maxPixels()).isEqualTo(16_000_000L);
     assertThat(
-            new DocumentAttachmentService(access, repository, storage, settings, 0)
+            new DocumentAttachmentService(
+                    access,
+                    repository,
+                    storage,
+                    settings,
+                    mock(io.qnop.repository.CommentRepository.class),
+                    0)
                 .pixelBudget()
                 .maxPixels())
         .isEqualTo(DocumentAttachmentService.DEFAULT_MAX_IMAGE_MEGAPIXELS * 1_000_000L);

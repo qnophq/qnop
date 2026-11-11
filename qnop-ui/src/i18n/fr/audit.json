@@ -122,6 +122,18 @@
       "label": "Révisions purgées",
       "description": "Des révisions archivées ont dépassé la durée de conservation avant purge et ont été définitivement supprimées, y compris les objets de stockage qu’aucun autre document ne référençait (issue #577). C’est la seule trace qui en subsiste — leur propre journal d’audit a été supprimé avec elles ; les détails indiquent ce qui a été supprimé."
     },
+    "secretsReencrypted": {
+      "label": "Secrets rechiffrés",
+      "description": "Des secrets stockés (paramètres sensibles, secrets client OIDC) dans un ancien format ou sous une clé retirée ont été rechiffrés sous la clé actuelle au démarrage (issue #927). Les détails donnent les nombres et l’identifiant de la clé actuelle — jamais une valeur."
+    },
+    "secretsUnreadable": {
+      "label": "Secrets illisibles",
+      "description": "Au démarrage, des secrets stockés n’ont pu être déchiffrés avec aucune clé configurée et sont considérés comme non définis (issue #927). Les détails nomment les paramètres et fournisseurs OIDC concernés — restaurez la clé qui les a écrits comme clé précédente, ou saisissez à nouveau les secrets."
+    },
+    "secretsReencryptionFailed": {
+      "label": "Échec du rechiffrement",
+      "description": "Le rechiffrement des secrets stockés au démarrage a échoué (issue #927). L’instance a démarré malgré tout et réessaiera au prochain démarrage ; les détails indiquent le type d’erreur, le journal du serveur le reste."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "Un événement de révision enregistré."

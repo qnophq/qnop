@@ -31,6 +31,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
@@ -39,8 +40,13 @@ import org.hibernate.annotations.UuidGenerator;
  * encrypted at rest via {@link EncryptedStringConverter}; the OAuth2 endpoint URIs and attribute
  * mappings are only needed for the generic {@link OidcProviderType#OAUTH2} variant. The {@code
  * provider_type} domain is guarded by a Postgres {@code CHECK} (ADR-0020).
+ *
+ * <p>{@code @DynamicUpdate} so an update writes only the columns that changed (issue #927): a
+ * client secret that cannot currently be decrypted reads as {@code null}, and must not be
+ * overwritten by an unrelated edit of the provider.
  */
 @Entity
+@DynamicUpdate
 @Table(name = "oidc_provider")
 public class OidcProvider {
 

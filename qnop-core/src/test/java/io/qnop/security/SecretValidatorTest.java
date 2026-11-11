@@ -65,7 +65,11 @@ class SecretValidatorTest {
         "change-me",
         "changeme",
         "password",
-        "qnop"
+        "qnop",
+        // long enough, but degenerate (issue #927): too few distinct characters
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "abababababababababababababababababababab",
+        "abcabcabcabcabcabcabcabcabcabcabcabcabc"
       })
   void rejectsWeakOrDefaultSecrets(String value) {
     assertFalse(

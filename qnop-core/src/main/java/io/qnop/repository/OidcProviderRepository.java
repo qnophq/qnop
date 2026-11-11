@@ -21,12 +21,52 @@
 package io.qnop.repository;
 
 import io.qnop.entity.OidcProvider;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Data access for {@link OidcProvider}. */
 public interface OidcProviderRepository extends JpaRepository<OidcProvider, UUID> {
 
   Optional<OidcProvider> findByName(String name);
+
+  /**
+   * The stored (still encrypted) client secrets, bypassing the decrypting entity converter — for
+   * the re-encryption pass (issue #927), which must see the ciphertext format.
+   */
+  @Query(
+      value =
+          "SELECT id AS id, name AS name, client_secret_encrypted AS ciphertext FROM oidc_provider"
+              + " WHERE client_secret_encrypted IS NOT NULL AND client_secret_encrypted <> ''",
+      nativeQuery = true)
+  List<StoredClientSecret> findStoredClientSecrets();
+
+  /**
+   * Compare-and-set of one stored client secret (issue #927): replaces the ciphertext only if it is
+   * still the one that was read, so a concurrent edit or another instance's pass is never
+   * overwritten.
+   *
+   * @return 1 if replaced, 0 if the stored value had changed in the meantime
+   */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      value =
+          "UPDATE oidc_provider SET client_secret_encrypted = :next"
+              + " WHERE id = :id AND client_secret_encrypted = :previous",
+      nativeQuery = true)
+  int replaceStoredClientSecret(
+      @Param("id") UUID id, @Param("previous") String previous, @Param("next") String next);
+
+  /** A raw stored client secret: the provider and its ciphertext as persisted. */
+  interface StoredClientSecret {
+    UUID getId();
+
+    String getName();
+
+    String getCiphertext();
+  }
 }

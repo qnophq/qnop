@@ -34,6 +34,7 @@ import io.qnop.service.auth.RegistrationService;
 import io.qnop.service.auth.RegistrationService.VerificationInputException;
 import io.qnop.service.auth.RegistrationService.VerificationPasswordMismatchException;
 import io.qnop.service.auth.RegistrationService.VerificationUsernameTakenException;
+import io.qnop.web.security.ratelimit.AuthIdentifierRateLimiter;
 import java.time.OffsetDateTime;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -56,11 +57,15 @@ public class AuthRegistrationController implements AuthRegistrationApi {
 
   private final RegistrationService registrationService;
   private final ApplicationSettingsService settings;
+  private final AuthIdentifierRateLimiter identifierRateLimiter;
 
   public AuthRegistrationController(
-      RegistrationService registrationService, ApplicationSettingsService settings) {
+      RegistrationService registrationService,
+      ApplicationSettingsService settings,
+      AuthIdentifierRateLimiter identifierRateLimiter) {
     this.registrationService = registrationService;
     this.settings = settings;
+    this.identifierRateLimiter = identifierRateLimiter;
   }
 
   @Override
@@ -71,6 +76,8 @@ public class AuthRegistrationController implements AuthRegistrationApi {
     if (!settings.selfRegistrationEnabled()) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found");
     }
+    // Per-e-mail throttle (issue #899), applied whether or not the address is taken.
+    identifierRateLimiter.register(request.getEmail());
     registrationService.register(
         request.getUsername(), request.getEmail(), request.getPassword(), request.getDisplayName());
     return ResponseEntity.ok(

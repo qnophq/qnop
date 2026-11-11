@@ -26,12 +26,17 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Applies the configurable outbound timeouts (issue #342) to the JDK {@code HttpURLConnection}
- * defaults, as a bound for outbound calls made over the legacy client that carries no timeout of
- * its own — notably Spring Security's OIDC issuer discovery ({@code ClientRegistrations}) and
- * JWK-set fetching, which build a default {@code RestTemplate}. Runs at context initialization,
- * well before any (user-triggered) OIDC discovery or login. An operator-supplied {@code
+ * defaults, as a bound for any outbound call made over the legacy client that carries no timeout of
+ * its own. Spring Security's OIDC discovery and JWK-set fetches originally went this way; since
+ * issue #904 they use the SSRF-guarded clients ({@code OutboundHttpClients}), which carry the same
+ * timeouts themselves, so this remains a backstop for anything else that builds a default {@code
+ * RestTemplate}. Runs at context initialization. An operator-supplied {@code
  * -Dsun.net.client.default*Timeout} always wins. Clients qnop constructs itself (S3, SMTP, the
- * GitHub {@code RestClient}) carry their own timeouts and are unaffected.
+ * GitHub {@code RestClient}, the guarded clients) carry their own timeouts and are unaffected.
+ *
+ * <p>Note: with Apache HttpClient 5 on the classpath (issue #904), a {@code RestClient} built
+ * without an explicit request factory defaults to an <em>unguarded</em> HttpComponents client that
+ * ignores these defaults; every client must therefore name its factory.
  */
 @Configuration(proxyBeanMethods = false)
 class HttpUrlConnectionTimeoutConfiguration {

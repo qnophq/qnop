@@ -32,11 +32,16 @@ import com.jayway.jsonpath.JsonPath;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ReviewParticipant;
+import io.qnop.entity.Team;
+import io.qnop.entity.TeamMembership;
+import io.qnop.entity.TeamRole;
 import io.qnop.entity.WorkflowState;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
+import io.qnop.repository.TeamMembershipRepository;
+import io.qnop.repository.TeamRepository;
 import io.qnop.testsupport.SeededIntegrationTest;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -59,6 +64,8 @@ class AnnotationApiIT extends SeededIntegrationTest {
   @Autowired private DocumentVersionRepository versions;
   @Autowired private ReviewParticipantRepository participants;
   @Autowired private AuditEventRepository auditEvents;
+  @Autowired private TeamRepository teams;
+  @Autowired private TeamMembershipRepository teamMemberships;
 
   /** A DRAFT document owned by MEMBER with AUDITOR + MEMBER2 as reviewers and one version. */
   private UUID seedDocumentWithVersion() {
@@ -390,6 +397,110 @@ class AnnotationApiIT extends SeededIntegrationTest {
         .perform(as(get("/api/v1/documents/" + documentId + "/annotations"), MEMBER_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.annotations.length()").value(0));
+  }
+
+  @Test
+  void anAuthorRemovedFromTheReviewCanNeitherResolveNorReopen() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String open = createAnnotation(documentId, AUDITOR_ID);
+    String resolved = createAnnotation(documentId, AUDITOR_ID);
+    resolve(resolved, AUDITOR_ID).andExpect(status().isOk());
+    participants.findByDocumentId(documentId).stream()
+        .filter(p -> AUDITOR_ID.equals(p.getUserId()))
+        .forEach(participants::delete);
+
+    // Lost access → the annotation is invisible: 404 like every other annotation path (#916).
+    resolve(open, AUDITOR_ID).andExpect(status().isNotFound());
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + resolved + "/reopen"), AUDITOR_ID))
+        .andExpect(status().isNotFound());
+
+    mockMvc
+        .perform(as(get("/api/v1/annotations/" + open), MEMBER_ID))
+        .andExpect(jsonPath("$.status").value("OPEN"))
+        .andExpect(jsonPath("$.commentCount").value(1));
+    mockMvc
+        .perform(as(get("/api/v1/annotations/" + resolved), MEMBER_ID))
+        .andExpect(jsonPath("$.status").value("RESOLVED"));
+  }
+
+  @Test
+  void anAuthorRemovedFromTheGrantingTeamCanNeitherResolveNorReopen() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    Team team = teams.save(Team.create("annotation-it-" + UUID.randomUUID(), null));
+    TeamMembership membership =
+        teamMemberships.save(TeamMembership.of(team.getId(), EXTERNAL_ID, TeamRole.MEMBER));
+    participants.save(ReviewParticipant.forTeam(documentId, team.getId()));
+    String open = createAnnotation(documentId, EXTERNAL_ID);
+    String resolved = createAnnotation(documentId, EXTERNAL_ID);
+    resolve(resolved, EXTERNAL_ID).andExpect(status().isOk());
+    teamMemberships.delete(membership);
+
+    resolve(open, EXTERNAL_ID).andExpect(status().isNotFound());
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + resolved + "/reopen"), EXTERNAL_ID))
+        .andExpect(status().isNotFound());
+    assertThat(auditEvents.findByDocumentIdOrderByCreatedAtDesc(documentId))
+        .noneMatch(event -> "annotation.reopened".equals(event.getEventType()));
+  }
+
+  @Test
+  void aHiddenAnnotationIsIndistinguishableFromAnUnknownOne() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String hidden = createAnnotation(documentId, AUDITOR_ID);
+    String unknown = UUID.randomUUID().toString();
+
+    // Same status, code and message shape on every annotation route (#916).
+    for (String id : new String[] {hidden, unknown}) {
+      for (MockHttpServletRequestBuilder request :
+          new MockHttpServletRequestBuilder[] {
+            get("/api/v1/annotations/" + id),
+            get("/api/v1/annotations/" + id + "/comments"),
+            post("/api/v1/annotations/" + id + "/resolve"),
+            post("/api/v1/annotations/" + id + "/reopen")
+          }) {
+        mockMvc
+            .perform(as(request, EXTERNAL_ID))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("ANNOTATION_NOT_FOUND"))
+            .andExpect(jsonPath("$.message").value("Unknown annotation: " + id));
+      }
+    }
+  }
+
+  @Test
+  void aNonParticipantAdminReachesTheAuthorOnlyRuleNotA404() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+
+    // Admins see every review, so the visibility gate passes and the author-only rule answers.
+    resolve(annotationId, ADMIN_ID)
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("ANNOTATION_ACTION_FORBIDDEN"));
+  }
+
+  @Test
+  void aForeignPrivateThreadCannotBeResolvedOrReopenedByAnotherReviewer() throws Exception {
+    // The policy is fixed at creation (the column is not updatable).
+    Document document = new Document(MEMBER_ID, "Private review");
+    document.setThreadParticipation(io.qnop.entity.ThreadParticipation.PRIVATE);
+    UUID documentId = documents.save(document).getId();
+    participants.save(ReviewParticipant.forUser(documentId, AUDITOR_ID));
+    participants.save(ReviewParticipant.forUser(documentId, MEMBER2_ID));
+    versions.save(
+        new DocumentVersion(
+            documentId, 1, "sha256/aa/deadbeef", "deadbeef", "application/pdf", 1234L, MEMBER_ID));
+    String open = createAnnotation(documentId, AUDITOR_ID);
+    String resolved = createAnnotation(documentId, AUDITOR_ID);
+    resolve(resolved, AUDITOR_ID).andExpect(status().isOk());
+
+    resolve(open, MEMBER2_ID)
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("ANNOTATION_NOT_FOUND"));
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + resolved + "/reopen"), MEMBER2_ID))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("ANNOTATION_NOT_FOUND"));
   }
 
   @Test

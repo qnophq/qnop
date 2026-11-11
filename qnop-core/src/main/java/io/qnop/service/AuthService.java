@@ -25,6 +25,7 @@ import io.qnop.entity.UserSource;
 import io.qnop.repository.UserRepository;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Predicate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,18 +72,39 @@ public class AuthService {
    */
   @Transactional(readOnly = true)
   public Optional<UUID> authenticate(String usernameOrEmail, String password) {
-    User user =
-        userRepository
-            .findByUsernameAndSource(usernameOrEmail, UserSource.INTERNAL)
-            .or(
-                () ->
-                    userRepository.findByEmailIgnoreCaseAndSource(
-                        usernameOrEmail, UserSource.INTERNAL))
-            .orElse(null);
+    return authenticate(usernameOrEmail, password, account -> true);
+  }
+
+  /**
+   * {@link #authenticate(String, String)} with a gate consulted between the account lookup and the
+   * password comparison (issue #899): it receives the id of the local account the identifier
+   * resolves to (empty when none), so a per-account login throttle keys on exactly the account the
+   * credential check means, whichever of username or e-mail spelling was used, without a second
+   * lookup. The gate may throw to refuse the attempt outright, or return {@code false} to fail it
+   * silently; the password comparison runs either way, so a silent refusal takes as long as a real
+   * one.
+   */
+  @Transactional(readOnly = true)
+  public Optional<UUID> authenticate(
+      String usernameOrEmail, String password, Predicate<Optional<UUID>> gate) {
+    User user = findLocalAccount(usernameOrEmail).orElse(null);
+    boolean admitted = gate.test(Optional.ofNullable(user).map(User::getId));
     boolean usable = user != null && user.isEnabled() && user.getPasswordHash() != null;
     boolean matches =
         passwordEncoder.matches(password, usable ? user.getPasswordHash() : dummyPasswordHash);
-    return usable && matches ? Optional.of(user.getId()) : Optional.empty();
+    return admitted && usable && matches ? Optional.of(user.getId()) : Optional.empty();
+  }
+
+  private Optional<User> findLocalAccount(String usernameOrEmail) {
+    if (usernameOrEmail == null) {
+      return Optional.empty();
+    }
+    return userRepository
+        .findByUsernameAndSource(usernameOrEmail, UserSource.INTERNAL)
+        .or(
+            () ->
+                userRepository.findByEmailIgnoreCaseAndSource(
+                    usernameOrEmail, UserSource.INTERNAL));
   }
 
   /**

@@ -24,6 +24,7 @@ import io.qnop.entity.AuditEvent;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -51,4 +52,7 @@ public interface AuditEventRepository
   /** How many events of one type landed after {@code since} (issue #454's weekly stat). */
   long countByDocumentIdInAndEventTypeAndCreatedAtAfter(
       Collection<UUID> documentIds, String eventType, Instant since);
+
+  /** The most recent event of one type, if any (issue #927: de-duplicating a repeated report). */
+  Optional<AuditEvent> findFirstByEventTypeOrderByCreatedAtDesc(String eventType);
 }

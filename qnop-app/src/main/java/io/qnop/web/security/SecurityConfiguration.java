@@ -27,6 +27,7 @@ import io.qnop.web.security.ratelimit.ForgotPasswordRateLimitFilter;
 import io.qnop.web.security.ratelimit.LoginRateLimitFilter;
 import io.qnop.web.security.ratelimit.RefreshRateLimitFilter;
 import io.qnop.web.security.ratelimit.RegisterRateLimitFilter;
+import io.qnop.web.security.ratelimit.ResetPasswordRateLimitFilter;
 import io.qnop.web.security.ratelimit.TrackingRateLimitFilter;
 import io.qnop.web.security.ratelimit.VerifyEmailRateLimitFilter;
 import java.util.List;
@@ -97,6 +98,7 @@ public class SecurityConfiguration {
       ChangePasswordRateLimitFilter changePasswordRateLimitFilter,
       RegisterRateLimitFilter registerRateLimitFilter,
       ForgotPasswordRateLimitFilter forgotPasswordRateLimitFilter,
+      ResetPasswordRateLimitFilter resetPasswordRateLimitFilter,
       VerifyEmailRateLimitFilter verifyEmailRateLimitFilter,
       TrackingRateLimitFilter trackingRateLimitFilter,
       PasswordChangeRequiredFilter passwordChangeRequiredFilter)
@@ -119,6 +121,7 @@ public class SecurityConfiguration {
         // IP-keyed limiters for the public self-service endpoints (issue #20).
         .addFilterBefore(registerRateLimitFilter, CsrfFilter.class)
         .addFilterBefore(forgotPasswordRateLimitFilter, CsrfFilter.class)
+        .addFilterBefore(resetPasswordRateLimitFilter, CsrfFilter.class)
         .addFilterBefore(verifyEmailRateLimitFilter, CsrfFilter.class)
         // The measurement endpoint is unauthenticated by necessity (the sign-in
         // screen is measured too), so its ceiling is enforced before anything else

@@ -32,6 +32,7 @@ import io.qnop.service.http.HttpClientProperties;
 import io.qnop.service.review.ReanchoringProperties;
 import io.qnop.service.storage.S3Properties;
 import io.qnop.web.security.ratelimit.RateLimitProperties;
+import io.qnop.web.security.ratelimit.RateLimitPropertiesFixture;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,6 +53,8 @@ class ConfigurationTreeBuilderTest {
   private static final String JWT_SECRET = "SUPER-SECRET-jwt-value";
   private static final String ENCRYPTION_KEY = "SUPER-SECRET-encryption-value";
   private static final String ENCRYPTION_SALT = "0123456789abcdef0123456789abcdef";
+  private static final String ENCRYPTION_KEY_PREVIOUS = "SUPER-SECRET-previous-key-value";
+  private static final String ENCRYPTION_SALT_PREVIOUS = "fedcba9876543210fedcba9876543210";
   private static final String S3_ACCESS_KEY = "SUPER-SECRET-access-value";
   private static final String S3_SECRET_KEY = "SUPER-SECRET-s3-value";
 
@@ -72,7 +75,10 @@ class ConfigurationTreeBuilderTest {
                 Duration.ofDays(7),
                 "qnop",
                 Boolean.TRUE,
-                new QnopProperties.Oidc("https://app.example.com")),
+                new QnopProperties.Oidc("https://app.example.com"),
+                ENCRYPTION_KEY_PREVIOUS,
+                ENCRYPTION_SALT_PREVIOUS,
+                null),
             new QnopProperties.Cors(List.of("https://a.example.com", "https://b.example.com")));
     S3Properties s3 =
         new S3Properties(
@@ -94,7 +100,7 @@ class ConfigurationTreeBuilderTest {
     HttpClientProperties http = new HttpClientProperties(null, null, null, null, null);
     ReanchoringProperties reanchoring = ReanchoringProperties.defaults();
     RateLimitProperties rateLimit =
-        new RateLimitProperties(List.of("10.0.0.0/8"), null, null, null, null, null, 100_000);
+        RateLimitPropertiesFixture.withTrustedProxies(List.of("10.0.0.0/8"));
 
     SequencedMap<String, Object> roots = new LinkedHashMap<>();
     roots.put("qnop", qnop);
@@ -122,6 +128,9 @@ class ConfigurationTreeBuilderTest {
             "qnop.auth.jwt-secret",
             "qnop.auth.encryption-key",
             "qnop.auth.encryption-salt",
+            // Rotation keys (issue #927): judged by `key`/`salt`, not the `previous` qualifier.
+            "qnop.auth.encryption-key-previous",
+            "qnop.auth.encryption-salt-previous",
             "qnop.s3.access-key",
             "qnop.s3.secret-key")) {
       ConfigurationEntry secret = entry(response, secretPath);
@@ -143,6 +152,8 @@ class ConfigurationTreeBuilderTest {
                 value.contains(JWT_SECRET)
                     || value.contains(ENCRYPTION_KEY)
                     || value.contains(ENCRYPTION_SALT)
+                    || value.contains(ENCRYPTION_KEY_PREVIOUS)
+                    || value.contains(ENCRYPTION_SALT_PREVIOUS)
                     || value.contains(S3_ACCESS_KEY)
                     || value.contains(S3_SECRET_KEY));
   }
@@ -186,6 +197,11 @@ class ConfigurationTreeBuilderTest {
   void derivesKebabPathsAndEnvVarNames() {
     ConfigurationResponse response = build(null);
     assertThat(entry(response, "qnop.s3.access-key").getEnvVar()).isEqualTo("QNOP_S3_ACCESS_KEY");
+    // The documented rotation variable is the one the page shows (issue #927).
+    assertThat(entry(response, "qnop.auth.encryption-key-previous").getEnvVar())
+        .isEqualTo("QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS");
+    assertThat(entry(response, "qnop.auth.secrets.write-format").getEnvVar())
+        .isEqualTo("QNOP_AUTH_SECRETS_WRITE_FORMAT");
     assertThat(entry(response, "qnop.auth.access-token-ttl").getEnvVar())
         .isEqualTo("QNOP_AUTH_ACCESS_TOKEN_TTL");
     assertThat(entry(response, "qnop.s3.path-style-access").getEnvVar())

@@ -164,7 +164,7 @@ comes into being without an authenticated session. Both are hardened:
   registration's password, since they may simply set a new one; so wrong passwords
   never spend a link. CPU cost per source is bounded by the per-IP rate limit on
   both verify endpoints (default 10 per 15 minutes,
-  `qnop.auth.rate-limit.verify-email.*`).
+  `qnop.auth.rate-limit.verify-email.*`, part of the ADR-0027 catalogue).
 - **Mail volume.** At most three links per address are outstanding (the oldest is
   spent, in one targeted update) and at most one new link and mail is issued per
   address per five minutes (newest token's `created_at`; inside the window a

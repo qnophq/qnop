@@ -34,7 +34,50 @@ All configuration is `QNOP_`-prefixed. The server **fails fast at startup** when
 | `QNOP_DB_HOST` / `QNOP_DB_PORT` / `QNOP_DB_NAME` / `QNOP_DB_USERNAME` / `QNOP_DB_PASSWORD` | PostgreSQL connection (Liquibase migrates the schema on startup) |
 | `QNOP_S3_ENDPOINT` / `QNOP_S3_BUCKET` / `QNOP_S3_ACCESS_KEY` / `QNOP_S3_SECRET_KEY` | S3-compatible object storage for document binaries (leave `QNOP_S3_ENDPOINT` empty for AWS S3) |
 
-Rotating `QNOP_AUTH_JWT_SECRET` invalidates all sessions; rotating the encryption key/salt makes previously encrypted values (e.g. stored OIDC client secrets) unreadable — plan key rotation deliberately.
+Rotating `QNOP_AUTH_JWT_SECRET` invalidates all sessions. The encryption key can be rotated without losing stored secrets — see [Rotating the encryption key](#rotating-the-encryption-key).
+
+`QNOP_AUTH_JWT_SECRET` and `QNOP_AUTH_ENCRYPTION_KEY` must contain **at least 8 distinct characters** besides being ≥ 32 characters long (since #927). Generated secrets (`openssl rand …`) always pass; a degenerate value such as one repeated character now **fails at startup** — check yours before upgrading.
+
+### Stored secrets at rest
+
+Stored secrets (the SMTP password and other sensitive settings, OIDC client secrets) are encrypted with AES-256-GCM under a key derived from `QNOP_AUTH_ENCRYPTION_KEY` + `QNOP_AUTH_ENCRYPTION_SALT`, and every value records which key wrote it (ADR-0022, amendment #927). Related optional variables:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` | *(blank)* | A second key, accepted **for decryption only** — used while rotating (same strength rule as the current key) |
+| `QNOP_AUTH_ENCRYPTION_SALT_PREVIOUS` | *(blank = same as current salt)* | The salt belonging to that second key, if it differs |
+| `QNOP_AUTH_SECRETS_WRITE_FORMAT` | `v2` | `v2`: write the current format and re-encrypt older values on start. `legacy`: keep writing the pre-#927 format and skip the re-encryption (staged upgrades, see below) |
+
+With `v2`, every start re-encrypts any stored secret that is in the pre-#927 format or was written under a key other than the current one, and records a **Secrets re-encrypted** entry in the audit trail.
+
+If a stored secret cannot be decrypted with any configured key (the old key was dropped too early, or the value was altered), qnop still starts: the secret is treated as **unset**, an error is logged, an OIDC provider with such a secret is not offered for login, and a **Secrets unreadable** audit entry names the setting or OIDC provider (never the value; recorded again only when that list changes). The stored ciphertext is kept, so setting the right key as `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` and restarting recovers it; otherwise an administrator enters the secret again. A failure of the re-encryption pass itself (e.g. a database hiccup) never stops the instance either: it is logged, audited as **Secret re-encryption failed**, and retried on the next start.
+
+### Upgrading to a release with versioned secrets (#927)
+
+Releases before #927 **cannot read** the new format. Once a stored secret has been re-encrypted, an older instance reads it as missing (OIDC logins through that provider fail; an older instance with a stored SMTP password fails at its next startup). Plan the upgrade accordingly:
+
+- **Single instance.** Take a **database backup**, then upgrade as usual. It just works: existing secrets are read in the old format and re-encrypted on the first start. From then on the change is **one-way** — rolling back to an earlier release requires restoring that backup (or re-entering the stored secrets after the rollback).
+- **Several instances (rolling upgrade), or if you want to keep a rollback window:**
+  1. Take a database backup.
+  2. Roll out the new release with `QNOP_AUTH_SECRETS_WRITE_FORMAT=legacy` on **every** instance. New and old instances now write and read the same old format; nothing is re-encrypted, and rolling back is still possible.
+  3. Once no instance of an earlier release is left and you no longer need the rollback, roll out `QNOP_AUTH_SECRETS_WRITE_FORMAT=v2` (or remove the variable). The first instance to start re-encrypts; instances still on `legacy` read the new values fine. From here on, rollback again means restoring the backup.
+
+### Rotating the encryption key
+
+Generate a new key (`openssl rand -base64 48`; optionally a new salt with `openssl rand -hex 32`). Then use one of the two procedures.
+
+**All at once** (you can stop every instance):
+
+1. Stop all instances.
+2. Set `QNOP_AUTH_ENCRYPTION_KEY` (and `QNOP_AUTH_ENCRYPTION_SALT`) to the new values, and move the old values to `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` (and `QNOP_AUTH_ENCRYPTION_SALT_PREVIOUS`, if the salt changed).
+3. Start the instances. The first one re-encrypts all stored secrets; check the audit trail (or the log line `Re-encrypted … under the current encryption key`) and confirm there is no **Secrets unreadable** entry.
+4. Remove the two `*_PREVIOUS` variables and restart.
+
+**Rolling** (no downtime; every phase is a normal rolling restart, finish each before starting the next):
+
+1. **Introduce the new key as the previous one** — keep `QNOP_AUTH_ENCRYPTION_KEY` = old key, set `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` = new key (and `…_SALT_PREVIOUS` = new salt if it differs). Every instance can now read both keys; nothing is rewritten.
+2. **Swap** — set `QNOP_AUTH_ENCRYPTION_KEY` = new key and `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` = old key (salts likewise). The first restarted instance re-encrypts under the new key; instances still in phase 1 read the new values. Check the audit trail as above.
+3. **Drop the old key** — remove the `*_PREVIOUS` variables.
 
 ### Common optional
 
@@ -47,6 +90,7 @@ Rotating `QNOP_AUTH_JWT_SECRET` invalidates all sessions; rotating the encryptio
 | `QNOP_UPLOAD_MULTIPART_LIMIT_MB` | `55` | HTTP multipart ceiling (keep above the document size limit) |
 | `QNOP_CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Only needed when a browser client runs on a *different* origin; the embedded UI is same-origin and needs none |
 | `QNOP_HTTP_FORWARD_HEADERS_STRATEGY` | `none` | Set `framework` behind a trusted reverse proxy so `X-Forwarded-*` drive scheme/host |
+| `QNOP_AUTH_RATELIMIT_TRUSTEDPROXYCIDRS` | *(empty)* | Comma-separated CIDRs of your reverse proxies; see [Behind a reverse proxy](#behind-a-reverse-proxy) |
 | `QNOP_HTTP_SHUTDOWN_GRACE` | `30s` | Graceful-shutdown drain window (align your orchestrator's stop grace period) |
 | `QNOP_ATTACHMENTS_MAX_IMAGE_MEGAPIXELS` | `50` | Image attachments larger than this (or 32768 px per side), or whose size cannot be read, are stored download-only: linked, never shown inline or embedded in exports |
 | `QNOP_AUTH_OIDC_FRONTEND_BASE_URL` | *(empty)* | Public base URL the OIDC login flow redirects back to, when it differs from the request origin |
@@ -72,6 +116,18 @@ docker compose exec qnop sh -c 'cat /tmp/qnop-bootstrap-*/admin-password.txt'
 - **JVM flags**: extend via `JDK_JAVA_OPTS`; the image defaults to `-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError` and runs as a non-root user.
 - **TLS**: terminate TLS at a reverse proxy and set `QNOP_HTTP_FORWARD_HEADERS_STRATEGY=framework`. The refresh cookie is `Secure` — plain-HTTP deployments are for local evaluation only.
 - **Backups**: the PostgreSQL database and the object-storage bucket together form the complete state; back them up as a pair.
+
+## Behind a reverse proxy
+
+The auth rate limits (login, refresh, registration, password reset — ADR-0027) and usage tracking key on the client IP. qnop only believes `X-Forwarded-For` when the TCP peer is one of the CIDRs in `QNOP_AUTH_RATELIMIT_TRUSTEDPROXYCIDRS` (property `qnop.auth.rate-limit.trusted-proxy-cidrs`).
+
+- **No proxy (default, empty list):** `X-Forwarded-For` is ignored and the connection address is used. Leave it empty when clients connect to qnop directly — any non-empty value there lets a client choose its own address.
+- **Behind a proxy:** list the address ranges of **every** proxy hop in front of qnop (load balancer, ingress, CDN egress ranges), and nothing else — e.g. `QNOP_AUTH_RATELIMIT_TRUSTEDPROXYCIDRS=10.0.0.0/8,172.28.0.0/16`. Never list a range clients can connect from. If the list is left empty behind a proxy, every client appears to come from the proxy and shares a single rate-limit bucket.
+- **How the client is chosen:** the header is read **right to left**. Entries written by your trusted proxies are skipped; the first address outside the list is the client. Anything to the left of it was supplied by the client and is never used. An entry that is not an IP literal stops the walk at the last trusted hop. This is correct for proxies that *append* to the header (nginx `$proxy_add_x_forwarded_for`, AWS ALB, GCP and Azure load balancers, Traefik) and for proxies that *replace* it (Caddy's default).
+- Make sure the proxy closest to the client does not trust an incoming `X-Forwarded-For` blindly unless it, too, sits behind trusted infrastructure.
+- `QNOP_HTTP_FORWARD_HEADERS_STRATEGY=framework` is a separate setting: it controls scheme/host for redirects and cookies, not the rate-limit IP.
+
+Besides the per-IP limits, login, registration, password-reset request and password reset are also throttled per account / e-mail address / reset token, so spreading attempts over many addresses does not lift the limit. Failed logins are counted per account and client network (IPv4 /24, IPv6 /56), and per recognised device: a successful login sets an `HttpOnly` `qnop_device` cookie (path `/api/v1/auth/login`, valid for `qnop.auth.rate-limit.login-device-cookie-lifetime`, default 30 days), and a browser that carries one is never held back by failures elsewhere. A much higher per-account ceiling bounds failures from unrecognised devices across all networks; a `WARN` line `Login ceiling reached for account …` means it was hit — worth a look. Rotating `QNOP_AUTH_JWT_SECRET` invalidates all device cookies. All limits are tunable under `qnop.auth.rate-limit.*` (see ADR-0027).
 
 ## Office converter isolation
 

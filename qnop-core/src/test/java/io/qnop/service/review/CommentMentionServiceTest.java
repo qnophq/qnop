@@ -55,10 +55,22 @@ class CommentMentionServiceTest {
   private final DocumentRepository documents = mock(DocumentRepository.class);
   private final ReviewParticipantRepository participants = mock(ReviewParticipantRepository.class);
   private final UserRepository users = mock(UserRepository.class);
+  private final io.qnop.repository.CommentRepository comments =
+      mock(io.qnop.repository.CommentRepository.class);
+  private final io.qnop.repository.AnnotationRepository annotations =
+      mock(io.qnop.repository.AnnotationRepository.class);
+  private final ReviewAudience audience =
+      new ReviewAudience(documents, annotations, comments, participants, users);
   // The Community resolver only — the seam (issue #598) must be invisible here.
   private final CommentMentionService service =
       new CommentMentionService(
-          mentions, documents, participants, List.of(new UserSlugMentionResolver(users)));
+          mentions,
+          documents,
+          participants,
+          comments,
+          annotations,
+          audience,
+          List.of(new UserSlugMentionResolver(users)));
 
   private final UUID commentId = UUID.randomUUID();
   private final UUID documentId = UUID.randomUUID();
@@ -97,6 +109,35 @@ class CommentMentionServiceTest {
     // Owner (by owner-id) and the participant resolve; the stranger stays plain text.
     assertThat(persisted).containsExactly(owner, participant);
     verify(mentions).saveAll(any());
+  }
+
+  @Test
+  void privateThreadsOnlyMentionThoseWhoCanSeeTheThread() {
+    // PRIVATE (issue #921): the participant cannot open the author's thread, so naming them
+    // there creates no mention; the owner and the thread's author can, so theirs persist.
+    Document document = document(false);
+    when(document.getId()).thenReturn(documentId);
+    when(document.getThreadParticipation()).thenReturn(io.qnop.entity.ThreadParticipation.PRIVATE);
+    when(documents.findById(documentId)).thenReturn(Optional.of(document));
+    UUID threadAuthor = UUID.randomUUID();
+    UUID annotationId = UUID.randomUUID();
+    io.qnop.entity.Comment comment = mock(io.qnop.entity.Comment.class);
+    when(comment.getAnnotationId()).thenReturn(annotationId);
+    when(comments.findById(commentId)).thenReturn(Optional.of(comment));
+    io.qnop.entity.Annotation annotation = mock(io.qnop.entity.Annotation.class);
+    when(annotation.getAuthorId()).thenReturn(threadAuthor);
+    when(annotations.findById(annotationId)).thenReturn(Optional.of(annotation));
+    slugResolvesTo("olivia-owner", owner);
+    slugResolvesTo("petra-part", participant);
+    slugResolvesTo("tom-thread", threadAuthor);
+    when(participants.existsAccessibleParticipant(documentId, participant)).thenReturn(true);
+    when(participants.existsAccessibleParticipant(documentId, threadAuthor)).thenReturn(true);
+
+    var persisted =
+        service.resolveAndPersist(
+            commentId, documentId, owner, "@olivia-owner @petra-part @tom-thread");
+
+    assertThat(persisted).containsExactly(owner, threadAuthor);
   }
 
   @Test
@@ -181,7 +222,13 @@ class CommentMentionServiceTest {
     TeamResolver team = new TeamResolver(Set.of(member, participant));
     CommentMentionService seamed =
         new CommentMentionService(
-            mentions, documents, participants, List.of(new UserSlugMentionResolver(users), team));
+            mentions,
+            documents,
+            participants,
+            comments,
+            annotations,
+            audience,
+            List.of(new UserSlugMentionResolver(users), team));
 
     var persisted =
         seamed.resolveAndPersist(commentId, documentId, author, "@petra-part @platform-team");
@@ -202,6 +249,9 @@ class CommentMentionServiceTest {
             mentions,
             documents,
             participants,
+            comments,
+            annotations,
+            audience,
             List.of(new UserSlugMentionResolver(users), new TeamResolver(Set.of(stranger, owner))));
 
     var persisted = seamed.resolveAndPersist(commentId, documentId, author, "@platform-team");
@@ -227,6 +277,9 @@ class CommentMentionServiceTest {
             mentions,
             documents,
             participants,
+            comments,
+            annotations,
+            audience,
             List.of(throwing, nullReturning, new UserSlugMentionResolver(users)));
 
     var persisted =

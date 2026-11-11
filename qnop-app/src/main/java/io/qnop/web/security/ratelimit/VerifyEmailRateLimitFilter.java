@@ -21,15 +21,13 @@
 package io.qnop.web.security.ratelimit;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
  * Rate-limits {@code POST /api/v1/auth/verify-email} and its {@code /registration} lookup per
- * client IP (issue #900), in one bucket. A verification costs a password-hash comparison (and, when
- * new credentials are set, a hash computation), so an unthrottled endpoint would be a cheap way to
- * burn server CPU. Configured under {@code qnop.auth.rate-limit.verify-email.*} (default 10 per 15
- * minutes).
+ * client network (issue #900), in one bucket. A verification costs a password-hash comparison (and,
+ * when new credentials are set, a hash computation), so an unthrottled endpoint would be a cheap
+ * way to burn server CPU. Limit {@code qnop.auth.rate-limit.verify-email.*} (default 10 / 900s).
  */
 @Component
 public class VerifyEmailRateLimitFilter extends AbstractRateLimitFilter {
@@ -38,18 +36,15 @@ public class VerifyEmailRateLimitFilter extends AbstractRateLimitFilter {
   static final String REGISTRATION_PATH = "/api/v1/auth/verify-email/registration";
 
   private final HttpClientIpResolver clientIpResolver;
-  private final int maxAttempts;
-  private final long windowSeconds;
+  private final RateLimitProperties.Limit limit;
 
   public VerifyEmailRateLimitFilter(
       BucketRateLimitService rateLimitService,
       HttpClientIpResolver clientIpResolver,
-      @Value("${qnop.auth.rate-limit.verify-email.max-attempts:10}") int maxAttempts,
-      @Value("${qnop.auth.rate-limit.verify-email.window-seconds:900}") long windowSeconds) {
+      RateLimitProperties properties) {
     super(rateLimitService, "Too many verification attempts. Please try again later.");
     this.clientIpResolver = clientIpResolver;
-    this.maxAttempts = maxAttempts;
-    this.windowSeconds = windowSeconds;
+    this.limit = properties.verifyEmail();
   }
 
   @Override
@@ -61,7 +56,8 @@ public class VerifyEmailRateLimitFilter extends AbstractRateLimitFilter {
 
   @Override
   protected String resolveKey(HttpServletRequest request) {
-    return clientIpResolver.resolve(request);
+    // IPv6 grouped by /56 (ClientNetworks), like the other auth limiters.
+    return ClientNetworks.perIpKey(clientIpResolver.resolve(request));
   }
 
   @Override
@@ -71,11 +67,11 @@ public class VerifyEmailRateLimitFilter extends AbstractRateLimitFilter {
 
   @Override
   protected int maxAttempts() {
-    return maxAttempts;
+    return limit.maxAttempts();
   }
 
   @Override
   protected long windowSeconds() {
-    return windowSeconds;
+    return limit.windowSeconds();
   }
 }
