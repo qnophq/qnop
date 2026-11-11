@@ -78,6 +78,15 @@ The unmasking path already exists and is the right one: the audit trail ([ADR-00
 
 One thing does change for admins, and it is a correction rather than an exception. The overview's annotation counts are visibility-scoped, and under a `PRIVATE` thread policy that made a moderation row read "0 open" for a review full of open concerns — while `AnnotationService.canSeeThread` was letting the same admin read every one of those threads. The counts now follow what the admin can actually see. That is a wrong number being fixed, not a privacy boundary being moved.
 
+## Amendment (2026-11, review access re-checks — issues #916, #919, #921)
+
+The `PRIVATE` rule and the participant gate were applied on the read paths but not everywhere a thread's existence or content leaves the server. The rule itself is unchanged; it now holds on every such path:
+
+- **Annotation decisions.** Resolve and reopen check review access and thread visibility *before* the authorization of the decision itself, exactly like the read and comment paths. An author who has since lost access (removed as a participant or from the granting team) gets the same 404 as for an unknown id, not a 403 that confirms the annotation exists.
+- **Out-of-band delivery.** Notification audiences are derived from history (authors, earlier commenters, mentions, team membership at the time), so they are re-checked at send time — and again when the daily digest is assembled — against *current* access: owner or participant (direct or via team), and, for thread-scoped events under `PRIVATE`, the owner or the annotation's author. Admin status is not consulted, matching the in-app inbox. The shared check lives in `ReviewAudience`.
+- **Activity feed.** Every thread-scoped event family (`annotation.*` and `placement.*`) of a `PRIVATE` review is shown to its owner only; review-wide events (workflow, due date) are unaffected.
+- **Attachments.** Attachments are document-scoped: a file is uploaded before the comment that embeds it exists, so no thread link is stored. Under `PRIVATE`, the thread is derived from the reference instead: besides admins, the owner and the uploader, a caller may read a file only when its **uploader** referenced it in a comment in one of the **caller's own** threads (the only threads `PRIVATE` shows them). Requiring the uploader as that comment's author means pasting a foreign attachment id into one's own thread grants nothing. No schema change; `OPEN` and `READ_ONLY` keep the document gate alone, since every thread is visible there.
+
 ## Relationships
 
 Extends [ADR-0011](0011-review-workflow-state-model.md) (review model & the `FINALIZED` invariant). Related issues: #403 (the original "Participant" placeholder), #410 (likes), #412 (permalinks), #563 (admin moderation).

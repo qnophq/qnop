@@ -21,6 +21,8 @@
 package io.qnop.service.document;
 
 import io.qnop.entity.DocumentAttachment;
+import io.qnop.entity.ThreadParticipation;
+import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentAttachmentRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
@@ -69,16 +71,19 @@ public class DocumentAttachmentService {
   private final DocumentAttachmentRepository repository;
   private final StorageService storage;
   private final ApplicationSettingsService settings;
+  private final CommentRepository comments;
 
   public DocumentAttachmentService(
       DocumentAccessService access,
       DocumentAttachmentRepository repository,
       StorageService storage,
-      ApplicationSettingsService settings) {
+      ApplicationSettingsService settings,
+      CommentRepository comments) {
     this.access = access;
     this.repository = repository;
     this.storage = storage;
     this.settings = settings;
+    this.comments = comments;
   }
 
   /**
@@ -122,14 +127,23 @@ public class DocumentAttachmentService {
     return new UploadedAttachment(saved.getId(), fileName, contentType, staged.sizeBytes());
   }
 
-  /** The serving metadata, participant-gated; 404 for outsiders and unknown ids alike. */
+  /**
+   * The serving metadata, participant-gated; 404 for outsiders and unknown ids alike. Under PRIVATE
+   * thread participation (issue #921) the attachment additionally follows the threads that use it:
+   * see {@link #canSeeUnderPrivate}.
+   */
   public AttachmentMetadata metadata(
       UUID documentId, UUID attachmentId, UUID actor, boolean admin) {
-    access.getDocument(documentId, actor, admin); // visibility → 404 if not a participant
+    DocumentAccessService.DocumentView document =
+        access.getDocument(documentId, actor, admin); // visibility → 404 if not a participant
     DocumentAttachment attachment =
         repository
             .findByIdAndDocumentId(attachmentId, documentId)
             .orElseThrow(() -> DocumentValidationException.notFound("unknown attachment"));
+    if (!canSeeUnderPrivate(document, attachment, actor, admin)) {
+      // Same 404 as an unknown id: a foreign PRIVATE thread's files are not enumerable.
+      throw DocumentValidationException.notFound("unknown attachment");
+    }
     return new AttachmentMetadata(
         attachment.getId(),
         attachment.getFileName(),
@@ -137,6 +151,34 @@ public class DocumentAttachmentService {
         attachment.getContentHash(),
         attachment.getSizeBytes(),
         attachment.getStorageKey());
+  }
+
+  /**
+   * Whether the PRIVATE-participation rule (issue #413) lets {@code actor} read this attachment.
+   *
+   * <p>Attachments are document-scoped: the file is uploaded before the comment that embeds it is
+   * posted, so the row carries no thread link — the link is the attachment's id inside a comment
+   * body. Rather than trust the document gate alone (which would let any participant read a file
+   * from a thread they cannot see), the thread is derived from that reference: under PRIVATE a
+   * caller who is neither admin, owner nor uploader may read the file only when the uploader
+   * referenced it in a comment in one of <em>the caller's own</em> threads (the only threads
+   * PRIVATE shows them). Requiring the uploader as the comment's author keeps a caller from
+   * granting themselves access by pasting a foreign attachment id into their own thread. OPEN and
+   * READ_ONLY show every thread, so the document gate suffices there.
+   */
+  private boolean canSeeUnderPrivate(
+      DocumentAccessService.DocumentView document,
+      DocumentAttachment attachment,
+      UUID actor,
+      boolean admin) {
+    if (!ThreadParticipation.PRIVATE.name().equals(document.threadParticipation())) {
+      return true;
+    }
+    if (admin || actor.equals(document.ownerId()) || actor.equals(attachment.getUploaderId())) {
+      return true;
+    }
+    return comments.existsInThreadOfBy(
+        document.id(), actor, attachment.getUploaderId(), attachment.getId().toString());
   }
 
   /** Opens the attachment's bytes; the caller closes the returned download. */

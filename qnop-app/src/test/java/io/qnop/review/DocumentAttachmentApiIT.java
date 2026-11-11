@@ -25,6 +25,7 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -59,6 +60,7 @@ class DocumentAttachmentApiIT extends SeededIntegrationTest {
 
   @Autowired private DocumentRepository documents;
   @Autowired private ReviewParticipantRepository participants;
+  @Autowired private io.qnop.repository.DocumentVersionRepository versions;
 
   private static byte[] pngBytes(int size) {
     byte[] bytes = new byte[size];
@@ -207,6 +209,70 @@ class DocumentAttachmentApiIT extends SeededIntegrationTest {
                 .content(
                     "{\"values\":{\"upload.attachment_max_file_size_mb\":\"" + megabytes + "\"}}"))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void privateThreadsKeepTheirAttachmentsToTheirOwnAudience() throws Exception {
+    // The policy is fixed at creation (the column is not updatable).
+    Document document = new Document(MEMBER_ID, "Private review");
+    document.setThreadParticipation(io.qnop.entity.ThreadParticipation.PRIVATE);
+    UUID documentId = documents.save(document).getId();
+    participants.save(ReviewParticipant.forUser(documentId, AUDITOR_ID));
+    participants.save(ReviewParticipant.forUser(documentId, MEMBER2_ID));
+    versions.save(
+        new io.qnop.entity.DocumentVersion(
+            documentId, 1, "sha256/aa/deadbeef", "deadbeef", "application/pdf", 1234L, MEMBER_ID));
+
+    // AUDITOR's file, embedded in AUDITOR's own PRIVATE thread.
+    String auditorUrl = upload(documentId, AUDITOR_ID);
+    createAnnotation(documentId, AUDITOR_ID, "see ![shot](" + auditorUrl + ")");
+
+    mockMvc.perform(as(get(auditorUrl), AUDITOR_ID)).andExpect(status().isOk());
+    mockMvc.perform(as(get(auditorUrl), MEMBER_ID)).andExpect(status().isOk());
+    // Another reviewer cannot see that thread, so neither its file (#921).
+    mockMvc.perform(as(get(auditorUrl), MEMBER2_ID)).andExpect(status().isNotFound());
+
+    // Referencing a foreign file in one's own thread does not grant access to it.
+    String member2Thread =
+        createAnnotation(documentId, MEMBER2_ID, "reference ![x](" + auditorUrl + ")");
+    mockMvc.perform(as(get(auditorUrl), MEMBER2_ID)).andExpect(status().isNotFound());
+
+    // A file the owner shares in MEMBER2's thread is readable by MEMBER2.
+    String ownerUrl = upload(documentId, MEMBER_ID);
+    mockMvc.perform(as(get(ownerUrl), MEMBER2_ID)).andExpect(status().isNotFound());
+    mockMvc
+        .perform(
+            as(post("/api/v1/annotations/" + member2Thread + "/comments"), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"body\":\"here ![y](" + ownerUrl + ")\"}"))
+        .andExpect(status().isCreated());
+    mockMvc.perform(as(get(ownerUrl), MEMBER2_ID)).andExpect(status().isOk());
+    mockMvc.perform(as(get(ownerUrl), AUDITOR_ID)).andExpect(status().isNotFound());
+  }
+
+  private String upload(UUID documentId, UUID actor) throws Exception {
+    String json =
+        mockMvc
+            .perform(as(uploadRequest(documentId, PNG_BYTES, "shot.png"), actor))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return JsonPath.read(json, "$.url");
+  }
+
+  private String createAnnotation(UUID documentId, UUID actor, String comment) throws Exception {
+    String json =
+        mockMvc
+            .perform(
+                as(post("/api/v1/documents/" + documentId + "/annotations"), actor)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"versionNumber\":1,\"comment\":\"" + comment + "\"}"))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return JsonPath.read(json, "$.id");
   }
 
   @Test

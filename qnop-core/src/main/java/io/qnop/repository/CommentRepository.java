@@ -47,6 +47,23 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
           + " WHERE c.annotationId = a.id AND a.documentId = :documentId")
   List<UUID> findDistinctCommentAuthorIdsByDocumentId(@Param("documentId") UUID documentId);
 
+  /**
+   * Whether {@code commentAuthorId} wrote a comment carrying {@code fragment} in one of {@code
+   * threadAuthorId}'s threads on the document — used to tie a document-scoped attachment to the
+   * PRIVATE threads its uploader shared it into (issue #921). The fragment is a UUID string, so it
+   * holds no LIKE wildcards.
+   */
+  @Query(
+      "SELECT COUNT(c) > 0 FROM Comment c, Annotation a"
+          + " WHERE c.annotationId = a.id AND a.documentId = :documentId"
+          + " AND a.authorId = :threadAuthorId AND c.authorId = :commentAuthorId"
+          + " AND c.body LIKE CONCAT('%', :fragment, '%')")
+  boolean existsInThreadOfBy(
+      @Param("documentId") UUID documentId,
+      @Param("threadAuthorId") UUID threadAuthorId,
+      @Param("commentAuthorId") UUID commentAuthorId,
+      @Param("fragment") String fragment);
+
   /** The opening message of an annotation's thread (issue #393); id breaks created_at ties. */
   Optional<Comment> findFirstByAnnotationIdOrderByCreatedAtAscIdAsc(UUID annotationId);
 
