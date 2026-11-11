@@ -31,6 +31,7 @@ import org.springframework.stereotype.Component;
 public class ForgotPasswordRateLimitFilter extends AbstractRateLimitFilter {
 
   static final String PATH = "/api/v1/auth/forgot-password";
+  static final String MESSAGE = "Too many password-reset requests. Please try again later.";
 
   private final HttpClientIpResolver clientIpResolver;
   private final RateLimitProperties.Limit limit;
@@ -39,7 +40,7 @@ public class ForgotPasswordRateLimitFilter extends AbstractRateLimitFilter {
       BucketRateLimitService rateLimitService,
       HttpClientIpResolver clientIpResolver,
       RateLimitProperties properties) {
-    super(rateLimitService, "Too many password-reset requests. Please try again later.");
+    super(rateLimitService, MESSAGE);
     this.clientIpResolver = clientIpResolver;
     this.limit = properties.forgotPassword();
   }
@@ -51,7 +52,8 @@ public class ForgotPasswordRateLimitFilter extends AbstractRateLimitFilter {
 
   @Override
   protected String resolveKey(HttpServletRequest request) {
-    return clientIpResolver.resolve(request);
+    // IPv6 grouped by /56 (ClientNetworks).
+    return ClientNetworks.perIpKey(clientIpResolver.resolve(request));
   }
 
   @Override

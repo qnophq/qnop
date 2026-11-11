@@ -31,6 +31,8 @@ import static org.mockito.Mockito.when;
 import io.qnop.entity.User;
 import io.qnop.entity.UserSource;
 import io.qnop.repository.UserRepository;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -109,6 +111,30 @@ class AuthServiceTest {
 
     assertThat(service.authenticate("jane", "secret")).isEmpty();
     verify(passwordEncoder, times(1)).matches("secret", DUMMY_HASH);
+  }
+
+  @Test
+  @DisplayName("the gate sees the resolved account id from the one lookup (issue #899)")
+  void gateReceivesTheResolvedAccount() {
+    User user = existing("jane", true, "stored-hash");
+    when(passwordEncoder.matches("secret", "stored-hash")).thenReturn(true);
+    List<Optional<UUID>> seen = new ArrayList<>();
+
+    assertThat(service.authenticate("jane", "secret", account -> seen.add(account)))
+        .contains(user.getId());
+    assertThat(service.authenticate("nobody", "secret", account -> seen.add(account))).isEmpty();
+    assertThat(seen).containsExactly(Optional.of(user.getId()), Optional.empty());
+    verify(users, times(1)).findByUsernameAndSource("jane", UserSource.INTERNAL);
+  }
+
+  @Test
+  @DisplayName("a gate that refuses silently fails even the right password, after one comparison")
+  void silentlyRefusingGate() {
+    existing("jane", true, "stored-hash");
+    when(passwordEncoder.matches("secret", "stored-hash")).thenReturn(true);
+
+    assertThat(service.authenticate("jane", "secret", account -> false)).isEmpty();
+    verify(passwordEncoder, times(1)).matches("secret", "stored-hash");
   }
 
   private User existing(String username, boolean enabled, String passwordHash) {

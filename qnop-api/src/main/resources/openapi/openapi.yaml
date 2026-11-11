@@ -5317,7 +5317,10 @@ components:
       properties:
         usernameOrEmail:
           type: string
-          description: The internal user's username or email address.
+          maxLength: 320
+          description: >-
+            The internal user's username or email address. Bounded by the longest
+            email address registration accepts (issue #899).
         password:
           type: string
           format: password

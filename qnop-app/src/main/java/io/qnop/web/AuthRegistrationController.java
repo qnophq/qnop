@@ -27,6 +27,7 @@ import io.qnop.api.v1.model.VerifyEmailResponse;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
 import io.qnop.service.auth.RegistrationService;
+import io.qnop.web.security.ratelimit.AuthIdentifierRateLimiter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -46,11 +47,15 @@ public class AuthRegistrationController implements AuthRegistrationApi {
 
   private final RegistrationService registrationService;
   private final ApplicationSettingsService settings;
+  private final AuthIdentifierRateLimiter identifierRateLimiter;
 
   public AuthRegistrationController(
-      RegistrationService registrationService, ApplicationSettingsService settings) {
+      RegistrationService registrationService,
+      ApplicationSettingsService settings,
+      AuthIdentifierRateLimiter identifierRateLimiter) {
     this.registrationService = registrationService;
     this.settings = settings;
+    this.identifierRateLimiter = identifierRateLimiter;
   }
 
   @Override
@@ -61,6 +66,8 @@ public class AuthRegistrationController implements AuthRegistrationApi {
     if (!settings.selfRegistrationEnabled()) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found");
     }
+    // Per-e-mail throttle (issue #899), applied whether or not the address is taken.
+    identifierRateLimiter.register(request.getEmail());
     registrationService.register(
         request.getUsername(), request.getEmail(), request.getPassword(), request.getDisplayName());
     return ResponseEntity.ok(

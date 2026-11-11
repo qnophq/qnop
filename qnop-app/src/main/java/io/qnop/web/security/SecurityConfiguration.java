@@ -27,6 +27,7 @@ import io.qnop.web.security.ratelimit.ForgotPasswordRateLimitFilter;
 import io.qnop.web.security.ratelimit.LoginRateLimitFilter;
 import io.qnop.web.security.ratelimit.RefreshRateLimitFilter;
 import io.qnop.web.security.ratelimit.RegisterRateLimitFilter;
+import io.qnop.web.security.ratelimit.ResetPasswordRateLimitFilter;
 import io.qnop.web.security.ratelimit.TrackingRateLimitFilter;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -96,6 +97,7 @@ public class SecurityConfiguration {
       ChangePasswordRateLimitFilter changePasswordRateLimitFilter,
       RegisterRateLimitFilter registerRateLimitFilter,
       ForgotPasswordRateLimitFilter forgotPasswordRateLimitFilter,
+      ResetPasswordRateLimitFilter resetPasswordRateLimitFilter,
       TrackingRateLimitFilter trackingRateLimitFilter,
       PasswordChangeRequiredFilter passwordChangeRequiredFilter)
       throws Exception {
@@ -117,6 +119,7 @@ public class SecurityConfiguration {
         // IP-keyed limiters for the public self-service endpoints (issue #20).
         .addFilterBefore(registerRateLimitFilter, CsrfFilter.class)
         .addFilterBefore(forgotPasswordRateLimitFilter, CsrfFilter.class)
+        .addFilterBefore(resetPasswordRateLimitFilter, CsrfFilter.class)
         // The measurement endpoint is unauthenticated by necessity (the sign-in
         // screen is measured too), so its ceiling is enforced before anything else
         // touches the request (issue #666).
