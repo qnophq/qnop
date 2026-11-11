@@ -49,6 +49,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -216,7 +217,7 @@ public class TeamController implements AdminTeamsApi {
     // the admin user list), so building URLs never streams image bytes per row.
     Map<UUID, Instant> avatarTimestamps =
         avatars.updatedAt(
-            java.util.stream.Stream.concat(v.members().stream(), v.pendingInvitations().stream())
+            Stream.concat(v.members().stream(), v.pendingInvitations().stream())
                 .map(TeamMemberView::userId)
                 .toList());
     return new AdminTeamDetail()

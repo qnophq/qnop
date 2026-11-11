@@ -192,6 +192,11 @@ public class TeamService {
     }
     if (enabled != null) {
       team.setEnabled(enabled);
+      if (!enabled) {
+        // A disabled team offers no invitations and accepts none; drop them rather
+        // than keep rows nobody can see or answer (issue #936, ADR-0064).
+        invitations.deleteAllOfTeam(id);
+      }
     }
     applyProfileVisibility(team, profileShowMembers, profileShowReviews);
     long count =
@@ -228,7 +233,7 @@ public class TeamService {
     TeamMembership saved =
         memberships.save(TeamMembership.of(teamId, userId, requireTeamRole(teamRole)));
     // A direct add supersedes a pending invitation of the same user (issue #936).
-    invitations.findByTeamIdAndUserId(teamId, userId).ifPresent(invitations::delete);
+    invitations.deleteInvitation(teamId, userId);
     return toMemberView(user, saved);
   }
 
@@ -442,6 +447,11 @@ public class TeamService {
       throw new TeamConflictException(
           "ALREADY_INVITED", "This user has already been invited to the team.");
     }
+    if (invitations.countByTeamId(teamId) >= MAX_PENDING_INVITATIONS) {
+      throw new TeamConflictException(
+          "TOO_MANY_PENDING_INVITATIONS",
+          "This team has too many unanswered invitations — revoke some first.");
+    }
     TeamInvitation saved = invitations.saveAndFlush(TeamInvitation.of(teamId, userId, actorId));
     return new TeamMemberView(
         userId,
@@ -474,11 +484,19 @@ public class TeamService {
   /** Withdraw a pending invitation (admin surface, issue #936); an unknown one is a 404. */
   @Transactional
   public void revokeInvitation(UUID teamId, UUID userId) {
-    TeamInvitation invitation =
-        invitations
-            .findByTeamIdAndUserId(teamId, userId)
-            .orElseThrow(() -> TeamNotFoundException.invitation(teamId, userId));
-    invitations.delete(invitation);
+    removeInvitationLocked(teamId, userId);
+  }
+
+  /**
+   * Deletes one invitation under the team's row lock — the same lock accept takes, so revoke,
+   * decline and accept of one invitation serialise — with a counted delete: an invitation already
+   * answered or revoked by the racing request is a plain 404, never a stale-state error (#936).
+   */
+  private void removeInvitationLocked(UUID teamId, UUID userId) {
+    teams.findByIdForUpdate(teamId);
+    if (invitations.deleteInvitation(teamId, userId) == 0) {
+      throw TeamNotFoundException.invitation(teamId, userId);
+    }
   }
 
   /** The caller's own pending invitations into enabled teams, newest first (issue #936). */
@@ -502,16 +520,19 @@ public class TeamService {
             .findByIdForUpdate(teamId)
             .filter(Team::isEnabled)
             .orElseThrow(() -> TeamNotFoundException.invitation(teamId, userId));
-    TeamInvitation invitation =
-        invitations
-            .findByTeamIdAndUserId(teamId, userId)
-            .orElseThrow(() -> TeamNotFoundException.invitation(teamId, userId));
-    limits.requireTeamMemberCapacity(teamId);
-    invitations.delete(invitation);
+    if (invitations.deleteInvitation(teamId, userId) == 0) {
+      throw TeamNotFoundException.invitation(teamId, userId);
+    }
+    // An existing membership takes no new seat, so the quota only guards a new one;
+    // a refusal rolls the delete back and the invitation stays pending.
     TeamMembership membership =
         memberships
             .findByTeamIdAndUserId(teamId, userId)
-            .orElseGet(() -> memberships.save(TeamMembership.of(teamId, userId, TeamRole.MEMBER)));
+            .orElseGet(
+                () -> {
+                  limits.requireTeamMemberCapacity(teamId);
+                  return memberships.save(TeamMembership.of(teamId, userId, TeamRole.MEMBER));
+                });
     long count =
         memberships.countMembersByTeamIds(List.of(teamId)).stream()
             .findFirst()
@@ -524,11 +545,7 @@ public class TeamService {
   /** The invited user declines: the invitation is deleted; 404 when there is none (issue #936). */
   @Transactional
   public void declineInvitation(UUID teamId, UUID userId) {
-    TeamInvitation invitation =
-        invitations
-            .findByTeamIdAndUserId(teamId, userId)
-            .orElseThrow(() -> TeamNotFoundException.invitation(teamId, userId));
-    invitations.delete(invitation);
+    removeInvitationLocked(teamId, userId);
   }
 
   /**
@@ -721,6 +738,12 @@ public class TeamService {
       return new TeamMemberView(userId, displayName, slug, null, teamRole, joinedAt, status);
     }
   }
+
+  /**
+   * How many unanswered invitations one team may hold (issue #936, ADR-0064) — a bound on what a
+   * lead can leave outstanding, independent of whether a member quota is configured.
+   */
+  public static final int MAX_PENDING_INVITATIONS = 50;
 
   /** {@link TeamMemberView#status()} of a membership (issue #936). */
   public static final String STATUS_ACTIVE = "ACTIVE";

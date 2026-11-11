@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -34,6 +35,23 @@ public interface TeamInvitationRepository extends JpaRepository<TeamInvitation, 
   Optional<TeamInvitation> findByTeamIdAndUserId(UUID teamId, UUID userId);
 
   boolean existsByTeamIdAndUserId(UUID teamId, UUID userId);
+
+  /** Pending invitations of one team — the per-team pending cap (issue #936). */
+  long countByTeamId(UUID teamId);
+
+  /**
+   * Deletes the invitation of the user into the team and reports how many rows went (0 or 1). A
+   * counted bulk delete, so an invitation answered or revoked concurrently is a clean "not found"
+   * rather than a stale-entity failure on flush (issue #936).
+   */
+  @Modifying
+  @Query("DELETE FROM TeamInvitation i WHERE i.teamId = :teamId AND i.userId = :userId")
+  int deleteInvitation(@Param("teamId") UUID teamId, @Param("userId") UUID userId);
+
+  /** Drops every pending invitation of a team — when an admin disables it (issue #936). */
+  @Modifying
+  @Query("DELETE FROM TeamInvitation i WHERE i.teamId = :teamId")
+  int deleteAllOfTeam(@Param("teamId") UUID teamId);
 
   /** A team's pending invitations joined with the invited user's identity, by display name. */
   @Query(

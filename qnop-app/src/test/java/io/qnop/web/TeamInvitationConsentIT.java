@@ -47,6 +47,11 @@ import io.qnop.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -269,6 +274,77 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
                 .content("{\"teamRole\":\"MEMBER\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.teamRole").value("MEMBER"));
+  }
+
+  @Test
+  @DisplayName("accept racing revoke resolves cleanly: one wins, the other is a 404, never a 500")
+  void acceptRacingRevokeNeverFails() throws Exception {
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      for (int round = 0; round < 5; round++) {
+        invite(invitee).andExpect(status().isCreated());
+        CyclicBarrier start = new CyclicBarrier(2);
+        Future<Integer> accept =
+            pool.submit(
+                () -> {
+                  start.await(5, TimeUnit.SECONDS);
+                  return mockMvc
+                      .perform(
+                          post("/api/v1/teams/invitations/{id}/accept", teamId)
+                              .with(asUser(invitee)))
+                      .andReturn()
+                      .getResponse()
+                      .getStatus();
+                });
+        Future<Integer> revoke =
+            pool.submit(
+                () -> {
+                  start.await(5, TimeUnit.SECONDS);
+                  return mockMvc
+                      .perform(
+                          delete("/api/v1/teams/{id}/invitations/{uid}", teamId, invitee)
+                              .with(asUser(lead)))
+                      .andReturn()
+                      .getResponse()
+                      .getStatus();
+                });
+        int accepted = accept.get(15, TimeUnit.SECONDS);
+        int revoked = revoke.get(15, TimeUnit.SECONDS);
+
+        // Exactly one of them took the invitation; the loser saw it gone.
+        assertThat(List.of(accepted, revoked)).containsAnyOf(200, 204);
+        assertThat(accepted == 200 ? revoked : accepted).isEqualTo(404);
+        assertThat(teamMemberships.existsByTeamIdAndUserId(teamId, invitee))
+            .isEqualTo(accepted == 200);
+        assertThat(invitations.existsByTeamIdAndUserId(teamId, invitee)).isFalse();
+        teamMemberships.findByTeamIdAndUserId(teamId, invitee).ifPresent(teamMemberships::delete);
+      }
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  @Test
+  @DisplayName("disabling a team drops its pending invitations")
+  void disablingTheTeamDropsInvitations() throws Exception {
+    invite(invitee).andExpect(status().isCreated());
+
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/teams/{id}", teamId)
+                .with(asAdmin(admin))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":false}"))
+        .andExpect(status().isOk());
+
+    assertThat(invitations.existsByTeamIdAndUserId(teamId, invitee)).isFalse();
+    mockMvc
+        .perform(get("/api/v1/teams/invitations").with(asUser(invitee)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items").isEmpty());
+    mockMvc
+        .perform(post("/api/v1/teams/invitations/{id}/decline", teamId).with(asUser(invitee)))
+        .andExpect(status().isNotFound());
   }
 
   private org.springframework.test.web.servlet.ResultActions invite(UUID userId) throws Exception {

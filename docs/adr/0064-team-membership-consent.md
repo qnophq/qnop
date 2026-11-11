@@ -32,6 +32,8 @@ mentions, notifications, the external-participant and review facades — each of
    revoke a pending invitation (`DELETE /teams/{teamId}/invitations/{userId}`, and
    `DELETE /admin/teams/{teamId}/invitations/{userId}` on the admin console). Only the invited user
    can answer: the lookup is keyed on the caller, so anybody else gets 404.
+   Accept, decline and revoke all take the team's row lock and delete the invitation with a counted
+   delete: when two of them race, one wins and the other is a plain 404 — never a stale-state error.
 2. **Admin adds stay immediate.** Both admin surfaces (`/admin/teams/**` and an admin acting through
    `/teams/**`) create an `ACTIVE` membership directly, with any role. A direct add supersedes a
    pending invitation of the same user.
@@ -49,24 +51,32 @@ mentions, notifications, the external-participant and review facades — each of
    `TeamMembershipStatus` (`ACTIVE` | `INVITED`) on team-member DTOs, and team details carry a
    separate `pendingInvitations` list — visible only to callers who may manage the team.
 5. **Quota.** The per-team member quota (ADR-0057) is checked when the invitation is sent (an early
-   refusal) and again, under the team row lock, when it is accepted — the moment the seat is taken.
-   Pending invitations do not count as members.
+   refusal) and again, under the team row lock, when it is accepted — the moment the seat is taken
+   (not when the user is already a member, which takes no seat). Pending invitations do not count
+   as members.
+6. **Pending cap.** A team holds at most 50 unanswered invitations
+   (`TeamService.MAX_PENDING_INVITATIONS`); one more answers `409 TOO_MANY_PENDING_INVITATIONS`.
+   A fixed cap rather than counting invitations against the member quota, because that quota may be
+   unlimited (0) and the point is to bound what a lead can leave outstanding. There is no
+   re-invite cooldown after a decline: an invitation grants nothing, so a repeat invite is a
+   nuisance at worst, and the user can decline again. This is an accepted residual.
+7. **Disabled teams.** Disabling a team (admin console) deletes its pending invitations. A disabled
+   team therefore has none to list, accept or decline; re-enabling it does not bring them back —
+   the lead invites again.
 
 ## Consequences
 
 - An invited user has no access to the team or its reviews until they accept; ITs prove this
   (`TeamInvitationConsentIT`).
 - Leads need an admin to create co-leads. This is deliberate friction on a privilege grant.
-- Invitations do not expire; they stay until accepted, declined, revoked, or until the team or the
-  user is deleted (FK cascade). An invitation into a team an admin later disables is hidden and
-  cannot be accepted.
+- Invitations do not expire; they stay until accepted, declined, revoked, the team is disabled, or
+  the team or the user is deleted (FK cascade).
 - **Notification.** The invitation surfaces in the UI ("My Teams") only. The in-app inbox
   (ADR-0051) and its mail cadence are review-scoped — every notification type is a review event
   rendered against a document and fed into the review digest — and there is no team mail template
-  today. Adding a team-invitation notification type is a follow-up, not part of this decision.
+  today. A team-invitation notification is tracked in #948.
 - **Audit.** Team-membership changes are not part of the audit vocabulary today (ADR-0042/0043), so
-  invitation events are not audited either; extending the audit vocabulary to team changes is a
-  follow-up.
+  invitation events are not audited either; team audit events are tracked in #948.
 - API change for clients: `POST /teams/{teamId}/members` by a non-admin lead no longer creates a
   member; it returns `status: INVITED`.
 
