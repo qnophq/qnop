@@ -78,6 +78,14 @@ describe('auditEventMeta', () => {
     expect(auditEventMeta('review.archived').tone).toBe('neutral');
   });
 
+  it('knows the audit-chain integrity events, and flags a broken chain in red', () => {
+    expect(AUDIT_EVENT_TYPES).toEqual(
+      expect.arrayContaining(['audit.chain.pruned', 'audit.chain.broken']),
+    );
+    expect(auditEventMeta('audit.chain.broken').tone).toBe('red');
+    expect(english(auditEventMeta('audit.chain.pruned').labelKey)).toBe('Audit trail pruned');
+  });
+
   it('falls back to the raw type and a neutral tone for an unknown event', () => {
     const meta = auditEventMeta('some.future.event');
     expect(meta.labelKey).toBe('events.fallback.label');

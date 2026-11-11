@@ -122,6 +122,14 @@
       "label": "Revisiones depuradas",
       "description": "Unas revisiones archivadas superaron el periodo de conservación para la depuración y se eliminaron de forma permanente, junto con los objetos de almacenamiento a los que no hacía referencia ningún otro documento (issue #577). Este es el único registro que queda de ellas — su propio registro de auditoría se eliminó con ellas; los detalles indican qué se eliminó."
     },
+    "auditChainPruned": {
+      "label": "Registro de auditoría depurado",
+      "description": "Se eliminó una revisión y sus propios eventos de auditoría se eliminaron con ella (issue #928). Esta marca registra qué posiciones de la cadena de auditoría a prueba de manipulaciones se eliminaron, para que la verificación de la cadena distinga esta eliminación autorizada de una manipulación."
+    },
+    "auditChainBroken": {
+      "label": "Cadena de auditoría rota",
+      "description": "La verificación de la cadena de auditoría encontró eventos de auditoría modificados, eliminados o insertados fuera de la aplicación (issue #928). Los detalles sitúan cada ruptura por su posición en la cadena; investíguelo antes de confiar en las entradas afectadas."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "Un evento de revisión registrado."
