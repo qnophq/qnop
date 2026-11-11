@@ -195,12 +195,13 @@ class DocumentAttachmentApiIT extends SeededIntegrationTest {
   }
 
   @Test
-  void rejectsAnImageDeclaringMoreThanThePixelBudgetWith400() throws Exception {
+  void storesAnImageDeclaringMoreThanThePixelBudgetAsDownloadOnly() throws Exception {
     UUID documentId = seedDocument();
     byte[] declared = pngBytes(64, 20_000, 20_000);
     mockMvc
         .perform(as(uploadRequest(documentId, declared, "wide.png"), AUDITOR_ID))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.contentType").value("application/octet-stream"));
   }
 
   @Test

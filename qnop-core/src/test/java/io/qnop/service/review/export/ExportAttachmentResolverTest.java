@@ -32,10 +32,12 @@ import io.qnop.service.document.DocumentAttachmentService;
 import io.qnop.service.document.DocumentAttachmentService.AttachmentDownload;
 import io.qnop.service.document.DocumentAttachmentService.AttachmentMetadata;
 import io.qnop.service.image.ImageFixtures;
+import io.qnop.service.image.PixelBudget;
 import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /** The export-side pixel budget for embedded attachments (issue #907). */
@@ -47,6 +49,11 @@ class ExportAttachmentResolverTest {
   private final DocumentAttachmentService attachments = mock(DocumentAttachmentService.class);
   private final ExportAttachmentResolver resolver =
       new ExportAttachmentResolver(attachments, mock(ApplicationSettingsService.class));
+
+  @BeforeEach
+  void budget() {
+    when(attachments.pixelBudget()).thenReturn(new PixelBudget(16_384, 16_000_000L));
+  }
 
   @Test
   void embedsAStoredImageWithinTheBudget() {

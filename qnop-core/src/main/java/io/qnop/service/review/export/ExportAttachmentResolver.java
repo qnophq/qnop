@@ -271,8 +271,7 @@ public class ExportAttachmentResolver {
       return Optional.of(new Converted(bytes, contentType));
     }
     BufferedImage decoded =
-        ImageHeaderProbe.decodeWithinBudget(bytes, DocumentAttachmentService.PIXEL_BUDGET)
-            .orElse(null);
+        ImageHeaderProbe.decodeWithinBudget(bytes, attachments.pixelBudget()).orElse(null);
     if (decoded == null) {
       return Optional.empty();
     }
@@ -283,10 +282,8 @@ public class ExportAttachmentResolver {
   }
 
   /** Header-only: true when the declared raster fits the attachment pixel budget (#907). */
-  private static boolean withinPixelBudget(byte[] bytes) {
-    return ImageHeaderProbe.probe(bytes)
-        .filter(DocumentAttachmentService.PIXEL_BUDGET::admits)
-        .isPresent();
+  private boolean withinPixelBudget(byte[] bytes) {
+    return ImageHeaderProbe.probe(bytes).filter(attachments.pixelBudget()::admits).isPresent();
   }
 
   private record Converted(byte[] bytes, String contentType) {}

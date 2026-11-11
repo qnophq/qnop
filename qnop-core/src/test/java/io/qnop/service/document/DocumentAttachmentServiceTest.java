@@ -21,13 +21,10 @@
 package io.qnop.service.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.qnop.entity.DocumentAttachment;
@@ -67,7 +64,7 @@ class DocumentAttachmentServiceTest {
               return new StagedObject("staging/key", "hash", bytes.length);
             });
     when(repository.save(any(DocumentAttachment.class))).thenAnswer(i -> i.getArgument(0));
-    service = new DocumentAttachmentService(access, repository, storage, settings);
+    service = new DocumentAttachmentService(access, repository, storage, settings, 16);
   }
 
   @Test
@@ -79,27 +76,37 @@ class DocumentAttachmentServiceTest {
   }
 
   @Test
-  void rejectsAnImageDeclaringMoreThanThePixelBudget() {
+  void storesAnImageDeclaringMoreThanThePixelBudgetAsDownloadOnly() {
     for (byte[] declared :
         new byte[][] {
           ImageFixtures.pngHeader(20_000, 20_000),
-          ImageFixtures.pngHeader(16_385, 1),
-          ImageFixtures.webpVp8x(5_000, 5_000)
+          ImageFixtures.pngHeader(32_769, 1),
+          ImageFixtures.webpVp8x(5_000, 5_000),
+          ImageFixtures.gif(10_000, 10_000, new int[] {0, 0, 1, 1})
         }) {
-      assertThatThrownBy(() -> service.store(DOCUMENT, ACTOR, false, upload(declared), "x.png"))
-          .isInstanceOf(DocumentValidationException.class)
-          .satisfies(e -> assertThat(((DocumentValidationException) e).getStatus()).isEqualTo(400));
+      DocumentAttachmentService.UploadedAttachment uploaded =
+          service.store(DOCUMENT, ACTOR, false, upload(declared), "x.png");
+
+      assertThat(uploaded.contentType()).isEqualTo(DocumentAttachmentService.BINARY);
     }
-    verify(storage, never()).stage(any(InputStream.class), anyString(), anyLong());
   }
 
   @Test
-  void rejectsAnImageWhoseHeaderCannotBeRead() {
+  void storesAnImageWhoseHeaderCannotBeReadAsDownloadOnly() {
     byte[] signatureOnly = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x42, 0x42};
 
-    assertThatThrownBy(() -> service.store(DOCUMENT, ACTOR, false, upload(signatureOnly), "x.png"))
-        .isInstanceOf(DocumentValidationException.class)
-        .hasMessageContaining("dimensions");
+    assertThat(service.store(DOCUMENT, ACTOR, false, upload(signatureOnly), "x.png").contentType())
+        .isEqualTo(DocumentAttachmentService.BINARY);
+  }
+
+  @Test
+  void theBudgetIsConfigurableInMegapixels() {
+    assertThat(service.pixelBudget().maxPixels()).isEqualTo(16_000_000L);
+    assertThat(
+            new DocumentAttachmentService(access, repository, storage, settings, 0)
+                .pixelBudget()
+                .maxPixels())
+        .isEqualTo(DocumentAttachmentService.DEFAULT_MAX_IMAGE_MEGAPIXELS * 1_000_000L);
   }
 
   @Test

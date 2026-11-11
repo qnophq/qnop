@@ -283,3 +283,8 @@ qnop:
     max-wait: ${QNOP_OFFICE_MAX_WAIT:30s}
     max-input-size: ${QNOP_OFFICE_MAX_INPUT_SIZE:100MB}
     max-output-size: ${QNOP_OFFICE_MAX_OUTPUT_SIZE:256MB}
+  # Image attachments above this many megapixels (or 32768 px per side), or whose
+  # size cannot be read from the header, are stored download-only: linked, never
+  # shown inline or embedded in exports (issue #907).
+  attachments:
+    max-image-megapixels: ${QNOP_ATTACHMENTS_MAX_IMAGE_MEGAPIXELS:50}
