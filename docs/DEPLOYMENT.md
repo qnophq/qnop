@@ -34,7 +34,27 @@ All configuration is `QNOP_`-prefixed. The server **fails fast at startup** when
 | `QNOP_DB_HOST` / `QNOP_DB_PORT` / `QNOP_DB_NAME` / `QNOP_DB_USERNAME` / `QNOP_DB_PASSWORD` | PostgreSQL connection (Liquibase migrates the schema on startup) |
 | `QNOP_S3_ENDPOINT` / `QNOP_S3_BUCKET` / `QNOP_S3_ACCESS_KEY` / `QNOP_S3_SECRET_KEY` | S3-compatible object storage for document binaries (leave `QNOP_S3_ENDPOINT` empty for AWS S3) |
 
-Rotating `QNOP_AUTH_JWT_SECRET` invalidates all sessions; rotating the encryption key/salt makes previously encrypted values (e.g. stored OIDC client secrets) unreadable — plan key rotation deliberately.
+Rotating `QNOP_AUTH_JWT_SECRET` invalidates all sessions. The encryption key can be rotated without losing stored secrets — see [Rotating the encryption key](#rotating-the-encryption-key).
+
+### Rotating the encryption key
+
+Stored secrets (the SMTP password and other sensitive settings, OIDC client secrets) are encrypted with AES-256-GCM under a key derived from `QNOP_AUTH_ENCRYPTION_KEY` + `QNOP_AUTH_ENCRYPTION_SALT`, and every value records which key wrote it (ADR-0022, amendment #927). Two optional variables are accepted **for decryption only**:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` | *(blank)* | The key being rotated out (same strength rule as the current key) |
+| `QNOP_AUTH_ENCRYPTION_SALT_PREVIOUS` | *(blank = same as current salt)* | The salt that belonged to the previous key, if it differed |
+
+On every start qnop re-encrypts any stored secret that is in the old (pre-#927) format or was written under a key other than the current one, and records a **Secrets re-encrypted** entry in the audit trail. To rotate:
+
+1. Generate a new key (`openssl rand -base64 48`; optionally a new salt with `openssl rand -hex 32`).
+2. Set `QNOP_AUTH_ENCRYPTION_KEY` (and `QNOP_AUTH_ENCRYPTION_SALT`) to the new values, and move the old values to `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` (and `QNOP_AUTH_ENCRYPTION_SALT_PREVIOUS`, if the salt changed).
+3. Restart **every** instance with that configuration. The first instance to start re-encrypts all stored secrets; the others find nothing to do. Check the audit trail (or the log line `Re-encrypted … under the current encryption key`) and confirm there is no **Secrets unreadable** entry.
+4. Remove the two `*_PREVIOUS` variables and restart again.
+
+Upgrading from a release before #927 needs no action: existing secrets are read in their old format and re-encrypted on the first start.
+
+If a stored secret cannot be decrypted with any configured key (the old key was dropped too early, or the value was altered), qnop still starts: the secret is treated as **unset**, an error is logged, and a **Secrets unreadable** audit entry names the setting or OIDC provider (never the value). The stored ciphertext is kept, so setting the right key as `QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS` and restarting recovers it; otherwise an administrator enters the secret again.
 
 ### Common optional
 

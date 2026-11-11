@@ -23,6 +23,7 @@ package io.qnop.security;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -58,6 +59,56 @@ class CryptoConfigurationTest {
     assertNotEquals("s3cret-password", hash);
     assertTrue(encoder.matches("s3cret-password", hash));
     assertFalse(encoder.matches("wrong-password", hash));
+  }
+
+  private static QnopProperties rotatingProperties(String previousKey, String previousSalt) {
+    return new QnopProperties(
+        new QnopProperties.Auth(
+            "crypto-test-jwt-secret-0123456789-abc",
+            "crypto-test-encryption-key-0123456789",
+            "0123456789abcdef0123456789abcdef",
+            null,
+            null,
+            null,
+            null,
+            null,
+            previousKey,
+            previousSalt),
+        new QnopProperties.Cors(List.of()));
+  }
+
+  @Test
+  void textEncryptorAcceptsValuesWrittenUnderThePreviousKey() {
+    String previousKey = "crypto-test-previous-key-9876543210";
+    String previousSalt = "fedcba9876543210fedcba9876543210";
+    String written =
+        new SecretCipher(new SecretCipher.KeyMaterial(previousKey, previousSalt), null)
+            .encrypt("rotated-secret");
+
+    SecretCipher rotating = config.textEncryptor(rotatingProperties(previousKey, previousSalt));
+
+    assertEquals("rotated-secret", rotating.decrypt(written));
+    assertTrue(rotating.needsReEncryption(written));
+  }
+
+  @Test
+  void previousKeyWithoutItsOwnSaltSharesTheCurrentSalt() {
+    String previousKey = "crypto-test-previous-key-9876543210";
+    String written =
+        new SecretCipher(
+                new SecretCipher.KeyMaterial(previousKey, "0123456789abcdef0123456789abcdef"), null)
+            .encrypt("rotated-secret");
+
+    assertEquals(
+        "rotated-secret",
+        config.textEncryptor(rotatingProperties(previousKey, "")).decrypt(written));
+  }
+
+  @Test
+  void weakPreviousKeyIsRefused() {
+    QnopProperties weak = rotatingProperties("CHANGE_ME", null);
+
+    assertThrows(IllegalStateException.class, () -> config.textEncryptor(weak));
   }
 
   @Test

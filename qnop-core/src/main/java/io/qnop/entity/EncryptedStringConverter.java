@@ -22,6 +22,8 @@ package io.qnop.entity;
 
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 import org.springframework.stereotype.Component;
 
@@ -32,10 +34,19 @@ import org.springframework.stereotype.Component;
  * injects the application {@link TextEncryptor} (derived from {@code qnop.auth.encryption-key}; see
  * the security configuration). Encryption is non-deterministic, so encrypted columns must never be
  * used as query predicates or unique keys.
+ *
+ * <p><b>Unreadable values (issue #927).</b> A value no configured key can decrypt — the key was
+ * rotated without keeping the old one as previous, or the value was altered — reads as {@code null}
+ * (no secret) with a loud error, rather than failing every load of the owning entity. The stored
+ * ciphertext is not touched: entities using this converter are {@code @DynamicUpdate}, so an
+ * unrelated edit never writes the {@code null} back, and restoring the right key recovers the
+ * value. The startup re-encryption pass reports such values in the SYSTEM audit trail.
  */
 @Converter
 @Component
 public class EncryptedStringConverter implements AttributeConverter<String, String> {
+
+  private static final Logger log = LoggerFactory.getLogger(EncryptedStringConverter.class);
 
   private final TextEncryptor encryptor;
 
@@ -57,6 +68,15 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
     if (dbData == null || dbData.isEmpty()) {
       return dbData;
     }
-    return encryptor.decrypt(dbData);
+    try {
+      return encryptor.decrypt(dbData);
+    } catch (IllegalStateException e) {
+      // Never log the value; the message names only the failure kind and key id.
+      log.error(
+          "An encrypted column could not be decrypted with any configured encryption key and is"
+              + " treated as unset: {}",
+          e.getMessage());
+      return null;
+    }
   }
 }

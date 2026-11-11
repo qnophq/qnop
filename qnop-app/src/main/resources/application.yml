@@ -131,6 +131,11 @@ qnop:
     jwt-secret: ${QNOP_AUTH_JWT_SECRET:CHANGE_ME}
     encryption-key: ${QNOP_AUTH_ENCRYPTION_KEY:CHANGE_ME}
     encryption-salt: ${QNOP_AUTH_ENCRYPTION_SALT:CHANGE_ME}
+    # Key rotation (issue #927, ADR-0022): the key being rotated out, accepted for
+    # decryption only. Blank = no rotation in progress; a blank previous salt means
+    # the previous key shares the current salt. See docs/DEPLOYMENT.md.
+    previous-encryption-key: ${QNOP_AUTH_ENCRYPTION_KEY_PREVIOUS:}
+    previous-encryption-salt: ${QNOP_AUTH_ENCRYPTION_SALT_PREVIOUS:}
     # OIDC discovery against a private/loopback issuer (e.g. a local Keycloak on
     # http://localhost) is blocked by default as an SSRF guard (issue #21). The
     # local-dev .env turns this on so the bundled Keycloak works out of the box.
