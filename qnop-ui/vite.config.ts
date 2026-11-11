@@ -1,9 +1,11 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { randomBytes } from 'node:crypto';
+import { statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { spaCspPolicy } from './src/utils/spaCspPolicy';
 
 // https://vite.dev/config/
 //
@@ -46,30 +48,32 @@ const proxy = {
  */
 const CSP_NONCE_PLACEHOLDER = '__CSP_NONCE__';
 
-/** Mirrors PathAwareCspHeaderWriter's SPA policy (qnop-app); keep the two in step. */
-function spaPolicy(nonce: string): string {
-  return (
-    `default-src 'self'; script-src 'self'; style-src 'self' 'nonce-${nonce}'; ` +
-    "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; " +
-    "worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; " +
-    "form-action 'self'; object-src 'none'"
-  );
-}
-
 function freshNonce(): string {
   return randomBytes(16).toString('base64');
 }
 
+/** Whether `pathname` names a file of the build other than index.html. */
+function isBuildFile(outDir: string, pathname: string): boolean {
+  try {
+    const file = path.resolve(outDir, `.${decodeURIComponent(pathname)}`);
+    const inBuild = file.startsWith(outDir + path.sep) && file !== path.join(outDir, 'index.html');
+    return inBuild && statSync(file).isFile();
+  } catch {
+    // Malformed escapes or a missing file: not a build file.
+    return false;
+  }
+}
+
 function cspNonce(): Plugin {
   const devNonce = freshNonce();
-  let indexPath = '';
+  let outDir = '';
   return {
     name: 'qnop-csp-nonce',
     config(_, { command }) {
       return { html: { cspNonce: command === 'build' ? CSP_NONCE_PLACEHOLDER : devNonce } };
     },
     configResolved(config) {
-      indexPath = path.resolve(config.root, config.build.outDir, 'index.html');
+      outDir = path.resolve(config.root, config.build.outDir);
     },
     configureServer(server) {
       server.middlewares.use((_req, res, next) => {
@@ -78,22 +82,25 @@ function cspNonce(): Plugin {
       });
     },
     configurePreviewServer(server) {
-      // Runs before the preview proxy and static files: a page navigation
-      // outside the proxied backend paths gets index.html, rendered per request.
+      // Runs before the preview proxy and static files. A browser navigation —
+      // decided by `Accept: text/html`, not by the path's shape, so a slug with
+      // a dot (`/reviews/v1.2`) is still a route — outside the proxied backend
+      // paths and not naming a file of the build gets index.html, rendered per
+      // request.
       server.middlewares.use((req, res, next) => {
-        const url = new URL(req.url ?? '/', 'http://preview');
+        const { pathname } = new URL(req.url ?? '/', 'http://preview');
         const isNavigation =
           req.method === 'GET' &&
           (req.headers.accept ?? '').includes('text/html') &&
-          !Object.keys(proxy).some((prefix) => url.pathname.startsWith(prefix)) &&
-          (path.extname(url.pathname) === '' || url.pathname.endsWith('.html'));
+          !Object.keys(proxy).some((prefix) => pathname.startsWith(prefix)) &&
+          !isBuildFile(outDir, pathname);
         if (!isNavigation) return next();
-        readFile(indexPath, 'utf8').then(
+        readFile(path.join(outDir, 'index.html'), 'utf8').then(
           (template) => {
             const nonce = freshNonce();
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             res.setHeader('Cache-Control', 'no-store');
-            res.setHeader('Content-Security-Policy', spaPolicy(nonce));
+            res.setHeader('Content-Security-Policy', spaCspPolicy(nonce));
             res.end(template.replaceAll(CSP_NONCE_PLACEHOLDER, nonce));
           },
           (error: unknown) => next(error),

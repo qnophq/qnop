@@ -133,7 +133,7 @@ export const test = base.extend<Record<never, never>, WorkerFixtures>({
     },
     { scope: 'worker' },
   ],
-  page: async ({ signedInContext, viewport }, use) => {
+  page: async ({ signedInContext, viewport }, use, testInfo) => {
     const page = await signedInContext.newPage();
     // The SPA keeps device-local state — the dashboard's "continue where you
     // left off" strip, the persisted focus/split choice, panel widths, the
@@ -150,16 +150,35 @@ export const test = base.extend<Record<never, never>, WorkerFixtures>({
     // The preview server enforces the SPA's nonce-based style policy (issue
     // #913); a style the browser refused is a regression even when the
     // screenshot happens to look right, so every page fails on one.
+    // Two nets: the page's own `securitypolicyviolation` events, reported
+    // through an exposed binding with the blocked directive and source, and
+    // the browser console as a backstop for anything reported only there.
     const cspViolations: string[] = [];
+    await page.exposeBinding('__qnopCspViolation', (_source, violation: string) => {
+      cspViolations.push(violation);
+    });
+    await page.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', (event) => {
+        const report = (window as unknown as { __qnopCspViolation?: (v: string) => void })
+          .__qnopCspViolation;
+        report?.(
+          `${event.effectiveDirective} blocked ${event.blockedURI || 'inline'} ` +
+            `at ${event.sourceFile || document.location.pathname}:${event.lineNumber}`,
+        );
+      });
+    });
     page.on('console', (message) => {
       if (message.type() === 'error' && message.text().includes('Content Security Policy')) {
-        cspViolations.push(message.text());
+        cspViolations.push(`console: ${message.text()}`);
       }
     });
     if (viewport) await page.setViewportSize(viewport);
     await use(page);
+    // Asserted before the page closes, inside the test that caused them.
+    baseExpect(cspViolations, `Content-Security-Policy violations in "${testInfo.title}"`).toEqual(
+      [],
+    );
     await page.close();
-    baseExpect(cspViolations, 'Content-Security-Policy violations').toEqual([]);
   },
 });
 
