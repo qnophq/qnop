@@ -45,6 +45,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -56,6 +57,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class DocumentOverviewApiIT extends SeededIntegrationTest {
 
   @Autowired private MockMvc mockMvc;
+  @Autowired private JdbcTemplate jdbc;
   @Autowired private DocumentRepository documents;
   @Autowired private DocumentVersionRepository versions;
   @Autowired private ReviewParticipantRepository participants;
@@ -292,16 +294,54 @@ class DocumentOverviewApiIT extends SeededIntegrationTest {
   }
 
   @Test
-  void teamMembersAreListedForPlainMembersNamesOnly() throws Exception {
-    // Team Alpha carries three seeded members (SeededTeamIT pins that count).
+  void teamMembersAreListedToTheTeamsOwnMembersNamesOnly() throws Exception {
+    // Team Alpha carries three seeded members (SeededTeamIT pins that count); MEMBER is one.
     mockMvc
-        .perform(as(get("/api/v1/principals/teams/" + TEAM_ALPHA_ID + "/members"), MEMBER2_ID))
+        .perform(as(get("/api/v1/principals/teams/" + TEAM_ALPHA_ID + "/members"), MEMBER_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.principals.length()").value(3))
         .andExpect(jsonPath("$.principals[0].kind").value("USER"))
         .andExpect(jsonPath("$.principals[0].displayName").isNotEmpty())
         // Names only — the members endpoint must never leak emails.
         .andExpect(jsonPath("$.principals[0].email").doesNotExist());
+  }
+
+  @Test
+  void foreignTeamMembersFollowTheTeamsProfileSetting() throws Exception {
+    // MEMBER2 is not in Alpha, and Alpha's profile hides its roster by default (issue #918).
+    String url = "/api/v1/principals/teams/" + TEAM_ALPHA_ID + "/members";
+    mockMvc
+        .perform(as(get(url), MEMBER2_ID))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("TEAM_NOT_FOUND"));
+    // An admin outside the team still sees it.
+    mockMvc
+        .perform(as(get(url), ADMIN2_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.principals.length()").value(3));
+
+    jdbc.update("UPDATE team SET profile_show_members = true WHERE id = ?", TEAM_ALPHA_ID);
+    mockMvc
+        .perform(as(get(url), MEMBER2_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.principals.length()").value(3));
+  }
+
+  @Test
+  void teamMembersLeaveOutDisabledAccountsAndDisabledTeams() throws Exception {
+    String url = "/api/v1/principals/teams/" + TEAM_ALPHA_ID + "/members";
+    jdbc.update("UPDATE qnop_user SET enabled = false WHERE id = ?", AUDITOR_ID);
+    mockMvc
+        .perform(as(get(url), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.principals.length()").value(2))
+        .andExpect(jsonPath("$.principals[?(@.id == '" + AUDITOR_ID + "')]").doesNotExist());
+
+    jdbc.update("UPDATE team SET enabled = false WHERE id = ?", TEAM_ALPHA_ID);
+    mockMvc
+        .perform(as(get(url), MEMBER_ID))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("TEAM_NOT_FOUND"));
   }
 
   @Test

@@ -415,6 +415,8 @@
     "title": "Participants",
     "loadingMembers": "Loading team members",
     "noMembers": "No members in this team.",
+    "membersHidden": "This team's members are not visible to you.",
+    "membersLoadFailed": "The team's members could not be loaded.",
     "empty": "No reviewers on this review yet.",
     "showMembers": "Show members of {{name}}",
     "addPlaceholder": "Add people or teams…",

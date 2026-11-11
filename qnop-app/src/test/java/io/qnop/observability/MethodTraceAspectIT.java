@@ -53,7 +53,8 @@ class MethodTraceAspectIT extends SeededIntegrationTest {
   @Test
   @DisplayName("a call is traced by name and shape, never by argument value")
   void argumentsAreDescribedNotPrinted(CapturedOutput output) {
-    assertThatThrownBy(() -> profiles.getProfileBySlug(SLUG)).isInstanceOf(RuntimeException.class);
+    assertThatThrownBy(() -> profiles.getProfileBySlug(SLUG, MEMBER_ID, false))
+        .isInstanceOf(RuntimeException.class);
 
     assertThat(output).contains("getProfileBySlug(String(len=" + SLUG.length() + ")");
     // The whole point. If this ever fails, the aspect is writing what users typed.
@@ -63,7 +64,8 @@ class MethodTraceAspectIT extends SeededIntegrationTest {
   @Test
   @DisplayName("a failure is traced as a shape too, so the frame it left is visible")
   void failuresAreTraced(CapturedOutput output) {
-    assertThatThrownBy(() -> profiles.getProfileBySlug(SLUG)).isInstanceOf(RuntimeException.class);
+    assertThatThrownBy(() -> profiles.getProfileBySlug(SLUG, MEMBER_ID, false))
+        .isInstanceOf(RuntimeException.class);
 
     assertThat(output).containsPattern("✗ getProfileBySlug threw \\w+ \\[\\d+ ms]");
   }
@@ -71,11 +73,11 @@ class MethodTraceAspectIT extends SeededIntegrationTest {
   @Test
   @DisplayName("an id is printed, and the call is timed on the way out")
   void idsAreKeptAndCallsAreTimed(CapturedOutput output) {
-    profiles.getProfile(MEMBER_ID);
+    profiles.getProfile(MEMBER_ID, MEMBER_ID, false);
 
     // A UUID resolves only for somebody with database access; a name resolves for
     // anyone holding the file. That difference is the whole rule.
-    assertThat(output).contains("getProfile(" + MEMBER_ID + ")");
+    assertThat(output).contains("getProfile(" + MEMBER_ID + ", " + MEMBER_ID + ", false)");
     // The duration is why this is worth switching on for a slow flow rather than a
     // broken one, and the return is described by type — never by content.
     assertThat(output).containsPattern("← getProfile = PublicProfileView \\[\\d+ ms]");

@@ -75,14 +75,16 @@ public class CurrentUserController implements UsersApi {
 
   @Override
   public ResponseEntity<PublicUserProfile> getUserProfile(UUID userId) {
-    CurrentUser.requireUserId(); // signed-in colleagues only, any role
-    return ResponseEntity.ok(toPublicUserProfile(publicProfiles.getProfile(userId)));
+    UUID actorId = CurrentUser.requireUserId(); // signed-in colleagues only, any role
+    return ResponseEntity.ok(
+        toPublicUserProfile(publicProfiles.getProfile(userId, actorId, CurrentUser.isAdmin())));
   }
 
   @Override
   public ResponseEntity<PublicUserProfile> getUserProfileBySlug(String slug) {
-    CurrentUser.requireUserId(); // signed-in colleagues only, any role
-    return ResponseEntity.ok(toPublicUserProfile(publicProfiles.getProfileBySlug(slug)));
+    UUID actorId = CurrentUser.requireUserId(); // signed-in colleagues only, any role
+    return ResponseEntity.ok(
+        toPublicUserProfile(publicProfiles.getProfileBySlug(slug, actorId, CurrentUser.isAdmin())));
   }
 
   private PublicUserProfile toPublicUserProfile(PublicProfileService.PublicProfileView profile) {

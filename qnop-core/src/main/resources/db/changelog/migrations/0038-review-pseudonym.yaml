@@ -1,0 +1,52 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Persisted anonymous-review pseudonym ordinals (issue #914, ADR-0038 amendment):
+# "Participant N" is assigned once per (document, principal) — in keyed (HMAC)
+# order, never by user id — and never changes afterwards, so labels stay stable
+# while further contributors join.
+#
+# No FK to document, deliberately: rows are allocated in their own short
+# transaction while the caller's transaction may hold the document row locked
+# (FOR UPDATE) or may have created it uncommitted — an FK check would then wait
+# on the caller, which is waiting on the allocation. ReviewDeletionService
+# removes the rows together with the review.
+databaseChangeLog:
+  - changeSet:
+      id: 0038-review-pseudonym
+      author: qnop
+      comment: review_pseudonym — write-once per-review pseudonym ordinals.
+      changes:
+        - createTable:
+            tableName: review_pseudonym
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: document_id
+                  type: UUID
+                  constraints: { nullable: false }
+              # A user id or an account-less participant's row id (ADR-0061): no user FK.
+              - column:
+                  name: principal_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: ordinal
+                  type: INTEGER
+                  constraints: { nullable: false }
+        - addUniqueConstraint:
+            constraintName: uq_review_pseudonym_principal
+            tableName: review_pseudonym
+            columnNames: document_id, principal_id
+        - addUniqueConstraint:
+            constraintName: uq_review_pseudonym_ordinal
+            tableName: review_pseudonym
+            columnNames: document_id, ordinal
+        - sql:
+            comment: Ordinals are 1-based labels.
+            sql: >-
+              ALTER TABLE review_pseudonym ADD CONSTRAINT ck_review_pseudonym_ordinal
+              CHECK (ordinal > 0)
