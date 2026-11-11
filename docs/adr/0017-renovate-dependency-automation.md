@@ -83,3 +83,9 @@ The 2026-08-29 design ran the fixer script from the pushed `renovate/**` branch 
 - `scripts/check-gradle-wrapper-checksum.sh` accepts only a `distributionUrl` under `https://services.gradle.org/distributions/`, so the "published checksum" is always Gradle's own — in CI guard and fixer alike.
 
 Consequence: a change to the script itself takes effect in the fixer only once it is on `main`, which is the point.
+
+## Amendment (2026-11, #925): Gradle dependency verification metadata
+
+`gradle/verification-metadata.xml` (SHA-256, `verify-metadata` on, signatures off) is checked in, so every Gradle run — locally and in every CI job — verifies each resolved artifact and fails on an unknown or changed checksum. `-sources`/`-javadoc` jars are trusted so IDE downloads keep working. `scripts/update-gradle-verification-metadata.sh` regenerates it (an init script resolves every configuration; Spotless, the license report and the CycloneDX SBOM run alongside for their execution-time resolutions).
+
+Renovate can update the file only if the self-hosted admin config sets `allowedUnsafeExecutions: ["gradleWrapper"]`, which runs the branch's build logic inside the Renovate job next to the App token. **We do not enable that.** Instead `.github/workflows/gradle-verification-metadata.yml` follows the #926 pattern: an unprivileged job (read-only token, no secrets, no persisted credentials) runs the regeneration on `renovate/**` pushes and hands over the file as an artifact; a second job copies that one file onto a fresh checkout, enforces a one-file scope guard, and only then mints the App token for the push. Its commits use the author `qnop-verification-metadata[bot]`, added to `gitIgnoredAuthors`.

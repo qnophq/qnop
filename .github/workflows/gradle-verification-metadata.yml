@@ -1,0 +1,120 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Keep gradle/verification-metadata.xml current on Renovate branches (issue #925).
+#
+# Gradle dependency verification fails every build that resolves an artifact
+# the metadata does not list, so each Gradle dependency/plugin bump must carry
+# the new checksums. Renovate can regenerate the file itself only when the
+# self-hosted admin allows it to execute the Gradle wrapper — i.e. to run the
+# branch's build logic inside the Renovate job, next to the App token. We do not
+# grant that. Instead this workflow splits the work at the trust boundary, the
+# same way gradle-wrapper-checksum-fix.yml does (ADR-0017):
+#
+#  1. `regenerate` runs the branch's build (scripts/update-gradle-verification-
+#     metadata.sh) with a read-only GITHUB_TOKEN, no secrets and no persisted
+#     credentials, and hands the regenerated file over as an artifact.
+#  2. `push` executes nothing from the branch: it copies that one file onto a
+#     fresh checkout, refuses to push anything else, and only then mints the
+#     Renovate App token — for the push alone. An App-token push (unlike a
+#     GITHUB_TOKEN one) re-runs the PR's checks.
+#
+# The commit carries its own author, listed in gitIgnoredAuthors of
+# .github/renovate.json, so Renovate keeps rebasing the branch. The push
+# touches only the metadata file, which is not in `paths`, so it does not
+# re-trigger this workflow.
+
+name: Gradle verification metadata
+
+on:
+  push:
+    branches: ['renovate/**']
+    paths:
+      - 'gradle/libs.versions.toml'
+      - 'gradle/wrapper/gradle-wrapper.properties'
+      - '**/*.gradle.kts'
+      - 'build-logic/**'
+
+permissions:
+  contents: read
+
+jobs:
+  regenerate:
+    name: Regenerate the checksums (untrusted, no secrets)
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+        with:
+          cache-read-only: true
+      - run: scripts/update-gradle-verification-metadata.sh
+      - name: Detect a change
+        id: diff
+        run: |
+          if git diff --quiet -- gradle/verification-metadata.xml; then
+            echo "metadata already current — nothing to push"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git diff --stat -- gradle/verification-metadata.xml
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: verification-metadata
+          path: gradle/verification-metadata.xml
+          retention-days: 1
+          if-no-files-found: error
+
+  push:
+    name: Commit the regenerated file (trusted, App token)
+    needs: regenerate
+    if: needs.regenerate.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: verification-metadata
+          path: ${{ runner.temp }}/verification-metadata
+      - name: Apply the file and enforce the scope guard
+        run: |
+          cp "$RUNNER_TEMP/verification-metadata/verification-metadata.xml" gradle/verification-metadata.xml
+          # The scope guard: exactly this one file, nothing else.
+          changed="$(git status --porcelain)"
+          [ "$changed" = " M gradle/verification-metadata.xml" ] || {
+            echo "::error::refusing to push: unexpected working-tree state: $changed"; exit 1; }
+          git config user.name 'qnop-verification-metadata[bot]'
+          git config user.email 'qnop-verification-metadata[bot]@users.noreply.github.com'
+          git commit -q -m 'chore(deps): update Gradle dependency verification metadata' \
+            -m 'Checksums regenerated for the bumped dependencies. Automated by gradle-verification-metadata.yml (issue #925).' \
+            -- gradle/verification-metadata.xml
+      - name: Mint Renovate App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.RENOVATE_APP_ID }}
+          private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+      - name: Push
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          auth="$(printf 'x-access-token:%s' "$APP_TOKEN" | base64 -w0)"
+          echo "::add-mask::$auth"
+          # Non-forced: if the branch moved meanwhile, the push fails and the
+          # newer push re-runs this workflow.
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" \
+            push "https://github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
