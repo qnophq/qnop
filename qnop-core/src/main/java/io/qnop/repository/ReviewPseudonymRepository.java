@@ -33,11 +33,24 @@ public interface ReviewPseudonymRepository extends JpaRepository<ReviewPseudonym
 
   List<ReviewPseudonym> findByDocumentId(UUID documentId);
 
+  /** Removes a deleted review's rows (there is no FK to cascade them — see migration 0038). */
+  @Modifying
+  @Query(value = "DELETE FROM review_pseudonym WHERE document_id = :documentId", nativeQuery = true)
+  int deleteByDocumentId(@Param("documentId") UUID documentId);
+
   /**
-   * Inserts an assignment unless it conflicts with an existing one — on the (document, principal)
-   * pair OR the (document, ordinal) pair. A concurrent allocator that already claimed either wins
-   * and this call is a no-op (no exception that would abort the caller's transaction); the caller
-   * re-reads and retries for anything still unassigned.
+   * Serializes pseudonym allocation per review for the rest of the current transaction (issue
+   * #914). Taken only when something needs allocating, inside the short allocation transaction.
+   */
+  @Query(
+      value = "SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))) AS locked",
+      nativeQuery = true)
+  int lockForAllocation(@Param("key") String key);
+
+  /**
+   * Inserts an assignment unless it conflicts with an existing one. Callers hold {@link
+   * #lockForAllocation}, so a conflict is not expected; the clause only keeps a stray duplicate
+   * from failing the allocation.
    *
    * @return 1 when inserted, 0 when skipped
    */

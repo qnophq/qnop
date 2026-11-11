@@ -90,7 +90,7 @@ class PublicTeamProfileServiceTest {
     assertThat(profile.members()).isNull();
     assertThat(profile.reviews()).isNull();
     // Hidden sections are never even computed — no roster or participation query runs.
-    verify(memberships, never()).findMembersByTeamId(any());
+    verify(memberships, never()).findEnabledMembersByTeamId(any());
     verify(documents, never()).findTeamParticipationsVisibleTo(any(), any(), anyBoolean());
   }
 
@@ -99,7 +99,7 @@ class PublicTeamProfileServiceTest {
   void membersToggleExposesRoster() {
     team.setProfileShowMembers(true);
     when(memberships.existsByTeamIdAndUserId(teamId, caller)).thenReturn(false);
-    when(memberships.findMembersByTeamId(teamId)).thenReturn(List.of());
+    when(memberships.findEnabledMembersByTeamId(teamId)).thenReturn(List.of());
 
     var profile = service.getProfile(teamId, caller, false);
 
@@ -125,7 +125,7 @@ class PublicTeamProfileServiceTest {
   @DisplayName("a team member sees everything regardless of the toggles")
   void membersAlwaysSeeTheirOwnTeamInFull() {
     when(memberships.existsByTeamIdAndUserId(teamId, caller)).thenReturn(true);
-    when(memberships.findMembersByTeamId(teamId)).thenReturn(List.of());
+    when(memberships.findEnabledMembersByTeamId(teamId)).thenReturn(List.of());
     when(documents.findTeamParticipationsVisibleTo(teamId, caller, false)).thenReturn(List.of());
 
     var profile = service.getProfile(teamId, caller, false);
@@ -139,7 +139,7 @@ class PublicTeamProfileServiceTest {
   @DisplayName("an admin sees everything regardless of membership and toggles")
   void adminsSeeEverything() {
     when(memberships.existsByTeamIdAndUserId(teamId, caller)).thenReturn(false);
-    when(memberships.findMembersByTeamId(teamId)).thenReturn(List.of());
+    when(memberships.findEnabledMembersByTeamId(teamId)).thenReturn(List.of());
     when(documents.findTeamParticipationsVisibleTo(teamId, caller, true)).thenReturn(List.of());
 
     var profile = service.getProfile(teamId, caller, true);

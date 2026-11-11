@@ -20,6 +20,7 @@
  */
 package io.qnop.web;
 
+import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -34,6 +35,8 @@ import io.qnop.testsupport.SeededIntegrationTest;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * The workspace-public user profile (issue #454): any signed-in user sees a colleague's display
@@ -41,6 +44,7 @@ import org.junit.jupiter.api.Test;
  */
 class UserProfileApiIT extends SeededIntegrationTest {
 
+  @Autowired private JdbcTemplate jdbc;
   @org.springframework.beans.factory.annotation.Autowired private DocumentRepository documents;
 
   @org.springframework.beans.factory.annotation.Autowired
@@ -182,6 +186,31 @@ class UserProfileApiIT extends SeededIntegrationTest {
                 .header("Authorization", "Bearer " + token(MEMBER_ID)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.teams", org.hamcrest.Matchers.hasSize(0)));
+  }
+
+  @Test
+  @DisplayName("team affiliations follow the team-roster rule (#918)")
+  void teamAffiliationsFollowTheRosterRule() throws Exception {
+    // MEMBER is in Alpha and Beta; MEMBER2 shares only Beta, and Alpha hides its members.
+    String url = "/api/v1/users/" + MEMBER_ID;
+    mockMvc
+        .perform(get(url).header("Authorization", "Bearer " + token(MEMBER2_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.teams[*].name", contains("Beta")));
+
+    // The profile's own user and an admin see every affiliation.
+    mockMvc
+        .perform(get(url).header("Authorization", "Bearer " + token(MEMBER_ID)))
+        .andExpect(jsonPath("$.teams[*].name", contains("Alpha", "Beta")));
+    mockMvc
+        .perform(get(url).header("Authorization", "Bearer " + token(ADMIN2_ID)))
+        .andExpect(jsonPath("$.teams[*].name", contains("Alpha", "Beta")));
+
+    // A team that shows its members on its profile is listed to everyone.
+    jdbc.update("UPDATE team SET profile_show_members = true WHERE id = ?", TEAM_ALPHA_ID);
+    mockMvc
+        .perform(get(url).header("Authorization", "Bearer " + token(MEMBER2_ID)))
+        .andExpect(jsonPath("$.teams[*].name", contains("Alpha", "Beta")));
   }
 
   private void createAnnotation(java.util.UUID documentId, java.util.UUID author) throws Exception {

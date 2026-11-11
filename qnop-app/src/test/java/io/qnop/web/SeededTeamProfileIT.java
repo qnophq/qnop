@@ -137,6 +137,16 @@ class SeededTeamProfileIT extends SeededIntegrationTest {
   }
 
   @Test
+  void theProfileRosterLeavesOutDisabledAccounts() throws Exception {
+    jdbc.update("UPDATE qnop_user SET enabled = false WHERE id = ?", AUDITOR_ID);
+    mockMvc
+        .perform(as(MEMBER_ID, get("/api/v1/teams/" + TEAM_ALPHA_ID + "/profile")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.members.length()").value(2))
+        .andExpect(jsonPath("$.members[?(@.userId == '" + AUDITOR_ID + "')]").doesNotExist());
+  }
+
+  @Test
   void unknownAndDisabledTeamsAnswerTheSame404() throws Exception {
     mockMvc
         .perform(as(MEMBER_ID, get("/api/v1/teams/by-slug/ghost-team")))

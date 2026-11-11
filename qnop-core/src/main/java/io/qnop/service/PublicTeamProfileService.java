@@ -100,7 +100,7 @@ public class PublicTeamProfileService {
 
     List<PublicTeamMemberView> members =
         insider || team.isProfileShowMembers()
-            ? memberships.findMembersByTeamId(teamId).stream()
+            ? memberships.findEnabledMembersByTeamId(teamId).stream()
                 .map(
                     m ->
                         new PublicTeamMemberView(

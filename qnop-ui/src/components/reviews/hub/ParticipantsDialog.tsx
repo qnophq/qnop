@@ -20,6 +20,7 @@
  */
 
 import { Fragment, useState } from 'react';
+import { isAxiosError } from 'axios';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
@@ -103,10 +104,12 @@ function TeamMemberList({ teamId }: { teamId: string }) {
     );
   }
   // A foreign team's roster follows its profile setting (issue #918): a hidden one answers 404.
+  // Anything else (5xx, network) is a real failure, not a privacy rule.
   if (membersQuery.isError) {
+    const hidden = isAxiosError(membersQuery.error) && membersQuery.error.response?.status === 404;
     return (
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', pl: 7 }}>
-        {t('participants.membersHidden')}
+        {t(hidden ? 'participants.membersHidden' : 'participants.membersLoadFailed')}
       </Typography>
     );
   }

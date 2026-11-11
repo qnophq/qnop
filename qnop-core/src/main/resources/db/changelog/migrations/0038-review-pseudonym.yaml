@@ -5,9 +5,15 @@
 # "Participant N" is assigned once per (document, principal) — in keyed (HMAC)
 # order, never by user id — and never changes afterwards, so labels stay stable
 # while further contributors join.
+#
+# No FK to document, deliberately: rows are allocated in their own short
+# transaction while the caller's transaction may hold the document row locked
+# (FOR UPDATE) or may have created it uncommitted — an FK check would then wait
+# on the caller, which is waiting on the allocation. ReviewDeletionService
+# removes the rows together with the review.
 databaseChangeLog:
   - changeSet:
-      id: 0039-review-pseudonym
+      id: 0038-review-pseudonym
       author: qnop
       comment: review_pseudonym — write-once per-review pseudonym ordinals.
       changes:
@@ -31,13 +37,6 @@ databaseChangeLog:
                   name: ordinal
                   type: INTEGER
                   constraints: { nullable: false }
-        - addForeignKeyConstraint:
-            constraintName: fk_review_pseudonym_document
-            baseTableName: review_pseudonym
-            baseColumnNames: document_id
-            referencedTableName: document
-            referencedColumnNames: id
-            onDelete: CASCADE
         - addUniqueConstraint:
             constraintName: uq_review_pseudonym_principal
             tableName: review_pseudonym

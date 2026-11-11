@@ -205,7 +205,11 @@ describe('ParticipantsDialog — owner management', () => {
   });
 
   it('says the roster is not visible when a foreign team hides its members (#918)', async () => {
-    vi.mocked(principalsApi.listTeamMembers).mockRejectedValue(new Error('404'));
+    vi.mocked(principalsApi.listTeamMembers).mockRejectedValue(
+      new AxiosError('Not Found', 'ERR_BAD_REQUEST', undefined, undefined, {
+        status: 404,
+      } as AxiosResponse),
+    );
     renderDialog(false);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Show members of Team Alpha' }));
@@ -214,5 +218,18 @@ describe('ParticipantsDialog — owner management', () => {
       await screen.findByText("This team's members are not visible to you."),
     ).toBeInTheDocument();
     expect(screen.queryByText('No members in this team.')).not.toBeInTheDocument();
+  });
+
+  it('reports a failed member load as an error, not as a hidden roster', async () => {
+    vi.mocked(principalsApi.listTeamMembers).mockRejectedValue(
+      new AxiosError('Server Error', 'ERR_BAD_RESPONSE', undefined, undefined, {
+        status: 500,
+      } as AxiosResponse),
+    );
+    renderDialog(false);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Show members of Team Alpha' }));
+
+    expect(await screen.findByText("The team's members could not be loaded.")).toBeInTheDocument();
   });
 });

@@ -123,7 +123,7 @@ databaseChangeLog:
       file: migrations/0037-external-participants.yaml
       relativeToChangelogFile: true
   - include:
-      file: migrations/0039-review-pseudonym.yaml
+      file: migrations/0038-review-pseudonym.yaml
       relativeToChangelogFile: true
   # Enterprise schema seam (issue #254, ADR-0039): a separately-licensed module
   # (ADR-0002) contributes its changelogs under db/changelog/enterprise/ on its

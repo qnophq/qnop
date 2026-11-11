@@ -45,6 +45,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -56,7 +57,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class DocumentOverviewApiIT extends SeededIntegrationTest {
 
   @Autowired private MockMvc mockMvc;
-  @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+  @Autowired private JdbcTemplate jdbc;
   @Autowired private DocumentRepository documents;
   @Autowired private DocumentVersionRepository versions;
   @Autowired private ReviewParticipantRepository participants;

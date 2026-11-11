@@ -416,6 +416,7 @@
     "loadingMembers": "Teammitglieder werden geladen",
     "noMembers": "Dieses Team hat keine Mitglieder.",
     "membersHidden": "Die Mitglieder dieses Teams sind für dich nicht sichtbar.",
+    "membersLoadFailed": "Die Mitglieder des Teams konnten nicht geladen werden.",
     "empty": "Dieses Review hat noch keine Reviewer.",
     "showMembers": "Mitglieder von {{name}} anzeigen",
     "addPlaceholder": "Personen oder Teams hinzufügen…",

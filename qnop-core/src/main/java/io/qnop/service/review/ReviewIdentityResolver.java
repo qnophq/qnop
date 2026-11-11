@@ -34,13 +34,17 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Resolves who a review's annotation/comment authors are, honouring the document's per-review
@@ -67,17 +71,17 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * ADR-0038 amendment): a principal without one is appended after the current maximum, newcomers
  * ordered among themselves by a keyed HMAC ({@link PseudonymKeyService}) — never by user id, which
  * is time-ordered and public. So a label is neither derivable from ids nor shifted by later joins.
- * Assignments are written whenever the resolver runs inside a writable transaction (every
- * contribution does); a read-only caller sees the same deterministic provisional ordinals for
- * not-yet-persisted principals.
+ *
+ * <p><b>Side effect — keep in mind when calling this from a new path.</b> When {@link #forDocument}
+ * runs inside a <em>writable</em> transaction and a principal has no ordinal yet, it allocates one:
+ * in a short, separate {@code REQUIRES_NEW} transaction under a per-review advisory lock, committed
+ * immediately, so no lock or uncommitted row outlives the allocation (the caller may go on to do
+ * slow work such as sending mail). Every contribution path (annotation, comment) runs writable and
+ * so persists its author's label. A read-only caller never writes; it sees the deterministic
+ * provisional ordinal the next writer will persist.
  */
 @Service
 public class ReviewIdentityResolver {
-
-  /**
-   * Bounded retries when a concurrent allocator claims the same ordinal (see {@link #ordinals}).
-   */
-  private static final int MAX_ALLOCATION_ATTEMPTS = 3;
 
   private final DocumentRepository documents;
   private final AnnotationRepository annotations;
@@ -86,6 +90,7 @@ public class ReviewIdentityResolver {
   private final UserRepository users;
   private final ReviewPseudonymRepository pseudonyms;
   private final PseudonymKeyService pseudonymKeys;
+  private final TransactionTemplate allocationTx;
 
   public ReviewIdentityResolver(
       DocumentRepository documents,
@@ -94,7 +99,8 @@ public class ReviewIdentityResolver {
       ReviewParticipantRepository participants,
       UserRepository users,
       ReviewPseudonymRepository pseudonyms,
-      PseudonymKeyService pseudonymKeys) {
+      PseudonymKeyService pseudonymKeys,
+      PlatformTransactionManager transactionManager) {
     this.documents = documents;
     this.annotations = annotations;
     this.comments = comments;
@@ -102,6 +108,8 @@ public class ReviewIdentityResolver {
     this.users = users;
     this.pseudonyms = pseudonyms;
     this.pseudonymKeys = pseudonymKeys;
+    this.allocationTx = new TransactionTemplate(transactionManager);
+    this.allocationTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
 
   /**
@@ -114,9 +122,10 @@ public class ReviewIdentityResolver {
         documents.findById(documentId).orElseThrow(() -> new DocumentNotFoundException(documentId));
     UUID ownerId = document.getOwnerId();
 
-    // Every non-owner user who needs a stable label: annotation authors, comment-only authors, AND
-    // direct participants who never wrote anything (issue #422) — one numbering across the roster
-    // and the notes. Authors who participate via a team are covered by their authorship.
+    // Every non-owner user who needs a stable label: annotation authors, comment-only authors,
+    // reactors, AND direct participants who never wrote anything (issue #422) — one numbering
+    // across
+    // the roster and the notes. Team-derived reviewers are covered by what they did.
     Set<UUID> userIds = new LinkedHashSet<>();
     userIds.addAll(annotations.findDistinctAuthorIdsByDocumentId(documentId));
     userIds.addAll(comments.findDistinctCommentAuthorIdsByDocumentId(documentId));
@@ -163,32 +172,42 @@ public class ReviewIdentityResolver {
   }
 
   /**
-   * The persisted ordinals of {@code principals}, allocating (write-once) any that are missing when
-   * the current transaction can write. Allocation is race-free without locks: an insert that loses
-   * to a concurrent allocator is skipped ({@code ON CONFLICT DO NOTHING}), the assignments are
-   * re-read, and the remainder is retried a bounded number of times. Whatever is still unassigned
-   * (read-only caller, or contention beyond the retries) gets the deterministic provisional ordinal
-   * the next writer will persist.
+   * The ordinals of {@code principals}: persisted ones as stored, missing ones allocated (when the
+   * caller's transaction is writable) or provisional (when it is not).
+   *
+   * <p>Allocation happens only when something is missing — the hot path is one read. It runs in its
+   * own short {@code REQUIRES_NEW} transaction that takes a per-review {@code
+   * pg_advisory_xact_lock}, re-reads the committed assignments, inserts the missing ones in ordinal
+   * order and commits. So concurrent first contributions to one review are serialized instead of
+   * racing on the unique keys, and the caller's transaction holds neither the lock nor uncommitted
+   * rows. A label survives a rolled-back contribution, which is harmless: it is never reused and
+   * reveals nothing. The table deliberately has no FK to the document, so the allocation never
+   * waits on a document row the caller holds locked or has not committed yet (migration 0038).
    */
   private Map<UUID, Integer> ordinals(UUID documentId, Collection<UUID> principals) {
     Function<UUID, byte[]> sortKey = id -> pseudonymKeys.sortKey(documentId, id);
     Map<UUID, Integer> assigned = loadAssigned(documentId);
-    if (!canWrite()) {
+    if (assigned.keySet().containsAll(principals) || !canWrite()) {
       return PseudonymOrdinals.extend(assigned, principals, sortKey);
     }
-    for (int attempt = 0;
-        attempt < MAX_ALLOCATION_ATTEMPTS && !assigned.keySet().containsAll(principals);
-        attempt++) {
-      Map<UUID, Integer> extended = PseudonymOrdinals.extend(assigned, principals, sortKey);
-      for (Map.Entry<UUID, Integer> entry : extended.entrySet()) {
-        if (!assigned.containsKey(entry.getKey())) {
-          pseudonyms.insertIfAbsent(
-              UUID.randomUUID(), documentId, entry.getKey(), entry.getValue());
-        }
-      }
-      assigned = loadAssigned(documentId);
-    }
-    return PseudonymOrdinals.extend(assigned, principals, sortKey);
+    List<UUID> wanted = List.copyOf(principals);
+    return allocationTx.execute(status -> allocate(documentId, wanted, sortKey));
+  }
+
+  /** Runs inside the allocation transaction; see {@link #ordinals}. */
+  private Map<UUID, Integer> allocate(
+      UUID documentId, List<UUID> principals, Function<UUID, byte[]> sortKey) {
+    pseudonyms.lockForAllocation("review_pseudonym:" + documentId);
+    Map<UUID, Integer> assigned = loadAssigned(documentId);
+    Map<UUID, Integer> extended = PseudonymOrdinals.extend(assigned, principals, sortKey);
+    extended.entrySet().stream()
+        .filter(entry -> !assigned.containsKey(entry.getKey()))
+        .sorted(Map.Entry.comparingByValue())
+        .forEach(
+            entry ->
+                pseudonyms.insertIfAbsent(
+                    UUID.randomUUID(), documentId, entry.getKey(), entry.getValue()));
+    return extended;
   }
 
   private Map<UUID, Integer> loadAssigned(UUID documentId) {

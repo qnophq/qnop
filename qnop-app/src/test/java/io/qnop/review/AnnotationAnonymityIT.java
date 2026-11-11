@@ -204,6 +204,34 @@ class AnnotationAnonymityIT extends SeededIntegrationTest {
   }
 
   @Test
+  void readsWriteNoPseudonymsAndShowTheLabelTheFirstWritePersists() throws Exception {
+    UUID documentId = seedDocument(true);
+
+    // A read-only roster read assigns nothing but already shows the provisional label.
+    String provisional = peerLabelInRosterOfMember2(documentId);
+    assertThat(provisional).matches(PSEUDONYM);
+    assertThat(pseudonyms.findByDocumentId(documentId)).isEmpty();
+
+    // The first contribution persists exactly that label.
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+    assertThat(pseudonyms.findByDocumentId(documentId)).hasSize(2);
+    assertThat(peerLabelInRosterOfMember2(documentId)).isEqualTo(provisional);
+    assertThat(labelSeenByMember2(documentId, annotationId)).isEqualTo(provisional);
+  }
+
+  /** The label MEMBER2 sees for their one peer (AUDITOR) on the roster; own row sorts first. */
+  private String peerLabelInRosterOfMember2(UUID documentId) throws Exception {
+    String json =
+        mockMvc
+            .perform(as(get("/api/v1/documents/" + documentId + "/participants"), MEMBER2_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return JsonPath.read(json, "$.participants[1].displayName");
+  }
+
+  @Test
   void nonAnonymousReviewPersistsNoPseudonyms() throws Exception {
     UUID documentId = seedDocument(false);
     createAnnotation(documentId, AUDITOR_ID);
