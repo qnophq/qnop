@@ -26,6 +26,7 @@ import io.qnop.api.v1.model.ResetPasswordRequest;
 import io.qnop.service.auth.PasswordResetFlowService;
 import io.qnop.service.auth.PasswordResetTokenService.InvalidPasswordResetTokenException;
 import io.qnop.web.security.ratelimit.AuthIdentifierRateLimiter;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -46,11 +47,16 @@ public class AuthPasswordResetController implements AuthPasswordResetApi {
 
   private final PasswordResetFlowService passwordResetFlow;
   private final AuthIdentifierRateLimiter identifierRateLimiter;
+  private final HttpServletRequest httpRequest;
 
   public AuthPasswordResetController(
-      PasswordResetFlowService passwordResetFlow, AuthIdentifierRateLimiter identifierRateLimiter) {
+      PasswordResetFlowService passwordResetFlow,
+      AuthIdentifierRateLimiter identifierRateLimiter,
+      HttpServletRequest httpRequest) {
     this.passwordResetFlow = passwordResetFlow;
     this.identifierRateLimiter = identifierRateLimiter;
+    // A request-scoped proxy: resolves to the request being served on each call.
+    this.httpRequest = httpRequest;
   }
 
   @Override
@@ -61,10 +67,12 @@ public class AuthPasswordResetController implements AuthPasswordResetApi {
       // going to be sent.
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "PASSWORD_RESET_DISABLED");
     }
-    // Per-e-mail throttle (issue #899), applied whether or not the address is registered, so the
-    // uniform 204 stays uniform.
-    identifierRateLimiter.forgotPassword(request.getEmail());
-    passwordResetFlow.requestReset(request.getEmail());
+    // Per-e-mail throttle (issue #899), applied whether or not the address is registered. Only
+    // this network's bucket answers 429; a drained per-address ceiling keeps the uniform 204 and
+    // sends nothing, protecting the mailbox without blocking the owner's own requests.
+    if (identifierRateLimiter.mayRequestPasswordReset(request.getEmail(), httpRequest)) {
+      passwordResetFlow.requestReset(request.getEmail());
+    }
     return ResponseEntity.noContent().build();
   }
 

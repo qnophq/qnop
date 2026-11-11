@@ -20,6 +20,7 @@
  */
 package io.qnop.web.security.ratelimit;
 
+import java.time.Duration;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -49,15 +50,25 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param resetPassword IP-keyed limit for {@code POST /api/v1/auth/reset-password} (default 5 /
  *     900s)
  * @param loginAccountNetwork limit on <em>failed</em> logins to one account from one client network
- *     (IPv4 /24, IPv6 /64) (default 10 / 900s); a successful login gives its token back
- * @param loginAccount overall ceiling on <em>failed</em> logins to one account from all networks
- *     together (default 100 / 3600s); deliberately much higher than {@code loginAccountNetwork}
+ *     (IPv4 /24, IPv6 /56), or from one recognised device (default 10 / 900s); a successful login
+ *     gives its token back. The only login limit that answers {@code 429}.
+ * @param loginAccount overall ceiling on <em>failed</em> logins to one account from unrecognised
+ *     devices, all networks together (default 100 / 3600s). A drained ceiling refuses silently (the
+ *     usual {@code 401}); recognised devices are exempt.
  * @param registerEmail per-e-mail limit for registrations (default 5 / 3600s)
- * @param forgotPasswordEmail per-e-mail limit for reset requests (default 5 / 3600s)
- * @param resetPasswordToken per-token limit for reset attempts (default 10 / 3600s)
+ * @param forgotPasswordEmailNetwork limit on reset requests for one e-mail address from one client
+ *     network (default 3 / 3600s); the only reset-request limit that answers {@code 429}
+ * @param forgotPasswordEmail overall ceiling on reset mails to one address (default 10 / 3600s). A
+ *     drained ceiling keeps the uniform {@code 204} but sends no mail.
+ * @param resetPasswordToken per-token limit for reset attempts (default 10 / 3600s): bounds retries
+ *     with one token, not guessing — see ADR-0027
+ * @param loginDeviceCookieLifetime how long a recognised-device cookie stays valid after the login
+ *     that issued it (default 30 days)
  * @param maxBuckets upper bound on the number of live token buckets held in memory (default
- *     100&nbsp;000). Bounds memory under a high-cardinality key space — e.g. a spoofable client IP
- *     when no trusted proxy is configured (issue #49).
+ *     100&nbsp;000), applied separately to the per-IP store and to the per-identifier store of
+ *     {@link AuthIdentifierRateLimiter}, so neither can evict the other's buckets. Bounds memory
+ *     under a high-cardinality key space — e.g. a spoofable client IP when no trusted proxy is
+ *     configured (issue #49).
  */
 @ConfigurationProperties(prefix = "qnop.auth.rate-limit")
 public record RateLimitProperties(
@@ -71,8 +82,10 @@ public record RateLimitProperties(
     Limit loginAccountNetwork,
     Limit loginAccount,
     Limit registerEmail,
+    Limit forgotPasswordEmailNetwork,
     Limit forgotPasswordEmail,
     Limit resetPasswordToken,
+    Duration loginDeviceCookieLifetime,
     @DefaultValue("100000") long maxBuckets) {
 
   // A whole scope absent from config arrives as null here; substitute its per-scope default. The
@@ -89,8 +102,14 @@ public record RateLimitProperties(
     loginAccountNetwork = loginAccountNetwork != null ? loginAccountNetwork : new Limit(10, 900);
     loginAccount = loginAccount != null ? loginAccount : new Limit(100, 3600);
     registerEmail = registerEmail != null ? registerEmail : new Limit(5, 3600);
-    forgotPasswordEmail = forgotPasswordEmail != null ? forgotPasswordEmail : new Limit(5, 3600);
+    forgotPasswordEmailNetwork =
+        forgotPasswordEmailNetwork != null ? forgotPasswordEmailNetwork : new Limit(3, 3600);
+    forgotPasswordEmail = forgotPasswordEmail != null ? forgotPasswordEmail : new Limit(10, 3600);
     resetPasswordToken = resetPasswordToken != null ? resetPasswordToken : new Limit(10, 3600);
+    loginDeviceCookieLifetime =
+        loginDeviceCookieLifetime != null && loginDeviceCookieLifetime.isPositive()
+            ? loginDeviceCookieLifetime
+            : Duration.ofDays(30);
   }
 
   /**

@@ -28,7 +28,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.qnop.service.AuthService;
+import io.qnop.web.security.ratelimit.AuthIdentifierRateLimiter.LoginAttempt;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -45,12 +48,15 @@ class AuthIdentifierRateLimiterTest {
 
   private final RateLimitProperties properties =
       new RateLimitProperties(
-          List.of(), null, null, null, null, null, null, TWO, FIVE, TWO, TWO, TWO, 100_000L);
+          List.of(), null, null, null, null, null, null, TWO, FIVE, TWO, TWO, FIVE, TWO, null,
+          100_000L);
   private final BucketRateLimitService buckets = new BucketRateLimitService(properties);
   private final AuthService authService = mock(AuthService.class);
+  private final LoginDeviceCookies deviceCookies =
+      LoginDeviceCookiesTest.cookies(LoginDeviceCookiesTest.PROPERTIES, Instant.now());
   private final AuthIdentifierRateLimiter limiter =
       new AuthIdentifierRateLimiter(
-          buckets, properties, new HttpClientIpResolver(properties), authService);
+          buckets, properties, new HttpClientIpResolver(properties), authService, deviceCookies);
 
   @BeforeEach
   void accounts() {
@@ -61,14 +67,29 @@ class AuthIdentifierRateLimiterTest {
   }
 
   private static HttpServletRequest from(String ip) {
+    return from(ip, null);
+  }
+
+  private static HttpServletRequest from(String ip, String deviceCookie) {
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getRemoteAddr()).thenReturn(ip);
     when(request.getHeaders("X-Forwarded-For")).thenReturn(Collections.emptyEnumeration());
+    if (deviceCookie != null) {
+      when(request.getCookies())
+          .thenReturn(new Cookie[] {new Cookie(LoginDeviceCookies.COOKIE_NAME, deviceCookie)});
+    }
     return request;
   }
 
+  /** Five failures from five networks: drains the ceiling (5) without touching any one network. */
+  private void drainCeiling() {
+    for (int net = 1; net <= 5; net++) {
+      assertThat(limiter.beginLogin("alice", from("192.0." + net + ".1")).refused()).isFalse();
+    }
+  }
+
   @Test
-  void usernameAndEmailOfOneAccountShareItsBuckets() {
+  void usernameAndEmailOfOneAccountShareTheNetworkBucket() {
     limiter.beginLogin("alice", from("203.0.113.5"));
     limiter.beginLogin("Alice@Example.com", from("203.0.113.5"));
 
@@ -80,43 +101,76 @@ class AuthIdentifierRateLimiterTest {
   }
 
   @Test
-  void failuresFromOneNetworkDoNotLockTheOwnerOutElsewhere() {
+  void failuresFromOneNetworkDoNotAffectAnotherNetwork() {
     limiter.beginLogin("alice", from("203.0.113.5"));
     limiter.beginLogin("alice", from("203.0.113.77")); // same /24
     assertThatThrownBy(() -> limiter.beginLogin("alice", from("203.0.113.9")))
         .isInstanceOf(RateLimitExceededException.class);
 
-    // The owner, from another network, still gets to try — and succeeds.
-    var attempt = limiter.beginLogin("alice", from("198.51.100.20"));
-    limiter.loginSucceeded(attempt);
-    assertThatCode(() -> limiter.beginLogin("alice", from("198.51.100.20")))
-        .doesNotThrowAnyException();
+    LoginAttempt owner = limiter.beginLogin("alice", from("198.51.100.20"));
+    assertThat(owner.refused()).isFalse();
+    limiter.loginSucceeded(owner);
   }
 
   @Test
-  void theOverallCeilingCapsFailuresAcrossNetworks() {
-    for (int net = 1; net <= 5; net++) {
-      limiter.beginLogin("alice", from("192.0." + net + ".1"));
-    }
+  void aDrainedCeilingRefusesSilentlyInsteadOfWith429() {
+    drainCeiling();
 
-    assertThatThrownBy(() -> limiter.beginLogin("alice", from("198.51.100.20")))
+    // Another network, another spelling of the same account: no 429, just a refused attempt.
+    LoginAttempt attempt = limiter.beginLogin("alice@example.com", from("198.51.100.20"));
+    assertThat(attempt.refused()).isTrue();
+  }
+
+  @Test
+  void aSilentRefusalStillSpendsTheCallersNetworkToken() {
+    drainCeiling();
+    HttpServletRequest source = from("198.51.100.20");
+    limiter.beginLogin("alice", source);
+    limiter.beginLogin("alice", source);
+
+    assertThatThrownBy(() -> limiter.beginLogin("alice", source))
         .isInstanceOf(RateLimitExceededException.class);
   }
 
   @Test
-  void aRefusalByTheCeilingIsNotChargedToTheNetwork() {
-    for (int net = 1; net <= 5; net++) {
-      limiter.beginLogin("alice", from("192.0." + net + ".1"));
-    }
-    HttpServletRequest owner = from("198.51.100.20");
-    for (int i = 0; i < 3; i++) {
-      assertThatThrownBy(() -> limiter.beginLogin("alice", owner))
-          .isInstanceOf(RateLimitExceededException.class);
-    }
+  void aRecognisedDeviceIsExemptFromTheCeiling() {
+    String device = deviceCookies.issue(ALICE).getValue();
+    drainCeiling();
 
-    // The ceiling refills one token; the owner's network bucket was never drained by the refusals.
-    buckets.refund(AuthIdentifierRateLimiter.LOGIN_ACCOUNT, "user:" + ALICE);
-    assertThatCode(() -> limiter.beginLogin("alice", owner)).doesNotThrowAnyException();
+    LoginAttempt owner = limiter.beginLogin("alice", from("198.51.100.20", device));
+
+    assertThat(owner.refused()).isFalse();
+    limiter.loginSucceeded(owner);
+  }
+
+  @Test
+  void aRecognisedDeviceHasItsOwnBucketEvenInsideABusyNetwork() {
+    String device = deviceCookies.issue(ALICE).getValue();
+    limiter.beginLogin("alice", from("203.0.113.5"));
+    limiter.beginLogin("alice", from("203.0.113.6"));
+    assertThatThrownBy(() -> limiter.beginLogin("alice", from("203.0.113.7")))
+        .isInstanceOf(RateLimitExceededException.class);
+
+    assertThatCode(() -> limiter.beginLogin("alice", from("203.0.113.8", device)))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  void aRecognisedDeviceIsStillThrottledOnItsOwn() {
+    String device = deviceCookies.issue(ALICE).getValue();
+    limiter.beginLogin("alice", from("203.0.113.5", device));
+    limiter.beginLogin("alice", from("198.51.100.5", device));
+
+    assertThatThrownBy(() -> limiter.beginLogin("alice", from("192.0.2.5", device)))
+        .isInstanceOf(RateLimitExceededException.class);
+  }
+
+  @Test
+  void aDeviceCookieForAnotherAccountIsNotRecognised() {
+    String device = deviceCookies.issue(UUID.randomUUID()).getValue();
+    drainCeiling();
+
+    assertThat(limiter.beginLogin("alice", from("198.51.100.20", device)).refused()).isTrue();
   }
 
   @Test
@@ -125,18 +179,17 @@ class AuthIdentifierRateLimiterTest {
       limiter.loginSucceeded(limiter.beginLogin("alice", from("203.0.113.5")));
     }
 
-    assertThatCode(() -> limiter.beginLogin("alice", from("203.0.113.5")))
-        .doesNotThrowAnyException();
+    assertThat(limiter.beginLogin("alice", from("203.0.113.5")).refused()).isFalse();
   }
 
   @Test
-  void ipv6ClientsAreGroupedByTheirSlash64() {
-    limiter.beginLogin("alice", from("2001:db8:1:2::1"));
-    limiter.beginLogin("alice", from("2001:db8:1:2:ffff::9"));
+  void ipv6ClientsAreGroupedByTheirSlash56() {
+    limiter.beginLogin("alice", from("2001:db8:1:200::1"));
+    limiter.beginLogin("alice", from("2001:db8:1:2ff:ffff::9"));
 
-    assertThatThrownBy(() -> limiter.beginLogin("alice", from("2001:db8:1:2::abcd")))
+    assertThatThrownBy(() -> limiter.beginLogin("alice", from("2001:db8:1:250::abcd")))
         .isInstanceOf(RateLimitExceededException.class);
-    assertThatCode(() -> limiter.beginLogin("alice", from("2001:db8:1:3::1")))
+    assertThatCode(() -> limiter.beginLogin("alice", from("2001:db8:1:300::1")))
         .doesNotThrowAnyException();
   }
 
@@ -151,7 +204,6 @@ class AuthIdentifierRateLimiterTest {
 
   @Test
   void unknownIdentifiersFoldLikeTheAccountLookup() {
-    // E-mail addresses match case-insensitively, usernames exactly.
     assertThat(AuthIdentifierRateLimiter.loginIdentifierHash("Ghost@Example.com"))
         .isEqualTo(AuthIdentifierRateLimiter.loginIdentifierHash("ghost@example.com"));
     assertThat(AuthIdentifierRateLimiter.loginIdentifierHash("Ghost"))
@@ -162,11 +214,38 @@ class AuthIdentifierRateLimiterTest {
   }
 
   @Test
-  void networkPrefixes() {
-    assertThat(AuthIdentifierRateLimiter.networkPrefix("203.0.113.5"))
-        .isEqualTo(AuthIdentifierRateLimiter.networkPrefix("203.0.113.250"))
-        .isNotEqualTo(AuthIdentifierRateLimiter.networkPrefix("203.0.114.5"));
-    assertThat(AuthIdentifierRateLimiter.networkPrefix("not-an-ip")).isEqualTo("raw:not-an-ip");
+  void resetRequestsAreCappedPerAddressAndNetwork() {
+    assertThat(limiter.mayRequestPasswordReset("bob@example.com", from("203.0.113.5"))).isTrue();
+    assertThat(limiter.mayRequestPasswordReset("BOB@example.com", from("203.0.113.6"))).isTrue();
+
+    assertThatThrownBy(
+            () -> limiter.mayRequestPasswordReset("bob@example.com", from("203.0.113.7")))
+        .isInstanceOf(RateLimitExceededException.class)
+        .hasMessage(ForgotPasswordRateLimitFilter.MESSAGE);
+    // The owner's own network is unaffected.
+    assertThat(limiter.mayRequestPasswordReset("bob@example.com", from("198.51.100.5"))).isTrue();
+  }
+
+  @Test
+  void aDrainedResetCeilingSuppressesTheMailWithout429() {
+    for (int net = 1; net <= 5; net++) {
+      assertThat(limiter.mayRequestPasswordReset("carol@example.com", from("192.0." + net + ".1")))
+          .isTrue();
+    }
+
+    assertThat(limiter.mayRequestPasswordReset("carol@example.com", from("198.51.100.5")))
+        .isFalse();
+  }
+
+  @Test
+  void drainedMailboxBucketsDoNotAffectTheOwnersLogin() {
+    limiter.register("alice@example.com");
+    limiter.register("alice@example.com");
+    for (int net = 1; net <= 6; net++) {
+      limiter.mayRequestPasswordReset("alice@example.com", from("192.0." + net + ".1"));
+    }
+
+    assertThat(limiter.beginLogin("alice@example.com", from("203.0.113.5")).refused()).isFalse();
   }
 
   @Test
@@ -177,20 +256,6 @@ class AuthIdentifierRateLimiterTest {
     assertThatThrownBy(() -> limiter.register("new@example.com"))
         .isInstanceOf(RateLimitExceededException.class)
         .hasMessage(RegisterRateLimitFilter.MESSAGE);
-  }
-
-  @Test
-  void drainedMailboxBucketsDoNotAffectTheOwnersLogin() {
-    limiter.register("alice@example.com");
-    limiter.register("alice@example.com");
-    limiter.forgotPassword("alice@example.com");
-    limiter.forgotPassword("alice@example.com");
-
-    assertThatThrownBy(() -> limiter.forgotPassword("alice@example.com"))
-        .isInstanceOf(RateLimitExceededException.class)
-        .hasMessage(ForgotPasswordRateLimitFilter.MESSAGE);
-    assertThatCode(() -> limiter.beginLogin("alice@example.com", from("203.0.113.5")))
-        .doesNotThrowAnyException();
   }
 
   @Test

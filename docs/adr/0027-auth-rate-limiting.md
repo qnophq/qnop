@@ -96,58 +96,90 @@ supported as long as every hop is listed. Operator guidance is in `docs/DEPLOYME
 ("Behind a reverse proxy"). The secure default (empty trust list → header ignored) is
 unchanged.
 
+Only entries that start with a hex digit or `:` and otherwise contain nothing but hex digits,
+`:` and `.` are ever handed to the JDK's address parser, which treats exactly those as literals.
+
+**Address grouping.** One IPv6 subscriber normally holds at least a /56, so keying anything on
+a single IPv6 address lets one party rotate through more buckets than any limit can absorb.
+The per-IP filters therefore key IPv4 per address and IPv6 per /56. The per-identifier buckets
+below key "the network an attempt comes from" as the IPv4 /24 or the IPv6 /56.
+
 **Per-identifier buckets (#899).** The email- and token-keyed limits deferred to #20 were never
 built, and login had no per-account limit, so per-IP limits were the only bound and a caller
 using many source addresses was not limited at all. They now exist next to the per-IP ones:
 
-| Scope (`qnop.auth.rate-limit.*`) | Key | Default | Counts |
-|---|---|---|---|
-| `login-account-network` | account × client network (IPv4 /24, IPv6 /64) | 10 / 900s | failed attempts only |
-| `login-account` | account, all networks together | 100 / 3600s | failed attempts only |
-| `register-email` | e-mail | 5 / 3600s | every attempt |
-| `forgot-password-email` | e-mail | 5 / 3600s | every attempt |
-| `reset-password-token` | reset token | 10 / 3600s | every attempt |
-| `reset-password` (per IP, filter) | client IP | 5 / 900s | every attempt |
+| Scope (`qnop.auth.rate-limit.*`) | Key | Default | Counts | When drained |
+|---|---|---|---|---|
+| `login-account-network` | account × client network, or account × recognised device | 10 / 900s | failed logins | `429` |
+| `login-account` | account (unrecognised devices only) | 100 / 3600s | failed logins | silent `401` |
+| `forgot-password-email-network` | e-mail × client network | 3 / 3600s | every request | `429` |
+| `forgot-password-email` | e-mail | 10 / 3600s | every request | `204`, no mail |
+| `register-email` | e-mail | 5 / 3600s | every request | `429` |
+| `reset-password-token` | reset token | 10 / 3600s | every attempt | `429` |
+| `reset-password` (per IP, filter) | client IP | 5 / 900s | every attempt | `429` |
 
-The per-IP `reset-password` filter is the IP half of the password-reset limit the decision
-above already named; `forgot-password` keeps its existing per-IP filter.
+`login-device-cookie-lifetime` (default 30 days) bounds the recognised-device cookie. The per-IP
+`reset-password` filter is the IP half of the password-reset limit the decision above already
+named; `forgot-password` keeps its existing per-IP filter.
 
 - **Enforced in the controller**, as the context section anticipated: the filters never read the
   body, and buffering and re-parsing it in a filter is not worth it. `AuthIdentifierRateLimiter`
   is called by `AuthController`, `AuthRegistrationController` and `AuthPasswordResetController`
-  after their feature-flag checks; a drained bucket throws `RateLimitExceededException`, rendered
+  after their feature-flag checks. A `429` is thrown as `RateLimitExceededException` and rendered
   by `RateLimitExceptionHandler` with the *same* status, `Retry-After`, code and message as that
   endpoint's per-IP filter.
 - **Which account a login is charged to.** The key is the user id whenever the identifier
-  resolves to a local account, through `AuthService.findLocalAccountId` — the very lookup the
+  resolves to a local account, through `AuthService.findLocalAccountId` — the lookup the
   credential check uses (username exact, else e-mail case-insensitively). Username and e-mail of
-  one account, and every spelling the lookup accepts, therefore share one bucket. The lookup runs
-  on every attempt, known or unknown, so it adds no timing difference of its own. An identifier
-  that resolves to nothing is keyed on a hash folded the same way the lookup folds
-  (case-insensitive if it contains `@`, exact otherwise, never trimmed), and gets buckets exactly
-  like a real account, so a refusal does not distinguish the two. The one residual signal is that
-  a username and an e-mail address share a bucket only if they belong to the same account; seeing
-  it requires exhausting that bucket from one network, i.e. many failed attempts, which the
-  limits themselves bound.
-- **Login: failures only, per network first, then a generous overall ceiling.** Each attempt
-  takes a token from both login buckets before the credential check (atomic, so concurrent
-  attempts cannot overshoot); a success gives both back, so only failures count. A drained bucket
-  refuses every attempt, the correct password included — otherwise the refusal would reveal the
-  right guess. The trade-off between guessing resistance and lock-out by a third party:
-  - A single hard per-account cap would let anyone keep an account's owner out simply by failing
-    on purpose. Keying the strict bucket on account × client network confines that effect to the
-    network that produces the failures; the owner signing in from anywhere else is unaffected.
-  - The overall per-account ceiling is an order of magnitude higher. It bounds the total guesses
-    against one account per hour however many networks are used, and it is the only bucket a
-    third party can drain for everyone — which takes failures from many networks. Reaching it is
-    an attack signal operators should see in the logs, not routine.
-  - Rejected: a pure per-account hard block (trivial lock-out), progressive server-side delay
-    (ties up request threads under exactly the load it is meant to absorb), and lock-out with
-    out-of-band unlock (needs mail and an unlock flow, and still lets a third party trigger it).
-- **Register / forgot-password / reset are hard caps per e-mail / token.** They protect a mailbox
-  from being flooded, not an account from guessing, so a hard cap is right. They are scopes of
-  their own and never count against login: draining them does not stop the owner from signing in.
-  E-mail keys are trimmed and lower-cased; the reset token is case-sensitive and only hashed.
-- **Keys are SHA-256 hashes** (or the user id); the raw identifier never sits in the bucket store.
-  The uniform `200`/`204` answers of register and forgot-password are kept.
+  one account, and every spelling the lookup accepts, therefore share one key. The lookup runs on
+  every attempt, known or unknown. An identifier that resolves to nothing is keyed on a hash
+  folded the way the lookup folds (case-insensitive if it contains `@`, exact otherwise, never
+  trimmed) and gets buckets exactly like a real account. The credential check itself runs as
+  well (twice the account lookup per login; folding the two together is left for after #930,
+  which reshapes `authenticate`).
+- **Only the caller's own bucket answers `429`.** Every identifier throttle that has a ceiling
+  pairs it with a strict bucket per identifier and *source* — the client network, or for login a
+  recognised device. Only the source bucket refuses with `429`. A drained ceiling refuses
+  silently: a login gets the ordinary `401` without its password being honoured (the credential
+  check still runs, so the refusal takes as long as a real one), a reset request gets the
+  ordinary `204` and no mail. State created from one network therefore never surfaces as a
+  `429` in another, and a held-down ceiling reveals neither itself nor which identifiers share
+  it.
+- **Login: failures only; recognised devices are exempt from the ceiling (OWASP "device
+  cookie").** Tokens are taken before the credential check (atomic, so concurrent attempts
+  cannot overshoot) and given back on success, so only failures count. A successful login sets
+  `qnop_device`: `HttpOnly`, `SameSite=Strict`, `Secure` (per `qnop.auth.cookie-secure`), path
+  `/api/v1/auth/login`, holding `accountId ‖ nonce ‖ issuedAt` signed with HMAC-SHA256 under a
+  key derived from the JWT secret with the HKDF purpose label `login-device-cookie`
+  (ADR-0022). A later attempt for the same account presenting a valid, unexpired cookie is
+  charged to a bucket of that device alone and skips the ceiling. Every other attempt is charged
+  to its account × network bucket and to the ceiling; when the ceiling refuses, the network
+  token stays spent.
+- **The lock-out trade-off, stated accurately.** Buckets refill continuously, so the ceiling
+  can be held drained by a *sustained* failure rate of about 100 per hour, which a handful of
+  client networks can supply (each network allows about 40 per hour). While it is drained,
+  every attempt for that account from an unrecognised device fails, the correct password
+  included. That is the price of a global bound on guesses against one account. The owner is
+  not locked out of devices they have signed in on within the cookie lifetime; a new device, or
+  one whose cookie expired or was cleared, must wait until the failures stop. The ceiling being
+  reached is logged at `WARN` (account key only). Rotating the JWT secret invalidates all device
+  cookies. A device cookie is not revoked by a password change; it only exempts its holder from
+  the ceiling, never from the password check or its own bucket.
+- **Residual signals.** (1) A caller who drains *their own* network bucket for an account with
+  one spelling and then sees a `429` for another spelling from the same network learns that both
+  spellings belong to one account. That costs the full per-network allowance each time and is
+  bounded by it; from any other network nothing is visible. (2) The reset-mail suppression is
+  invisible to the requester by design. Rejected: a pure per-account hard block (trivial
+  lock-out), a `429` from the ceiling (lock-out plus a cross-network signal), progressive
+  server-side delay (ties up request threads under the load it is meant to absorb), lock-out
+  with out-of-band unlock (needs mail and an unlock flow, and still lets a third party trigger
+  it).
+- **Register** keeps a single hard cap per e-mail: it protects a mailbox, and the owner does not
+  need to register repeatedly. **Reset token**: each guess is a different token and gets a fresh
+  bucket, so the per-token cap does nothing against guessing — the per-IP `reset-password`
+  filter and the token's entropy do that. It bounds retries with one (possibly leaked) token.
+  Neither of these, nor the reset-request buckets, ever counts against login.
+- **Keys are SHA-256 hashes** (or the user id); the raw identifier never sits in the bucket
+  store. The identifier buckets live in a store of their own (same `max-buckets` cap), so a
+  flood of per-IP keys cannot evict them and vice versa.
 - A breached-password check was considered and left out of scope here.

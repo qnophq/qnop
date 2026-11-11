@@ -36,6 +36,7 @@ import io.qnop.service.TokenRevocationService;
 import io.qnop.web.security.RefreshTokenCookieFactory;
 import io.qnop.web.security.ratelimit.AuthIdentifierRateLimiter;
 import io.qnop.web.security.ratelimit.AuthIdentifierRateLimiter.LoginAttempt;
+import io.qnop.web.security.ratelimit.LoginDeviceCookies;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -75,6 +76,7 @@ public class AuthController implements AuthApi {
   private final QnopProperties properties;
   private final AuthIdentifierRateLimiter identifierRateLimiter;
   private final HttpServletRequest httpRequest;
+  private final LoginDeviceCookies deviceCookies;
 
   public AuthController(
       AuthService authService,
@@ -84,7 +86,8 @@ public class AuthController implements AuthApi {
       RefreshTokenCookieFactory cookieFactory,
       QnopProperties properties,
       AuthIdentifierRateLimiter identifierRateLimiter,
-      HttpServletRequest httpRequest) {
+      HttpServletRequest httpRequest,
+      LoginDeviceCookies deviceCookies) {
     this.authService = authService;
     this.jwtTokenService = jwtTokenService;
     this.refreshTokenService = refreshTokenService;
@@ -94,6 +97,7 @@ public class AuthController implements AuthApi {
     this.identifierRateLimiter = identifierRateLimiter;
     // A request-scoped proxy: resolves to the request being served on each call.
     this.httpRequest = httpRequest;
+    this.deviceCookies = deviceCookies;
   }
 
   @Override
@@ -103,12 +107,14 @@ public class AuthController implements AuthApi {
     // control. The request id ties the attempt to its rate-limit and audit rows.
     //
     // Per-account throttle (issue #899): checked before the credentials, for known and unknown
-    // identifiers alike, and only failures count against it.
+    // identifiers alike, and only failures count against it. The credentials are checked even when
+    // the account's ceiling refused the attempt, so a silent refusal takes as long as a real one.
     LoginAttempt attempt =
         identifierRateLimiter.beginLogin(request.getUsernameOrEmail(), httpRequest);
     UUID userId =
         authService
             .authenticate(request.getUsernameOrEmail(), request.getPassword())
+            .filter(authenticated -> !attempt.refused())
             .orElseThrow(
                 () -> {
                   log.info("Login rejected: invalid credentials");
@@ -117,7 +123,12 @@ public class AuthController implements AuthApi {
                 });
     identifierRateLimiter.loginSucceeded(attempt);
     log.info("Login succeeded for {}", userId);
-    return issueSession(userId);
+    ResponseEntity<TokenResponse> session = issueSession(userId);
+    // Recognise this device on the next attempt (issue #899, LoginDeviceCookies).
+    return ResponseEntity.status(session.getStatusCode())
+        .headers(session.getHeaders())
+        .header(HttpHeaders.SET_COOKIE, deviceCookies.issue(userId).toString())
+        .body(session.getBody());
   }
 
   @Override

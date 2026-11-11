@@ -20,7 +20,9 @@
  */
 package io.qnop.web.security.ratelimit;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -31,6 +33,7 @@ import io.qnop.entity.UserSource;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import jakarta.servlet.http.Cookie;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -62,7 +65,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
       "qnop.auth.rate-limit.login-account-network.max-attempts=3",
       "qnop.auth.rate-limit.login-account.max-attempts=6",
       "qnop.auth.rate-limit.register-email.max-attempts=2",
-      "qnop.auth.rate-limit.forgot-password-email.max-attempts=2",
+      "qnop.auth.rate-limit.forgot-password-email-network.max-attempts=2",
+      "qnop.auth.rate-limit.forgot-password-email.max-attempts=4",
+      "qnop.auth.rate-limit.trusted-proxy-cidrs=10.0.0.0/8",
       "qnop.auth.rate-limit.reset-password-token.max-attempts=2"
     })
 class IdentifierRateLimitIT extends AbstractIntegrationTest {
@@ -81,7 +86,13 @@ class IdentifierRateLimitIT extends AbstractIntegrationTest {
   void cleanup() {
     settings.update(Map.of(REGISTRATION_KEY, "false"), null);
     for (String username :
-        List.of("limited-login", "limited-alias", "limited-ceiling", "limited-ok", "limited-reg")) {
+        List.of(
+            "limited-login",
+            "limited-alias",
+            "limited-ceiling",
+            "limited-ok",
+            "limited-reg",
+            "limited-xff")) {
       userRepository
           .findByUsernameAndSource(username, UserSource.INTERNAL)
           .ifPresent(userRepository::delete);
@@ -118,17 +129,49 @@ class IdentifierRateLimitIT extends AbstractIntegrationTest {
   }
 
   @Test
-  void failuresAcrossNetworksHitTheOverallCeiling() throws Exception {
+  void aDrainedCeilingRefusesSilentlyButNotOnARecognisedDevice() throws Exception {
     createUser("limited-ceiling", "limited-ceiling@example.com");
+    // The owner signed in once before: this browser now carries a device cookie.
+    Cookie device =
+        performFrom(login("limited-ceiling", PASSWORD), "192.0.2.50")
+            .andExpect(status().isOk())
+            .andExpect(cookie().httpOnly(LoginDeviceCookies.COOKIE_NAME, true))
+            .andExpect(
+                cookie().path(LoginDeviceCookies.COOKIE_NAME, LoginDeviceCookies.COOKIE_PATH))
+            .andReturn()
+            .getResponse()
+            .getCookie(LoginDeviceCookies.COOKIE_NAME);
+    assertThat(device).isNotNull();
 
     for (int net = 1; net <= 6; net++) {
       performFrom(login("limited-ceiling", "wrong-password"), "203.0." + net + ".1")
           .andExpect(status().isUnauthorized());
     }
 
+    // The ceiling is drained. From an unrecognised source even the right password gets the
+    // ordinary 401 — no 429 that would tell this apart from a wrong guess ...
+    performFrom(login("limited-ceiling", PASSWORD), "203.0.99.1")
+        .andExpect(status().isUnauthorized());
+    // ... while the owner's recognised device still signs in.
+    performFrom(login("limited-ceiling", PASSWORD).cookie(device), "203.0.99.1")
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void theNetworkIsTakenFromXForwardedForBehindATrustedProxy() throws Exception {
+    createUser("limited-xff", "limited-xff@example.com");
+
+    for (int i = 0; i < 3; i++) {
+      performFrom(viaProxy(login("limited-xff", "wrong-password"), "203.0.113.200"), "10.0.0.1")
+          .andExpect(status().isUnauthorized());
+    }
+
     expectRateLimited(
-        performFrom(login("limited-ceiling", PASSWORD), "203.0.99.1"),
+        performFrom(viaProxy(login("limited-xff", PASSWORD), "203.0.113.201"), "10.0.0.1"),
         LoginRateLimitFilter.MESSAGE);
+    // Same proxy, a client in another network: its own bucket.
+    performFrom(viaProxy(login("limited-xff", PASSWORD), "192.0.2.200"), "10.0.0.1")
+        .andExpect(status().isOk());
   }
 
   @Test
@@ -163,13 +206,19 @@ class IdentifierRateLimitIT extends AbstractIntegrationTest {
   }
 
   @Test
-  void resetRequestsAreCappedPerEmail() throws Exception {
+  void resetRequestsAreCappedPerEmailAndNetwork() throws Exception {
     for (int i = 0; i < 2; i++) {
       perform(forgot("capped-forgot@example.com")).andExpect(status().isNoContent());
     }
 
     expectRateLimited(
         perform(forgot("capped-forgot@example.com")), ForgotPasswordRateLimitFilter.MESSAGE);
+    // Other networks are unaffected; once the address's ceiling is spent the answer stays the
+    // uniform 204 (the mail is suppressed, see AuthIdentifierRateLimiterTest).
+    for (int net = 1; net <= 3; net++) {
+      performFrom(forgot("capped-forgot@example.com"), "203.0." + net + ".9")
+          .andExpect(status().isNoContent());
+    }
   }
 
   @Test
@@ -208,6 +257,11 @@ class IdentifierRateLimitIT extends AbstractIntegrationTest {
         .andExpect(header().exists("Retry-After"))
         .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
         .andExpect(jsonPath("$.message").value(message));
+  }
+
+  private static MockHttpServletRequestBuilder viaProxy(
+      MockHttpServletRequestBuilder request, String client) {
+    return request.header("X-Forwarded-For", client);
   }
 
   private static MockHttpServletRequestBuilder login(String usernameOrEmail, String password) {

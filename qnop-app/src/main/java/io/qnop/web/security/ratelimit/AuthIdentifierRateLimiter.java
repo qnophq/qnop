@@ -22,49 +22,49 @@ package io.qnop.web.security.ratelimit;
 
 import io.qnop.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
  * Per-identifier auth throttles (issue #899, ADR-0027): the buckets that sit next to the per-IP
  * filters and are keyed on what the request is <em>about</em> — the account being signed in to, the
- * e-mail address being registered or sent a reset link, the reset token being redeemed. Per-IP
- * limits alone are defeated by a caller that spreads its attempts over many source addresses.
+ * e-mail address being sent a mail, the reset token being redeemed. Per-IP limits alone are
+ * defeated by a caller that spreads its attempts over many source addresses.
  *
- * <p>These need the parsed request body, so the controllers call them rather than a servlet filter
- * (which would have to buffer and re-parse the body). A rejected check throws {@link
- * RateLimitExceededException}, rendered by {@link RateLimitExceptionHandler} as the same {@code
- * 429} + {@code Retry-After} body the per-IP filter of that endpoint writes.
+ * <p>These need the parsed request body, so the controllers call them rather than a servlet filter.
+ * A {@code 429} is thrown as {@link RateLimitExceededException} and rendered by {@link
+ * RateLimitExceptionHandler} exactly like the endpoint's per-IP filter renders its own.
  *
- * <p><b>Login: failures only, per network first.</b> A login is charged to two buckets of the
- * account: a strict one per client network (IPv4 /24, IPv6 /64) and a much more generous one across
- * all networks. A token is taken from both before the credential check (atomic, so concurrent
- * attempts cannot overshoot) and both are given back when the login succeeds, so only failures
- * count. A source that keeps failing exhausts its own network bucket and is refused, while the
- * account owner signing in from elsewhere is not; only the overall ceiling, which takes failures
- * from many networks to reach, refuses everyone, and it bounds the total guesses on one account.
- * While a bucket is drained the correct password is refused too; otherwise the refusal would tell
- * which guess was right.
+ * <p><b>Only the caller's own bucket answers 429.</b> Each throttle has a strict bucket per
+ * identifier and <em>source</em> — the client network (IPv4 /24, IPv6 /56) or, for login, a
+ * recognised device ({@link LoginDeviceCookies}) — and a much larger ceiling per identifier across
+ * all sources. Only the source bucket refuses with {@code 429}. A drained ceiling refuses
+ * <em>silently</em>: a login gets the ordinary {@code 401} without its password being honoured, a
+ * reset request the ordinary {@code 204} without a mail. So what one source does never shows up as
+ * a {@code 429} elsewhere, and a ceiling that is held drained neither reveals itself nor which
+ * identifiers share it.
  *
- * <p><b>Which account.</b> The account key is the user id when the identifier resolves to a local
- * account, through {@link AuthService#findLocalAccountId} (the same lookup the credential check
- * uses, run on every attempt), so username and e-mail of one account, and any case variant the
- * e-mail lookup accepts, share one bucket. An identifier that resolves to nothing is keyed on its
- * hash, folded the way the lookup folds: case-insensitive when it looks like an e-mail address
- * (contains {@code @}), exact otherwise. Unknown identifiers get buckets just like known ones, so a
- * refusal does not tell the two apart.
+ * <p><b>Login.</b> Only failures count: tokens are taken before the credential check (atomic, so
+ * concurrent attempts cannot overshoot) and given back on success. An attempt from a recognised
+ * device is charged to that device's bucket and is exempt from the ceiling, so the owner keeps
+ * access from devices they have signed in on whatever happens elsewhere; every other attempt is
+ * charged to its network bucket and the ceiling. The account key is the user id when the identifier
+ * resolves to a local account, through {@link AuthService#findLocalAccountId} (the same lookup the
+ * credential check uses, run on every attempt); an identifier that resolves to nothing is keyed on
+ * its hash, folded the way that lookup folds.
  *
- * <p><b>Register / forgot-password / reset</b> are hard per-e-mail (per-token) caps: they protect a
- * mailbox, not an account, and live in scopes of their own, so draining them never affects the
- * owner's login. Keys are SHA-256 hashes; no raw identifier is held in the bucket store.
+ * <p><b>Register / reset token</b> keep a single hard cap per e-mail / token. The buckets live in a
+ * store of their own, separate from the per-IP filters', so neither can evict the other's. Keys are
+ * SHA-256 hashes or user ids; no raw identifier is held.
  */
 @Component
 public class AuthIdentifierRateLimiter {
@@ -75,64 +75,85 @@ public class AuthIdentifierRateLimiter {
   static final String LOGIN_ACCOUNT_NETWORK = "login-account-network";
   static final String REGISTER_EMAIL = "register-email";
   static final String FORGOT_PASSWORD_EMAIL = "forgot-password-email";
+  static final String FORGOT_PASSWORD_EMAIL_NETWORK = "forgot-password-email-network";
   static final String RESET_PASSWORD_TOKEN = "reset-password-token";
 
-  private final BucketRateLimitService rateLimitService;
+  private final BucketRateLimitService buckets;
   private final RateLimitProperties properties;
   private final HttpClientIpResolver clientIpResolver;
   private final AuthService authService;
+  private final LoginDeviceCookies deviceCookies;
 
+  /** Production wiring: a bucket store of its own, sized by {@code max-buckets}. */
+  @Autowired
   public AuthIdentifierRateLimiter(
-      BucketRateLimitService rateLimitService,
       RateLimitProperties properties,
       HttpClientIpResolver clientIpResolver,
-      AuthService authService) {
-    this.rateLimitService = rateLimitService;
+      AuthService authService,
+      LoginDeviceCookies deviceCookies) {
+    this(
+        new BucketRateLimitService(properties),
+        properties,
+        clientIpResolver,
+        authService,
+        deviceCookies);
+  }
+
+  AuthIdentifierRateLimiter(
+      BucketRateLimitService buckets,
+      RateLimitProperties properties,
+      HttpClientIpResolver clientIpResolver,
+      AuthService authService,
+      LoginDeviceCookies deviceCookies) {
+    this.buckets = buckets;
     this.properties = properties;
     this.clientIpResolver = clientIpResolver;
     this.authService = authService;
+    this.deviceCookies = deviceCookies;
   }
 
-  /** The buckets one login attempt was charged to; hand it back to {@link #loginSucceeded}. */
-  public record LoginAttempt(String accountKey, String networkKey) {}
+  /**
+   * What {@link #beginLogin} charged. {@code refused} means the account's ceiling is drained and
+   * the attempt must fail like a wrong password, whatever the credentials. Hand it to {@link
+   * #loginSucceeded} when the credentials were right.
+   */
+  public record LoginAttempt(String sourceKey, String ceilingKey, boolean refused) {}
 
   /**
-   * A login attempt for {@code usernameOrEmail} from {@code request}'s client: charges the
-   * account's per-network and overall buckets, refusing the attempt before any credential check
-   * when either is drained. Pair with {@link #loginSucceeded} so only failed attempts count.
+   * A login attempt for {@code usernameOrEmail} from {@code request}'s client. Throws {@link
+   * RateLimitExceededException} when the caller's own source bucket for the account is drained.
    */
   public LoginAttempt beginLogin(String usernameOrEmail, HttpServletRequest request) {
-    String accountKey = accountKey(usernameOrEmail);
-    String networkKey = accountKey + "|" + networkPrefix(clientIpResolver.resolve(request));
-    consume(
-        LOGIN_ACCOUNT_NETWORK,
-        networkKey,
-        properties.loginAccountNetwork(),
-        LoginRateLimitFilter.MESSAGE);
-    try {
-      consume(LOGIN_ACCOUNT, accountKey, properties.loginAccount(), LoginRateLimitFilter.MESSAGE);
-    } catch (RateLimitExceededException e) {
-      // Refused anyway: do not also count it against this network.
-      rateLimitService.refund(LOGIN_ACCOUNT_NETWORK, networkKey);
-      // Reaching the overall ceiling takes failures from many networks: worth an operator's eye.
-      // The key is a user id or a hash, never the identifier that was typed (issue #659).
-      log.warn("Login ceiling reached for account {}", accountKey);
-      throw e;
+    Optional<UUID> accountId = authService.findLocalAccountId(usernameOrEmail);
+    String accountKey =
+        accountId
+            .map(id -> "user:" + id)
+            .orElseGet(() -> "id:" + loginIdentifierHash(usernameOrEmail));
+    Optional<String> device = accountId.flatMap(id -> deviceCookies.recognisedDevice(request, id));
+    if (device.isPresent()) {
+      String deviceKey = accountKey + "|device:" + device.get();
+      consume(LOGIN_ACCOUNT_NETWORK, deviceKey, properties.loginAccountNetwork(), loginMessage());
+      return new LoginAttempt(deviceKey, null, false);
     }
-    return new LoginAttempt(accountKey, networkKey);
+    String networkKey =
+        accountKey + "|net:" + ClientNetworks.networkKey(clientIpResolver.resolve(request));
+    consume(LOGIN_ACCOUNT_NETWORK, networkKey, properties.loginAccountNetwork(), loginMessage());
+    if (!tryConsume(LOGIN_ACCOUNT, accountKey, properties.loginAccount())) {
+      // Silent refusal, and the network token stays spent. Reaching the ceiling takes failures
+      // from many networks: worth an operator's eye. The key is a user id or a hash, never the
+      // identifier that was typed (issue #659).
+      log.warn("Login ceiling reached for account {}", accountKey);
+      return new LoginAttempt(networkKey, null, true);
+    }
+    return new LoginAttempt(networkKey, accountKey, false);
   }
 
   /** Returns the tokens {@link #beginLogin} took: a successful sign-in is not a failed attempt. */
   public void loginSucceeded(LoginAttempt attempt) {
-    rateLimitService.refund(LOGIN_ACCOUNT_NETWORK, attempt.networkKey());
-    rateLimitService.refund(LOGIN_ACCOUNT, attempt.accountKey());
-  }
-
-  private String accountKey(String usernameOrEmail) {
-    return authService
-        .findLocalAccountId(usernameOrEmail)
-        .map(id -> "user:" + id)
-        .orElseGet(() -> "id:" + loginIdentifierHash(usernameOrEmail));
+    buckets.refund(LOGIN_ACCOUNT_NETWORK, attempt.sourceKey());
+    if (attempt.ceilingKey() != null) {
+      buckets.refund(LOGIN_ACCOUNT, attempt.ceilingKey());
+    }
   }
 
   /**
@@ -144,26 +165,7 @@ public class AuthIdentifierRateLimiter {
     return sha256(value.indexOf('@') >= 0 ? value.toLowerCase(Locale.ROOT) : value);
   }
 
-  /**
-   * The client network an address belongs to (its IPv4 /24 or IPv6 /64), so one source cannot dodge
-   * the per-network bucket by moving within the block it controls.
-   */
-  static String networkPrefix(String clientIp) {
-    String canonical =
-        HttpClientIpResolver.parseLiteral(clientIp == null ? "" : clientIp).orElse(null);
-    if (canonical == null) {
-      return "raw:" + clientIp;
-    }
-    try {
-      byte[] bytes = InetAddress.getByName(canonical).getAddress(); // a literal: no lookup
-      int keep = bytes.length == 4 ? 3 : 8;
-      return HexFormat.of().formatHex(bytes, 0, keep) + "/" + keep * 8;
-    } catch (UnknownHostException e) {
-      return "raw:" + clientIp;
-    }
-  }
-
-  /** A registration for {@code email}. */
+  /** A registration for {@code email}: one hard cap per address. */
   public void register(String email) {
     consume(
         REGISTER_EMAIL,
@@ -172,16 +174,32 @@ public class AuthIdentifierRateLimiter {
         RegisterRateLimitFilter.MESSAGE);
   }
 
-  /** A password-reset request for {@code email}. */
-  public void forgotPassword(String email) {
+  /**
+   * A password-reset request for {@code email} from {@code request}'s client. Throws {@link
+   * RateLimitExceededException} when this network's bucket for the address is drained; returns
+   * {@code false} — answer as usual, send nothing — when the address's overall ceiling is.
+   */
+  public boolean mayRequestPasswordReset(String email, HttpServletRequest request) {
+    String emailKey = normalizedHash(email);
+    String networkKey =
+        emailKey + "|net:" + ClientNetworks.networkKey(clientIpResolver.resolve(request));
     consume(
-        FORGOT_PASSWORD_EMAIL,
-        normalizedHash(email),
-        properties.forgotPasswordEmail(),
+        FORGOT_PASSWORD_EMAIL_NETWORK,
+        networkKey,
+        properties.forgotPasswordEmailNetwork(),
         ForgotPasswordRateLimitFilter.MESSAGE);
+    if (!tryConsume(FORGOT_PASSWORD_EMAIL, emailKey, properties.forgotPasswordEmail())) {
+      log.info("Password-reset mail suppressed: ceiling reached for one address");
+      return false;
+    }
+    return true;
   }
 
-  /** A redemption attempt of {@code token}. The token is case-sensitive, so it is not folded. */
+  /**
+   * A redemption attempt of {@code token}. Bounds retries with one (possibly leaked) token; it does
+   * nothing against guessing, where each guess is a new token — that is the per-IP filter's job.
+   * The token is case-sensitive, so it is not folded.
+   */
   public void resetPassword(String token) {
     consume(
         RESET_PASSWORD_TOKEN,
@@ -190,15 +208,24 @@ public class AuthIdentifierRateLimiter {
         ResetPasswordRateLimitFilter.MESSAGE);
   }
 
+  private static String loginMessage() {
+    return LoginRateLimitFilter.MESSAGE;
+  }
+
+  private boolean tryConsume(String scope, String key, RateLimitProperties.Limit limit) {
+    return buckets.tryConsume(scope, key, limit.maxAttempts(), limit.windowSeconds())
+        instanceof RateLimitResult.Allowed;
+  }
+
   private void consume(String scope, String key, RateLimitProperties.Limit limit, String message) {
     RateLimitResult result =
-        rateLimitService.tryConsume(scope, key, limit.maxAttempts(), limit.windowSeconds());
+        buckets.tryConsume(scope, key, limit.maxAttempts(), limit.windowSeconds());
     if (result instanceof RateLimitResult.Rejected rejected) {
       throw new RateLimitExceededException(message, rejected.retryAfterSeconds());
     }
   }
 
-  /** Trim + lower-case, so trivially different spellings of one identifier share a bucket. */
+  /** Trim + lower-case, so trivially different spellings of one address share a bucket. */
   static String normalizedHash(String identifier) {
     return sha256(identifier == null ? "" : identifier.trim().toLowerCase(Locale.ROOT));
   }
