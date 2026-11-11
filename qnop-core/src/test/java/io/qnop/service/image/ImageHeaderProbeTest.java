@@ -59,6 +59,36 @@ class ImageHeaderProbeTest {
   }
 
   @Test
+  void webpBitstreamLargerThanItsCanvasIsUnreadable() {
+    assertThat(ImageHeaderProbe.probe(ImageFixtures.webpVp8xWithFrame(16, 16, 16_000, 16_000)))
+        .isEmpty();
+    assertThat(ImageHeaderProbe.probe(ImageFixtures.webpVp8xWithFrame(16, 16, 17, 16))).isEmpty();
+  }
+
+  @Test
+  void webpAnimationFramesAreCheckedAgainstTheCanvas() {
+    assertThat(ImageHeaderProbe.probe(ImageFixtures.webpAnimated(100, 80, 50, 40)))
+        .contains(new Dimensions(100, 80));
+    assertThat(ImageHeaderProbe.probe(ImageFixtures.webpAnimated(16, 16, 16_000, 16_000)))
+        .isEmpty();
+  }
+
+  @Test
+  void webpWithoutAnyBitstreamIsUnreadable() {
+    // The RIFF header plus the VP8X chunk, and nothing after it.
+    byte[] canvasOnly = Arrays.copyOf(ImageFixtures.webpVp8x(10, 10), 12 + 18);
+    assertThat(ImageHeaderProbe.probe(canvasOnly)).isEmpty();
+  }
+
+  @Test
+  void decodeWithinBudgetRefusesAWebpWhoseBitstreamExceedsItsCanvas() {
+    assertThat(
+            ImageHeaderProbe.decodeWithinBudget(
+                ImageFixtures.webpVp8xWithFrame(16, 16, 16_000, 16_000), SMALL))
+        .isEmpty();
+  }
+
+  @Test
   void probesFromAStream() {
     assertThat(
             ImageHeaderProbe.probe(

@@ -44,16 +44,13 @@ import org.slf4j.LoggerFactory;
  * the byte-size cap on an upload says nothing about the memory a decode will allocate. The header
  * is the only safe place to look before deciding to decode.
  *
- * <p>WebP is parsed here directly (VP8, VP8L and VP8X headers) so its dimensions are known whether
- * or not an ImageIO WebP plugin is on the classpath. Every other format uses the matching {@link
- * ImageReader}'s {@code getWidth}/{@code getHeight}, which read only the header.
+ * <p>WebP is parsed here directly ({@link WebpHeader} walks every RIFF chunk) so its dimensions are
+ * known whether or not an ImageIO WebP plugin is on the classpath. Every other format uses the
+ * matching {@link ImageReader}'s {@code getWidth}/{@code getHeight}, which read only the header.
  */
 public final class ImageHeaderProbe {
 
   private static final Logger log = LoggerFactory.getLogger(ImageHeaderProbe.class);
-
-  /** Enough bytes for the RIFF header plus the first chunk's dimension fields. */
-  private static final int WEBP_HEADER_LENGTH = 30;
 
   private ImageHeaderProbe() {}
 
@@ -69,17 +66,17 @@ public final class ImageHeaderProbe {
   }
 
   /**
-   * The declared dimensions of the image in {@code in}, reading only as far as the header. The
-   * caller owns (and closes) the stream; its position afterwards is unspecified.
+   * The declared dimensions of the image in {@code in}, reading only headers. The caller owns (and
+   * closes) the stream; its position afterwards is unspecified.
    */
   public static Optional<Dimensions> probe(InputStream in) {
     try {
-      byte[] prefix = in.readNBytes(WEBP_HEADER_LENGTH);
+      byte[] prefix = in.readNBytes(WebpHeader.RIFF_HEADER_LENGTH);
       if (prefix.length == 0) {
         return Optional.empty();
       }
-      if (isWebp(prefix)) {
-        return webpDimensions(prefix);
+      if (WebpHeader.matches(prefix)) {
+        return WebpHeader.read(in);
       }
       InputStream whole = new SequenceInputStream(new ByteArrayInputStream(prefix), in);
       try (ImageInputStream stream = new MemoryCacheImageInputStream(whole)) {
@@ -94,16 +91,35 @@ public final class ImageHeaderProbe {
   }
 
   /**
-   * Decodes {@code bytes} only if its header-declared size fits {@code budget}; empty when the
-   * header is unreadable, the size is over budget, or no reader can decode it.
+   * Decodes the first image in {@code bytes} only if it fits {@code budget}; empty when the header
+   * is unreadable, any declared size is over budget, or no reader can decode it.
+   *
+   * <p>Two checks precede the decode: this class's own header probe (which, for WebP, checks every
+   * frame and bitstream) and the size the chosen {@link ImageReader} itself reports for the image
+   * it is about to decode — so a reader that interprets the file differently from the probe is
+   * still held to the budget.
    */
   public static Optional<BufferedImage> decodeWithinBudget(byte[] bytes, PixelBudget budget) {
-    Optional<Dimensions> dimensions = probe(bytes);
-    if (dimensions.isEmpty() || !budget.admits(dimensions.get())) {
+    Optional<Dimensions> declared = probe(bytes);
+    if (declared.isEmpty() || !budget.admits(declared.get())) {
       return Optional.empty();
     }
-    try {
-      return Optional.ofNullable(ImageIO.read(new ByteArrayInputStream(bytes)));
+    try (ImageInputStream stream =
+        new MemoryCacheImageInputStream(new ByteArrayInputStream(bytes))) {
+      Iterator<ImageReader> readers = ImageIO.getImageReaders(stream);
+      if (!readers.hasNext()) {
+        return Optional.empty();
+      }
+      ImageReader reader = readers.next();
+      try {
+        reader.setInput(stream, true, true);
+        if (!budget.admits(new Dimensions(reader.getWidth(0), reader.getHeight(0)))) {
+          return Optional.empty();
+        }
+        return Optional.ofNullable(reader.read(0));
+      } finally {
+        reader.dispose();
+      }
     } catch (IOException | RuntimeException e) {
       log.debug("Could not decode an image within its pixel budget", e);
       return Optional.empty();
@@ -122,67 +138,5 @@ public final class ImageHeaderProbe {
     } finally {
       reader.dispose();
     }
-  }
-
-  private static boolean isWebp(byte[] b) {
-    return b.length >= 12
-        && b[0] == 'R'
-        && b[1] == 'I'
-        && b[2] == 'F'
-        && b[3] == 'F'
-        && b[8] == 'W'
-        && b[9] == 'E'
-        && b[10] == 'B'
-        && b[11] == 'P';
-  }
-
-  /** Dimensions from the first chunk of a WebP file: VP8 (lossy), VP8L (lossless) or VP8X. */
-  private static Optional<Dimensions> webpDimensions(byte[] b) {
-    if (b.length < 20) {
-      return Optional.empty();
-    }
-    String chunk = new String(b, 12, 4, java.nio.charset.StandardCharsets.US_ASCII);
-    int data = 20;
-    switch (chunk) {
-      case "VP8 " -> {
-        if (b.length < data + 10
-            || (b[data + 3] & 0xFF) != 0x9D
-            || (b[data + 4] & 0xFF) != 0x01
-            || (b[data + 5] & 0xFF) != 0x2A) {
-          return Optional.empty();
-        }
-        return Optional.of(new Dimensions(le16(b, data + 6) & 0x3FFF, le16(b, data + 8) & 0x3FFF));
-      }
-      case "VP8L" -> {
-        if (b.length < data + 5 || (b[data] & 0xFF) != 0x2F) {
-          return Optional.empty();
-        }
-        long bits =
-            (b[data + 1] & 0xFFL)
-                | (b[data + 2] & 0xFFL) << 8
-                | (b[data + 3] & 0xFFL) << 16
-                | (b[data + 4] & 0xFFL) << 24;
-        int width = (int) (bits & 0x3FFF) + 1;
-        int height = (int) ((bits >> 14) & 0x3FFF) + 1;
-        return Optional.of(new Dimensions(width, height));
-      }
-      case "VP8X" -> {
-        if (b.length < data + 10) {
-          return Optional.empty();
-        }
-        return Optional.of(new Dimensions(le24(b, data + 4) + 1, le24(b, data + 7) + 1));
-      }
-      default -> {
-        return Optional.empty();
-      }
-    }
-  }
-
-  private static int le16(byte[] b, int offset) {
-    return (b[offset] & 0xFF) | (b[offset + 1] & 0xFF) << 8;
-  }
-
-  private static int le24(byte[] b, int offset) {
-    return (b[offset] & 0xFF) | (b[offset + 1] & 0xFF) << 8 | (b[offset + 2] & 0xFF) << 16;
   }
 }
