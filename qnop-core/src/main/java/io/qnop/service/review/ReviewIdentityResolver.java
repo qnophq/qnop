@@ -24,6 +24,7 @@ import io.qnop.entity.Document;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
+import io.qnop.repository.ReactionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.ReviewPseudonymRepository;
 import io.qnop.repository.UserDisplayName;
@@ -86,6 +87,7 @@ public class ReviewIdentityResolver {
   private final DocumentRepository documents;
   private final AnnotationRepository annotations;
   private final CommentRepository comments;
+  private final ReactionRepository reactions;
   private final ReviewParticipantRepository participants;
   private final UserRepository users;
   private final ReviewPseudonymRepository pseudonyms;
@@ -96,6 +98,7 @@ public class ReviewIdentityResolver {
       DocumentRepository documents,
       AnnotationRepository annotations,
       CommentRepository comments,
+      ReactionRepository reactions,
       ReviewParticipantRepository participants,
       UserRepository users,
       ReviewPseudonymRepository pseudonyms,
@@ -104,6 +107,7 @@ public class ReviewIdentityResolver {
     this.documents = documents;
     this.annotations = annotations;
     this.comments = comments;
+    this.reactions = reactions;
     this.participants = participants;
     this.users = users;
     this.pseudonyms = pseudonyms;
@@ -130,6 +134,9 @@ public class ReviewIdentityResolver {
     userIds.addAll(annotations.findDistinctAuthorIdsByDocumentId(documentId));
     userIds.addAll(comments.findDistinctCommentAuthorIdsByDocumentId(documentId));
     userIds.addAll(participants.findDirectUserIdsByDocumentId(documentId));
+    // Reactors (issue #921): someone reviewing only through a team who only reacts is no author
+    // and no participant row, but is shown as a reactor and so needs a proper label too.
+    userIds.addAll(reactions.findDistinctReactorIdsByDocumentId(documentId));
     // The owner is structurally public (#413) but is no participant row and may
     // not have written anything yet — without this, owner-driven events (workflow
     // transitions, reviewer additions) resolve to a null name (issue #472).

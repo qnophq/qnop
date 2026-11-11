@@ -28,6 +28,7 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -47,6 +48,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
@@ -65,6 +67,7 @@ class AnnotationAnonymityIT extends SeededIntegrationTest {
   @Autowired private ReviewParticipantRepository participants;
   @Autowired private UserRepository users;
   @Autowired private ReviewPseudonymRepository pseudonyms;
+  @Autowired private JdbcTemplate jdbc;
 
   private static final String PSEUDONYM = "Participant [12]";
 
@@ -229,6 +232,30 @@ class AnnotationAnonymityIT extends SeededIntegrationTest {
             .getResponse()
             .getContentAsString();
     return JsonPath.read(json, "$.participants[1].displayName");
+  }
+
+  @Test
+  void aTeamOnlyReactorGetsAProperPseudonym() throws Exception {
+    UUID documentId = seedDocument(true);
+    // ADMIN2 reviews only through team Beta: no participant row, no authorship (issue #921).
+    participants.save(ReviewParticipant.forTeam(documentId, TEAM_BETA_ID));
+    jdbc.update(
+        "INSERT INTO team_membership (id, team_id, user_id, team_role, joined_at, version)"
+            + " VALUES (?, ?, ?, 'MEMBER', now(), 0)",
+        UUID.randomUUID(),
+        TEAM_BETA_ID,
+        ADMIN2_ID);
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+    mockMvc
+        .perform(
+            as(put("/api/v1/annotations/{id}/reactions/{emoji}", annotationId, "👍"), ADMIN2_ID))
+        .andExpect(status().is2xxSuccessful());
+
+    mockMvc
+        .perform(as(get("/api/v1/annotations/" + annotationId), MEMBER2_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.reactions[0].reactors[0]").value(matchesPattern("Participant \\d+")))
+        .andExpect(jsonPath("$.reactions[0].reactors[0]").value(not(realName(ADMIN2_ID))));
   }
 
   @Test
