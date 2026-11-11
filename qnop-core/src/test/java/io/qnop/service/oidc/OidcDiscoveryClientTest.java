@@ -68,8 +68,14 @@ class OidcDiscoveryClientTest {
                 .getResponseHeaders()
                 .add("Location", issuer + "/.well-known/openid-configuration");
             exchange.sendResponseHeaders(302, -1);
+          } else if (path.startsWith("/missing")) {
+            exchange.sendResponseHeaders(404, -1);
           } else {
-            byte[] body = document(path.startsWith("/other") ? "https://other.example" : issuer);
+            String advertised =
+                path.startsWith("/other")
+                    ? "https://other.example"
+                    : path.startsWith("/slash") ? origin() + "/slash/" : issuer;
+            byte[] body = document(advertised);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, body.length);
             exchange.getResponseBody().write(body);
@@ -146,5 +152,44 @@ class OidcDiscoveryClientTest {
     assertThatThrownBy(() -> client(true).fromIssuer(other))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("does not match");
+  }
+
+  private String origin() {
+    return "http://idp.example.test:" + idp.getAddress().getPort();
+  }
+
+  @Test
+  @DisplayName("an issuer with a trailing slash must match exactly and is fetched without '//'")
+  void trailingSlashIssuer() {
+    String slashed = origin() + "/slash/";
+
+    ClientRegistration registration =
+        client(true).fromIssuer(slashed).registrationId("r").clientId("c").build();
+
+    assertThat(registration.getProviderDetails().getIssuerUri()).isEqualTo(slashed);
+    assertThat(received).containsExactly("/slash/.well-known/openid-configuration");
+  }
+
+  @Test
+  @DisplayName("an issuer with a query or fragment is refused before any request")
+  void issuerWithQueryOrFragmentIsRefused() {
+    assertThatThrownBy(() -> client(true).fromIssuer(issuer + "?tenant=a"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("query or fragment");
+    assertThatThrownBy(() -> client(true).fromIssuer(issuer + "#frag"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("query or fragment");
+    assertThat(received).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a missing discovery document names the location that was tried")
+  void notFoundNamesTheLocation() {
+    String missing = origin() + "/missing";
+
+    assertThatThrownBy(() -> client(true).fromIssuer(missing))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("404")
+        .hasMessageContaining(missing + "/.well-known/openid-configuration");
   }
 }

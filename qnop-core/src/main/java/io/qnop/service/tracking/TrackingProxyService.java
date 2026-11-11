@@ -22,6 +22,7 @@ package io.qnop.service.tracking;
 
 import io.qnop.service.http.HttpClientProperties;
 import io.qnop.service.http.OutboundHttpClients;
+import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
@@ -39,7 +40,6 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.util.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -74,6 +74,7 @@ public class TrackingProxyService {
 
   private final TrackingConfigService config;
   private final CloseableHttpClient http;
+  private final RequestConfig requestDefaults;
 
   private volatile CachedScript cachedScript;
 
@@ -90,19 +91,23 @@ public class TrackingProxyService {
   /**
    * The outbound client is guarded (issue #904): it resolves the tracking host itself, refuses a
    * blocked address unless {@code qnop.tracking.allow-private-host} is set, connects to exactly the
-   * address it validated, and never follows a redirect.
+   * address it validated, never follows a redirect, reads at most {@link
+   * OutboundHttpClients#MAX_RESPONSE_BYTES} of a response, and waits for a pooled connection no
+   * longer than the request may take as a whole.
    */
-  @Autowired
   public TrackingProxyService(
       TrackingConfigService config,
       HttpClientProperties httpProperties,
       @Value("${qnop.tracking.allow-private-host:false}") boolean allowPrivateHost) {
-    this(config, OutboundHttpClients.create(httpProperties, allowPrivateHost));
+    this.config = config;
+    this.http = OutboundHttpClients.create(httpProperties, allowPrivateHost);
+    this.requestDefaults = OutboundHttpClients.defaultRequestConfig(httpProperties);
   }
 
-  TrackingProxyService(TrackingConfigService config, CloseableHttpClient http) {
-    this.config = config;
-    this.http = http;
+  /** Releases the pooled connections with the application context. */
+  @PreDestroy
+  void close() throws IOException {
+    http.close();
   }
 
   /** The vendor script, cached; empty when tracking is off or the backend would not answer. */
@@ -236,8 +241,17 @@ public class TrackingProxyService {
     }
   }
 
-  private static RequestConfig timeout(Duration timeout) {
-    return RequestConfig.custom().setResponseTimeout(Timeout.of(timeout)).build();
+  /**
+   * The client defaults with this call's bound. A per-request config replaces the client's, so it
+   * starts from a copy; the pool-lease wait is capped by the same bound, so a slow backend that has
+   * filled the pool cannot hold a request thread longer than one measurement may take.
+   */
+  private RequestConfig timeout(Duration timeout) {
+    Timeout bound = Timeout.of(timeout);
+    return RequestConfig.copy(requestDefaults)
+        .setResponseTimeout(bound)
+        .setConnectionRequestTimeout(bound)
+        .build();
   }
 
   /** Reports a broken backend on the transition into that state, never once per measurement. */

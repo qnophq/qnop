@@ -76,11 +76,22 @@ class OutboundAddressPolicyTest {
         "::127.0.0.1",
         "::10.0.0.1",
         "::169.254.169.254",
-        "64:ff9b::808:808",
         "64:ff9b::7f00:1",
+        "64:ff9b::a9fe:a9fe",
+        "64:ff9b::a00:1",
         "64:ff9b:1::1",
         "2002:7f00:1::1",
-        "2002:a9fe:a9fe::1"
+        "2002:a9fe:a9fe::1",
+        // special-purpose IPv6 / IPv4 blocks
+        "2001::1",
+        "2001:0:4136:e378:8000:63bf:3fff:fdd2",
+        "100::1",
+        "100::ffff:ffff:ffff:ffff",
+        "2001:db8::1",
+        "2001:db8:ffff::1",
+        "2001:2::1",
+        "2001:2:0:ffff::1",
+        "192.88.99.1"
       })
   void blocks(String literal) throws Exception {
     assertThat(OutboundAddressPolicy.isBlocked(InetAddress.getByName(literal))).isTrue();
@@ -104,7 +115,14 @@ class OutboundAddressPolicyTest {
         "2001:4860:4860::8888",
         "2606:4700:4700::1111",
         "2002:808:808::1",
-        "::8.8.8.8"
+        "::8.8.8.8",
+        // NAT64 (DNS64 on IPv6-only networks) to a public IPv4 host is a public destination
+        "64:ff9b::808:808",
+        "64:ff9b::5db8:d822",
+        "2001:3::1",
+        "2001:db9::1",
+        "100:0:0:1::1",
+        "192.88.98.1"
       })
   void allows(String literal) throws Exception {
     assertThat(OutboundAddressPolicy.isBlocked(InetAddress.getByName(literal))).isFalse();

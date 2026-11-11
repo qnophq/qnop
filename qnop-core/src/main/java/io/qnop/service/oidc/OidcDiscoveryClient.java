@@ -20,8 +20,6 @@
  */
 package io.qnop.service.oidc;
 
-import io.qnop.service.http.HttpClientProperties;
-import io.qnop.service.http.OutboundHttpClients;
 import java.net.URI;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,8 +55,8 @@ public class OidcDiscoveryClient {
   private final RestClient rest;
 
   @Autowired
-  public OidcDiscoveryClient(OidcSsrfPolicy ssrfPolicy, HttpClientProperties httpProperties) {
-    this(OutboundHttpClients.requestFactory(httpProperties, ssrfPolicy.allowsPrivate()));
+  public OidcDiscoveryClient(OidcHttpTransport transport) {
+    this(transport.requestFactory());
   }
 
   OidcDiscoveryClient(ClientHttpRequestFactory requestFactory) {
@@ -84,7 +82,13 @@ public class OidcDiscoveryClient {
                   status -> !status.is2xxSuccessful(),
                   (request, response) -> {
                     throw new IllegalArgumentException(
-                        "the discovery endpoint answered " + response.getStatusCode().value());
+                        "The discovery document at "
+                            + location
+                            + " answered HTTP "
+                            + response.getStatusCode().value()
+                            + " (qnop reads <issuer>"
+                            + OIDC_METADATA_PATH
+                            + " and follows no redirects)");
                   })
               .body(JSON_OBJECT);
     } catch (RestClientException e) {
@@ -110,13 +114,22 @@ public class OidcDiscoveryClient {
     return ClientRegistrations.fromOidcConfiguration(configuration);
   }
 
-  /** {@code <issuer>/.well-known/openid-configuration} (OpenID Connect Discovery 1.0, §4). */
+  /**
+   * {@code <issuer>/.well-known/openid-configuration} (OpenID Connect Discovery 1.0, §4). An issuer
+   * is a URL without query or fragment (§2); one carrying either is refused rather than turned into
+   * a wrong location.
+   */
   static URI metadataLocation(String issuer) {
-    String base = issuer.endsWith("/") ? issuer.substring(0, issuer.length() - 1) : issuer;
+    URI parsed;
     try {
-      return URI.create(base + OIDC_METADATA_PATH);
+      parsed = URI.create(issuer);
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException("issuerUri is not a valid URI");
     }
+    if (parsed.getRawQuery() != null || parsed.getRawFragment() != null) {
+      throw new IllegalArgumentException("issuerUri must not contain a query or fragment");
+    }
+    String base = issuer.endsWith("/") ? issuer.substring(0, issuer.length() - 1) : issuer;
+    return URI.create(base + OIDC_METADATA_PATH);
   }
 }

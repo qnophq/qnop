@@ -20,8 +20,6 @@
  */
 package io.qnop.service.oidc;
 
-import io.qnop.service.http.HttpClientProperties;
-import io.qnop.service.http.OutboundHttpClients;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.context.annotation.Bean;
@@ -71,12 +69,12 @@ public class OidcOutboundHttpConfiguration {
 
   @Bean
   OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> guardedTokenResponseClient(
-      OidcSsrfPolicy ssrfPolicy, HttpClientProperties httpProperties) {
+      OidcHttpTransport transport) {
     RestClientAuthorizationCodeTokenResponseClient client =
         new RestClientAuthorizationCodeTokenResponseClient();
     client.setRestClient(
         RestClient.builder()
-            .requestFactory(requestFactory(ssrfPolicy, httpProperties))
+            .requestFactory(transport.requestFactory())
             .configureMessageConverters(
                 converters ->
                     converters
@@ -89,28 +87,20 @@ public class OidcOutboundHttpConfiguration {
 
   @Bean
   OAuth2UserService<OAuth2UserRequest, OAuth2User> guardedOAuth2UserService(
-      OidcSsrfPolicy ssrfPolicy, HttpClientProperties httpProperties) {
-    return userService(guardedRestTemplate(ssrfPolicy, httpProperties));
+      OidcHttpTransport transport) {
+    return userService(guardedRestTemplate(transport.requestFactory()));
   }
 
   @Bean
-  OAuth2UserService<OidcUserRequest, OidcUser> guardedOidcUserService(
-      OidcSsrfPolicy ssrfPolicy, HttpClientProperties httpProperties) {
+  OAuth2UserService<OidcUserRequest, OidcUser> guardedOidcUserService(OidcHttpTransport transport) {
     OidcUserService service = new OidcUserService();
-    service.setOauth2UserService(userService(guardedRestTemplate(ssrfPolicy, httpProperties)));
+    service.setOauth2UserService(userService(guardedRestTemplate(transport.requestFactory())));
     return service;
   }
 
   @Bean
-  JwtDecoderFactory<ClientRegistration> guardedIdTokenDecoderFactory(
-      OidcSsrfPolicy ssrfPolicy, HttpClientProperties httpProperties) {
-    return new GuardedIdTokenDecoderFactory(guardedRestTemplate(ssrfPolicy, httpProperties));
-  }
-
-  /** The guarded transport; honours the deployment's private-IdP opt-in. */
-  private static ClientHttpRequestFactory requestFactory(
-      OidcSsrfPolicy ssrfPolicy, HttpClientProperties httpProperties) {
-    return OutboundHttpClients.requestFactory(httpProperties, ssrfPolicy.allowsPrivate());
+  JwtDecoderFactory<ClientRegistration> guardedIdTokenDecoderFactory(OidcHttpTransport transport) {
+    return new GuardedIdTokenDecoderFactory(guardedRestTemplate(transport.requestFactory()));
   }
 
   private static DefaultOAuth2UserService userService(RestTemplate rest) {
@@ -119,9 +109,11 @@ public class OidcOutboundHttpConfiguration {
     return service;
   }
 
-  private static RestTemplate guardedRestTemplate(
-      OidcSsrfPolicy ssrfPolicy, HttpClientProperties httpProperties) {
-    RestTemplate rest = new RestTemplate(requestFactory(ssrfPolicy, httpProperties));
+  /**
+   * A {@code RestTemplate} configured as Spring Security configures its own, on {@code factory}.
+   */
+  static RestTemplate guardedRestTemplate(ClientHttpRequestFactory factory) {
+    RestTemplate rest = new RestTemplate(factory);
     rest.setErrorHandler(new OAuth2ErrorResponseErrorHandler());
     return rest;
   }

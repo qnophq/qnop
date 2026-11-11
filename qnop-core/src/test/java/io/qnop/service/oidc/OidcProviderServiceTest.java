@@ -60,7 +60,9 @@ class OidcProviderServiceTest {
         new OidcProviderService(
             providers,
             policy,
-            new OidcDiscoveryClient(policy, new HttpClientProperties(null, null, null, null, null)),
+            new OidcDiscoveryClient(
+                new OidcHttpTransport(
+                    policy, new HttpClientProperties(null, null, null, null, null))),
             events,
             FeatureToggleProperties.all());
   }

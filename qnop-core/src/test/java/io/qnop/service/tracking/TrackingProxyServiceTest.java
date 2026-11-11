@@ -29,9 +29,12 @@ import io.qnop.service.http.HttpClientProperties;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -184,5 +187,47 @@ class TrackingProxyServiceTest {
         .isEmpty();
     assertThat(guarded.script()).isEmpty();
     assertThat(requests.poll(1, TimeUnit.SECONDS)).as("nothing was sent").isNull();
+  }
+
+  @Test
+  @DisplayName("a hung backend costs a measurement its timeout, not a request thread")
+  void hungBackendFailsWithinTheForwardTimeout() throws Exception {
+    CountDownLatch release = new CountDownLatch(1);
+    HttpServer hung = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    hung.setExecutor(Executors.newCachedThreadPool());
+    hung.createContext(
+        "/",
+        exchange -> {
+          try {
+            release.await(30, TimeUnit.SECONDS);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+          exchange.close();
+        });
+    hung.start();
+    try {
+      String host = "http://127.0.0.1:" + hung.getAddress().getPort();
+      when(config.current())
+          .thenReturn(
+              Optional.of(
+                  new TrackingRuntimeConfig(
+                      TrackingProvider.MATOMO,
+                      "1",
+                      host + "/matomo.js",
+                      host,
+                      false,
+                      false,
+                      false,
+                      ClientIpForwarding.ANONYMIZED)));
+
+      long started = System.nanoTime();
+      assertThat(proxy.forward("GET", "/matomo.php", "idsite=1", new byte[0], null, null, null))
+          .isEmpty();
+      assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(6));
+    } finally {
+      release.countDown();
+      hung.stop(0);
+    }
   }
 }
