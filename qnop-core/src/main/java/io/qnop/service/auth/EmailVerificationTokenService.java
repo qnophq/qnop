@@ -33,6 +33,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Optional;
+import java.util.UUID;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -50,6 +52,9 @@ public class EmailVerificationTokenService {
 
   static final int TOKEN_BYTES = 32;
   static final Duration TOKEN_TTL = Duration.ofHours(24);
+
+  /** Wrong registration passwords a verification link tolerates before it is spent (#900). */
+  public static final int MAX_FAILED_ATTEMPTS = 5;
 
   private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -81,6 +86,29 @@ public class EmailVerificationTokenService {
   @Transactional(readOnly = true)
   public User peek(String rawToken) {
     return requireUsable(rawToken).getUser();
+  }
+
+  /**
+   * Records a wrong password presented with a usable token (issue #900) and spends the token once
+   * {@value #MAX_FAILED_ATTEMPTS} have been counted, so the registration password cannot be guessed
+   * with the link: the registrant then simply registers again. Returns whether the token is now
+   * spent.
+   */
+  @Transactional
+  public boolean recordFailedAttempt(String rawToken) {
+    EmailVerificationToken token = requireUsable(rawToken);
+    UUID id = token.getId();
+    tokens.incrementFailedAttempts(id);
+    return tokens.consumeIfAttemptsExhausted(id, MAX_FAILED_ATTEMPTS, Instant.now()) == 1;
+  }
+
+  /**
+   * When the user's newest verification token was issued, i.e. their last (re)registration (issue
+   * #900); empty when none is left (all swept).
+   */
+  @Transactional(readOnly = true)
+  public Optional<Instant> latestIssuedAt(UUID userId) {
+    return tokens.findLatestIssuedAt(userId);
   }
 
   /** Validates and consumes a token, returning its owner. Throws if unknown/expired/used. */

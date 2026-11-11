@@ -69,7 +69,8 @@ import org.springframework.test.web.servlet.MvcResult;
       "qnop.auth.rate-limit.refresh.max-attempts=1000000",
       "qnop.auth.rate-limit.change-password.max-attempts=1000000",
       "qnop.auth.rate-limit.register.max-attempts=1000000",
-      "qnop.auth.rate-limit.forgot-password.max-attempts=1000000"
+      "qnop.auth.rate-limit.forgot-password.max-attempts=1000000",
+      "qnop.auth.rate-limit.verify-email.max-attempts=1000000"
     })
 public abstract class SeededIntegrationTest extends AbstractIntegrationTest {
 

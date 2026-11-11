@@ -46,3 +46,18 @@ databaseChangeLog:
                               WHERE t.user_id = u.id AND t.consumed_at IS NULL);
               ALTER TABLE qnop_user ADD CONSTRAINT ck_qnop_user_pending_not_enabled
                 CHECK (NOT (email_verification_pending AND enabled));
+  - changeSet:
+      id: 0039-email-verification-token-attempts
+      author: qnop
+      comment: >-
+        email_verification_token.failed_attempts: wrong passwords presented with
+        a token; the token is spent once the cap is reached (issue #900).
+      changes:
+        - addColumn:
+            tableName: email_verification_token
+            columns:
+              - column:
+                  name: failed_attempts
+                  type: INTEGER
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }

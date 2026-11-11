@@ -95,9 +95,19 @@ public class UserService {
     if (!user.isEmailVerificationPending()) {
       throw new IllegalStateException("account " + id + " is not pending verification");
     }
+    InvalidTextException.requireNoControlCharacters("displayName", displayName);
+    String name = displayNameOrUsername(displayName, username);
     user.setUsername(username);
-    user.setDisplayName(displayNameOrUsername(displayName, username));
+    user.setDisplayName(name);
     user.setPasswordHash(passwordHash);
+    // The earlier registrant's name must not live on in the public profile URL (#473): the slug
+    // follows the new display name unless it already is that name's natural slug.
+    String naturalSlug = UserSlugs.candidate(UserSlugs.derive(name), 1);
+    if (!naturalSlug.equalsIgnoreCase(user.getSlug())) {
+      String slug = slugs.allocate(name);
+      users.updateSlug(id, slug);
+      user.setSlug(slug);
+    }
     return user;
   }
 
@@ -201,6 +211,18 @@ public class UserService {
   @Transactional(readOnly = true)
   public boolean internalUsernameExists(String username) {
     return users.findByUsernameAndSource(username, UserSource.INTERNAL).isPresent();
+  }
+
+  /**
+   * Whether the internal user still has to replace its initial password — {@code false} once it
+   * did, and for a user that no longer exists (bootstrap clean-up, issue #905).
+   */
+  @Transactional(readOnly = true)
+  public boolean internalPasswordChangeStillRequired(String username) {
+    return users
+        .findByUsernameAndSource(username, UserSource.INTERNAL)
+        .map(User::isPasswordChangeRequired)
+        .orElse(false);
   }
 
   /** Creates an enabled internal {@link UserRole#ADMIN} (used by the first-start bootstrap). */

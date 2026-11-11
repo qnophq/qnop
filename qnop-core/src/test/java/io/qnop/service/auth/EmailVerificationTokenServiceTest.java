@@ -23,6 +23,7 @@ package io.qnop.service.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -163,5 +164,28 @@ class EmailVerificationTokenServiceTest {
     when(tokens.findByTokenHash(any())).thenReturn(Optional.of(expired));
     assertThatThrownBy(() -> service.peek("raw-token"))
         .isInstanceOf(InvalidVerificationTokenException.class);
+  }
+
+  @Test
+  @DisplayName("a wrong password is counted; the token is spent once the cap is reached (#900)")
+  void recordFailedAttemptCountsAndSpendsAtTheCap() {
+    EmailVerificationToken token =
+        new EmailVerificationToken(user, "h", Instant.now().plusSeconds(60));
+    when(tokens.findByTokenHash(any())).thenReturn(Optional.of(token));
+    when(tokens.consumeIfAttemptsExhausted(any(), eq(5), any())).thenReturn(0, 1);
+
+    assertThat(service.recordFailedAttempt("raw-token")).isFalse();
+    assertThat(service.recordFailedAttempt("raw-token")).isTrue();
+
+    verify(tokens, org.mockito.Mockito.times(2)).incrementFailedAttempts(any());
+  }
+
+  @Test
+  @DisplayName("latestIssuedAt reports the newest token of the user")
+  void latestIssuedAtDelegates() {
+    Instant issued = Instant.now();
+    when(tokens.findLatestIssuedAt(any())).thenReturn(Optional.of(issued));
+
+    assertThat(service.latestIssuedAt(java.util.UUID.randomUUID())).contains(issued);
   }
 }

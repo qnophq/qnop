@@ -289,10 +289,64 @@ class RegistrationServiceTest {
     when(passwordEncoder.matches("guess", "OLD-HASH")).thenReturn(false);
 
     assertThatThrownBy(() -> service.verify("tok", "guess"))
-        .isInstanceOf(VerificationPasswordMismatchException.class);
+        .isInstanceOf(VerificationPasswordMismatchException.class)
+        .satisfies(
+            e -> assertThat(((VerificationPasswordMismatchException) e).linkSpent()).isFalse());
 
+    verify(verificationTokens).recordFailedAttempt("tok");
     verify(verificationTokens, never()).consume(any());
     verify(userService, never()).activatePendingVerification(any());
+  }
+
+  @Test
+  @DisplayName("the wrong password that reaches the attempt cap reports the link as spent")
+  void verifyReportsSpentLinkAtTheCap() {
+    User user = pending("jane", "jane@example.com");
+    when(verificationTokens.peek("tok")).thenReturn(user);
+    when(passwordEncoder.matches("guess", "OLD-HASH")).thenReturn(false);
+    when(verificationTokens.recordFailedAttempt("tok")).thenReturn(true);
+
+    assertThatThrownBy(() -> service.verify("tok", "guess"))
+        .isInstanceOf(VerificationPasswordMismatchException.class)
+        .satisfies(
+            e -> assertThat(((VerificationPasswordMismatchException) e).linkSpent()).isTrue());
+    verify(userService, never()).activatePendingVerification(any());
+  }
+
+  @Test
+  @DisplayName(
+      "within the cool-down a re-registration of a pending address is a silent no-op:"
+          + " nothing replaced, no mail")
+  void pendingAccountIsProtectedDuringCoolDown() {
+    User existing = pending("first", "jane@example.com");
+    when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(existing));
+    when(verificationTokens.latestIssuedAt(existing.getId()))
+        .thenReturn(Optional.of(Instant.now().minusSeconds(60)));
+
+    service.register("second", "jane@example.com", "password1", "Someone");
+
+    verify(passwordEncoder).encode("password1"); // same cost as every other branch
+    verify(userService, never()).replacePendingRegistration(any(), any(), any(), any());
+    verify(verificationTokens, never()).issue(any());
+    verify(mailService, never()).sendMailFromTemplateAfterCommit(any(), any(), anyMap(), any());
+  }
+
+  @Test
+  @DisplayName("after the cool-down a re-registration of a pending address takes it over")
+  void pendingAccountIsTakenOverAfterCoolDown() {
+    User existing = pending("first", "jane@example.com");
+    when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(existing));
+    when(verificationTokens.latestIssuedAt(existing.getId()))
+        .thenReturn(
+            Optional.of(
+                Instant.now().minus(RegistrationService.TAKEOVER_COOL_DOWN).minusSeconds(1)));
+    when(userService.replacePendingRegistration(existing.getId(), "second", "HASH", "Someone"))
+        .thenReturn(existing);
+    tokenFor(existing);
+
+    service.register("second", "jane@example.com", "password1", "Someone");
+
+    verify(userService).replacePendingRegistration(existing.getId(), "second", "HASH", "Someone");
   }
 
   @Test

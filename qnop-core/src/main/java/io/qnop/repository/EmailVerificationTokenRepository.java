@@ -55,6 +55,34 @@ public interface EmailVerificationTokenRepository
       "UPDATE EmailVerificationToken t SET t.consumedAt = :at WHERE t.id = :id AND t.consumedAt IS NULL")
   int markConsumed(@Param("id") UUID id, @Param("at") Instant at);
 
+  /**
+   * Counts one wrong password presented with a still-usable token (issue #900). Atomic, so
+   * concurrent attempts are all counted.
+   */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      "UPDATE EmailVerificationToken t SET t.failedAttempts = t.failedAttempts + 1"
+          + " WHERE t.id = :id AND t.consumedAt IS NULL")
+  int incrementFailedAttempts(@Param("id") UUID id);
+
+  /**
+   * Spends a token whose wrong-password count reached {@code max} (issue #900). Returns 1 when this
+   * call spent it.
+   */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      "UPDATE EmailVerificationToken t SET t.consumedAt = :at"
+          + " WHERE t.id = :id AND t.consumedAt IS NULL AND t.failedAttempts >= :max")
+  int consumeIfAttemptsExhausted(
+      @Param("id") UUID id, @Param("max") int max, @Param("at") Instant at);
+
+  /**
+   * When the newest verification token of a user was issued — i.e. the last (re)registration (issue
+   * #900); empty when the user has none left.
+   */
+  @Query("SELECT MAX(t.createdAt) FROM EmailVerificationToken t WHERE t.user.id = :userId")
+  Optional<Instant> findLatestIssuedAt(@Param("userId") UUID userId);
+
   /** Scheduled-sweep target: rows whose {@code expires_at} has passed. */
   long deleteByExpiresAtBefore(Instant cutoff);
 }

@@ -188,7 +188,11 @@ public class AdminUserService {
       user.setDisplayName(displayName);
     }
     user.setRole(newRole);
-    user.setEnabled(newEnabled);
+    if (enabled != null) {
+      // Only an explicit decision about the enabled state settles a pending e-mail verification
+      // (issue #900); a display-name or role edit leaves the registrant's link working.
+      user.setEnabled(newEnabled);
+    }
 
     // Disabling or a role change must take effect immediately (mirrors the admin password reset):
     // the role is a claim of the access token, so a demoted user would otherwise keep the old

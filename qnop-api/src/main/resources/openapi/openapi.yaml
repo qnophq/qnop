@@ -1928,8 +1928,10 @@ paths:
         at registration: a password only becomes a credential once the owner of the
         mailbox confirms it. Only an account still pending verification can be
         activated — never one an administrator has disabled. A wrong password leaves
-        the token usable (`VERIFICATION_PASSWORD_MISMATCH`); an unknown, expired or
-        used token, or an account no longer pending, is `INVALID_VERIFICATION_TOKEN`.
+        the token usable (`VERIFICATION_PASSWORD_MISMATCH`) up to five times; the fifth
+        spends it. An unknown, expired, used or spent token, or an account no longer
+        pending, is `INVALID_VERIFICATION_TOKEN` — the registrant registers again.
+        Rate-limited per client IP.
       operationId: verifyEmail
       security: []
       requestBody:
@@ -1951,6 +1953,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /auth/forgot-password:
     post:
       tags:

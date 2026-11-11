@@ -25,10 +25,20 @@ import userEvent from '@testing-library/user-event';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import { verifyEmail } from '../../api/auth';
+import { useConfig } from '../../api/hooks/useConfig';
 import { VerifyEmailPage } from './VerifyEmailPage';
 
 vi.mock('../../api/auth', () => ({ verifyEmail: vi.fn() }));
+vi.mock('../../api/hooks/useConfig', () => ({ useConfig: vi.fn() }));
 const verifyEmailFn = vi.mocked(verifyEmail);
+const useConfigMock = vi.mocked(useConfig);
+
+function mockConfig(selfRegistrationEnabled: boolean) {
+  useConfigMock.mockReturnValue({
+    data: { auth: { selfRegistrationEnabled } },
+    isLoading: false,
+  } as unknown as ReturnType<typeof useConfig>);
+}
 
 function apiError(code: string): AxiosError {
   const headers = new AxiosHeaders();
@@ -49,6 +59,7 @@ async function submitPassword(password: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockConfig(true);
 });
 
 describe('VerifyEmailPage', () => {
@@ -74,7 +85,7 @@ describe('VerifyEmailPage', () => {
 
     await submitPassword('wrong');
 
-    expect(await screen.findByText(/doesn't match the password chosen/i)).toBeInTheDocument();
+    expect(await screen.findByText(/doesn't match the one chosen at sign-up/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /confirm and activate/i })).toBeInTheDocument();
   });
 
@@ -86,6 +97,20 @@ describe('VerifyEmailPage', () => {
 
     expect(await screen.findByText(/link is invalid or expired/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /confirm and activate/i })).toBeNull();
+    // A dead link (expired, used, or spent by wrong passwords) points to registering again.
+    expect(screen.getByText(/stop working after five wrong passwords/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /register again/i })).toHaveAttribute(
+      'href',
+      '/register',
+    );
+  });
+
+  it('offers no register link where self-registration is off', () => {
+    mockConfig(false);
+    renderWithProviders(<VerifyEmailPage />, { initialEntries: ['/verify-email'] });
+
+    expect(screen.getByText(/link is invalid or expired/i)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /register again/i })).toBeNull();
   });
 
   it('shows an error and never calls the API when no token is present', () => {

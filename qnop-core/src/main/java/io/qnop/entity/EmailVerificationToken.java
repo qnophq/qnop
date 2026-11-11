@@ -75,6 +75,10 @@ public class EmailVerificationToken {
   @Column(name = "consumed_at")
   private Instant consumedAt;
 
+  /** Wrong passwords presented with this token (issue #900); capped, then the token is spent. */
+  @Column(name = "failed_attempts", nullable = false)
+  private int failedAttempts;
+
   protected EmailVerificationToken() {
     // for JPA
   }
@@ -107,6 +111,10 @@ public class EmailVerificationToken {
 
   public Instant getConsumedAt() {
     return consumedAt;
+  }
+
+  public int getFailedAttempts() {
+    return failedAttempts;
   }
 
   public void setConsumedAt(Instant consumedAt) {

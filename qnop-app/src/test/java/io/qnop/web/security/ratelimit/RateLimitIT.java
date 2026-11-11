@@ -73,4 +73,28 @@ class RateLimitIT extends AbstractIntegrationTest {
     assertThat(throttled.headers().firstValue("Retry-After")).isPresent();
     assertThat(throttled.body()).contains("\"code\":\"RATE_LIMITED\"");
   }
+
+  @Test
+  void throttlesVerifyEmailPerClientIp() throws Exception {
+    // Default 10 per 15 minutes (issue #900); an unknown token is a 400 until the bucket is empty.
+    for (int attempt = 1; attempt <= 10; attempt++) {
+      assertThat(postVerify().statusCode())
+          .as("attempt %d within the limit must not be rate-limited", attempt)
+          .isEqualTo(400);
+    }
+
+    HttpResponse<String> throttled = postVerify();
+
+    assertThat(throttled.statusCode()).isEqualTo(429);
+    assertThat(throttled.headers().firstValue("Retry-After")).isPresent();
+  }
+
+  private HttpResponse<String> postVerify() throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/auth/verify-email"))
+            .header("Content-Type", "application/json")
+            .POST(BodyPublishers.ofString("{\"token\":\"unknown\",\"password\":\"whatever-1\"}"))
+            .build();
+    return HttpClient.newHttpClient().send(request, BodyHandlers.ofString());
+  }
 }

@@ -26,6 +26,7 @@ import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import { Link as RouterLink, useSearchParams } from 'react-router';
+import { useConfig } from '../../api/hooks/useConfig';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { PasswordField } from '../../components/auth/PasswordField';
 import { verifyEmail } from '../../api/auth';
@@ -42,6 +43,7 @@ type Status = 'form' | 'success' | 'invalid';
  */
 export function VerifyEmailPage() {
   const { t } = useTranslation('auth');
+  const canRegister = !!useConfig().data?.auth?.selfRegistrationEnabled;
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   const [status, setStatus] = useState<Status>(token ? 'form' : 'invalid');
@@ -109,10 +111,22 @@ export function VerifyEmailPage() {
         <>
           <Alert severity="error" sx={{ mb: 2 }}>
             {t('verifyEmail.error')}
+            {canRegister && (
+              <Box component="span" sx={{ display: 'block', mt: 0.5 }}>
+                {t('verifyEmail.deadLinkHint')}
+              </Box>
+            )}
           </Alert>
-          <Link component={RouterLink} to="/login" underline="hover">
-            {t('shared.toSignIn')}
-          </Link>
+          <Stack direction="row" spacing={2}>
+            {canRegister && (
+              <Link component={RouterLink} to="/register" underline="hover">
+                {t('verifyEmail.registerAgain')}
+              </Link>
+            )}
+            <Link component={RouterLink} to="/login" underline="hover">
+              {t('shared.toSignIn')}
+            </Link>
+          </Stack>
         </>
       )}
     </AuthLayout>

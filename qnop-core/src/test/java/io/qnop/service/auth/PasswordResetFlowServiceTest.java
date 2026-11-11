@@ -153,6 +153,22 @@ class PasswordResetFlowServiceTest {
   }
 
   @Test
+  @DisplayName(
+      "requestReset stays silent for an account pending verification — a reset link must not"
+          + " become a way around confirming the address (#900)")
+  void requestResetPendingUser() {
+    User user = User.internal("Jane", "jane@example.com", "jane", "hash");
+    user.markPendingEmailVerification();
+    when(settings.getBoolean(ApplicationSettingKey.AUTH_PASSWORD_RESET_ENABLED)).thenReturn(true);
+    when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(user));
+
+    service.requestReset("jane@example.com");
+
+    verify(resetTokens, never()).issue(any());
+    verify(mailService, never()).sendMailFromTemplateAfterCommit(any(), any(), anyMap(), any());
+  }
+
+  @Test
   @DisplayName("reset consumes the token, applies the new password and ends every session (#897)")
   void resetApplies() {
     User user = User.internal("Jane", "jane@example.com", "jane", "hash");

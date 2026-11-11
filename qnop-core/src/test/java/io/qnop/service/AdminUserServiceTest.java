@@ -200,6 +200,24 @@ class AdminUserServiceTest {
   }
 
   @Test
+  @DisplayName(
+      "an edit without an enabled decision leaves a pending verification pending (#900);"
+          + " an explicit enabled=false settles it")
+  void updateOnlySettlesPendingOnAnExplicitDecision() {
+    UUID id = UUID.randomUUID();
+    User pending = User.internal("Pending", "p@example.com", "p", "h");
+    pending.markPendingEmailVerification();
+    when(users.findById(id)).thenReturn(Optional.of(pending));
+
+    service.update(id, "Renamed", "AUDITOR", null, UUID.randomUUID());
+    assertThat(pending.isEmailVerificationPending()).isTrue();
+
+    service.update(id, null, null, false, UUID.randomUUID());
+    assertThat(pending.isEmailVerificationPending()).isFalse();
+    assertThat(pending.isEnabled()).isFalse();
+  }
+
+  @Test
   @DisplayName("disabling a user revokes their active sessions")
   void updateDisablingRevokesSessions() {
     UUID id = UUID.randomUUID();

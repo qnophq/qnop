@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
+import io.qnop.entity.UserSource;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.UserService.UserProfileView;
@@ -138,16 +139,48 @@ class UserServiceTest {
   @DisplayName("replacePendingRegistration swaps username, display name and password hash")
   void replacePendingRegistrationReplacesCredentials() {
     UUID id = UUID.randomUUID();
-    User pending = User.internal("Old", "jane@example.com", "old", "old-hash");
+    User pending = User.internal("Squatter Name", "jane@example.com", "old", "old-hash");
+    pending.setSlug("squatter-name");
     pending.markPendingEmailVerification();
     when(users.findById(id)).thenReturn(Optional.of(pending));
 
-    User replaced = service.replacePendingRegistration(id, "jane", "new-hash", null);
+    User replaced = service.replacePendingRegistration(id, "jane", "new-hash", "Jane Doe");
 
     assertThat(replaced.getUsername()).isEqualTo("jane");
-    assertThat(replaced.getDisplayName()).isEqualTo("jane");
+    assertThat(replaced.getDisplayName()).isEqualTo("Jane Doe");
     assertThat(replaced.getPasswordHash()).isEqualTo("new-hash");
     assertThat(replaced.isEmailVerificationPending()).isTrue();
+    // The earlier registrant's name does not survive in the profile URL (issue #900, L4).
+    assertThat(replaced.getSlug()).isEqualTo("jane-doe");
+    verify(users).updateSlug(id, "jane-doe");
+  }
+
+  @Test
+  @DisplayName("replacePendingRegistration keeps a slug that already fits the new name")
+  void replacePendingRegistrationKeepsAFittingSlug() {
+    UUID id = UUID.randomUUID();
+    User pending = User.internal("Jane Doe", "jane@example.com", "jane", "old-hash");
+    pending.setSlug("jane-doe");
+    pending.markPendingEmailVerification();
+    when(users.findById(id)).thenReturn(Optional.of(pending));
+
+    service.replacePendingRegistration(id, "jane", "new-hash", "Jane Doe");
+
+    verify(users, never()).updateSlug(any(), any());
+  }
+
+  @Test
+  @DisplayName("internalPasswordChangeStillRequired is false once changed or when the user is gone")
+  void passwordChangeStillRequired() {
+    User admin = User.internal("Administrator", "admin@qnop.local", "admin", "h");
+    admin.setPasswordChangeRequired(true);
+    when(users.findByUsernameAndSource("admin", UserSource.INTERNAL))
+        .thenReturn(Optional.of(admin));
+    assertThat(service.internalPasswordChangeStillRequired("admin")).isTrue();
+
+    admin.setPasswordChangeRequired(false);
+    assertThat(service.internalPasswordChangeStillRequired("admin")).isFalse();
+    assertThat(service.internalPasswordChangeStillRequired("ghost")).isFalse();
   }
 
   @Test

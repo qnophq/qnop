@@ -145,6 +145,15 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * account an administrator has decided about in the meantime — a verification link can never
    * re-enable an administrator-disabled account, not even in a race with that decision.
    */
+  /**
+   * Re-points the slug of a still-pending registration that was superseded (issue #900). Native
+   * because the mapped column is not updatable; flushes first so pending entity changes are written
+   * before, and are not lost to, this statement.
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(value = "UPDATE qnop_user SET slug = :slug WHERE id = :id", nativeQuery = true)
+  int updateSlug(@Param("id") UUID id, @Param("slug") String slug);
+
   @Modifying(clearAutomatically = true)
   @Query(
       "UPDATE User u SET u.enabled = true, u.emailVerificationPending = false,"

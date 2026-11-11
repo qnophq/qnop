@@ -120,7 +120,8 @@ class AuthPublicFlowIT extends AbstractIntegrationTest {
         .perform(
             post("/api/v1/auth/verify-email")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"token\":\"not-a-real-token\",\"password\":\"" + PASSWORD + "\"}"))
+                .content("{\"token\":\"not-a-real-token\",\"password\":\"" + PASSWORD + "\"}")
+                .with(freshIp()))
         .andExpect(status().isBadRequest());
   }
 

@@ -21,6 +21,7 @@
 package io.qnop.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
@@ -71,6 +72,7 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
 
   @Autowired private ApplicationSettingsService settings;
   @Autowired private UserRepository users;
+  @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
   @BeforeEach
   void enableSelfRegistration() {
@@ -138,6 +140,13 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
     String firstToken = lastVerificationToken("contested@qnop.test");
     clearInvocations(mail);
 
+    // Within the cool-down a second registration changes nothing and mails nobody.
+    register("second", "contested@qnop.test", PASSWORD).andExpect(status().isOk());
+    verify(mail, never()).sendMailFromTemplateAfterCommit(any(), any(), anyMap(), any());
+    assertThat(internal("first").isEmailVerificationPending()).isTrue();
+
+    // Once the first link has aged past the cool-down, the new registration replaces it.
+    ageVerificationTokens(java.time.Duration.ofMinutes(16));
     register("second", "contested@qnop.test", PASSWORD).andExpect(status().isOk());
     String secondToken = lastVerificationToken("contested@qnop.test");
 
@@ -171,6 +180,104 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
             eq(MailTemplateKey.REGISTRATION_VERIFICATION), any(), anyMap(), any());
     assertThat(users.findByUsernameAndSource("someone-new", UserSource.INTERNAL)).isEmpty();
     assertThat(users.findById(MEMBER_ID).orElseThrow().getPasswordHash()).isEqualTo(hashBefore);
+  }
+
+  @Test
+  @DisplayName("five wrong passwords spend the link; the right one does not help afterwards")
+  void wrongPasswordsSpendTheLink() throws Exception {
+    register("guessed", "guessed@qnop.test", PASSWORD).andExpect(status().isOk());
+    String token = lastVerificationToken("guessed@qnop.test");
+
+    for (int attempt = 1; attempt < 5; attempt++) {
+      verifyEmail(token, "Wrong-Pass-" + attempt)
+          .andExpect(jsonPath("$.code").value("VERIFICATION_PASSWORD_MISMATCH"));
+    }
+    verifyEmail(token, "Wrong-Pass-5")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
+    verifyEmail(token, PASSWORD)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
+    assertThat(internal("guessed").isEnabled()).isFalse();
+  }
+
+  @Test
+  @DisplayName("the database refuses an account that is both pending and enabled")
+  void pendingAndEnabledIsRejectedByTheSchema() {
+    assertThatThrownBy(
+            () ->
+                jdbc.update(
+                    "UPDATE qnop_user SET enabled = TRUE, email_verification_pending = TRUE"
+                        + " WHERE id = ?",
+                    MEMBER_ID))
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+  }
+
+  @Test
+  @DisplayName(
+      "the 0039 backfill marks only untouched, never-verified registrations with a live token")
+  void backfillIsConservative() throws Exception {
+    java.util.UUID untouched = disabledWithToken("bf-untouched", false, false, false);
+    java.util.UUID edited = disabledWithToken("bf-edited", true, false, false);
+    java.util.UUID loggedIn = disabledWithToken("bf-logged-in", false, true, false);
+    java.util.UUID consumedOnly = disabledWithToken("bf-consumed", false, false, true);
+
+    jdbc.update(backfillStatement());
+
+    assertThat(pendingFlag(untouched)).isTrue();
+    assertThat(pendingFlag(edited)).isFalse();
+    assertThat(pendingFlag(loggedIn)).isFalse();
+    assertThat(pendingFlag(consumedOnly)).isFalse();
+    // Enabled seed accounts are never touched.
+    assertThat(pendingFlag(MEMBER_ID)).isFalse();
+  }
+
+  private java.util.UUID disabledWithToken(
+      String username, boolean edited, boolean loggedIn, boolean consumed) {
+    User user = User.internal(username, username + "@qnop.test", username, "h");
+    user.setEnabled(false);
+    user.setSlug(username);
+    User saved = users.saveAndFlush(user);
+    jdbc.update(
+        "INSERT INTO email_verification_token (id, user_id, token_hash, created_at, expires_at,"
+            + " consumed_at) VALUES (?, ?, ?, now(), now() + interval '1 day', "
+            + (consumed ? "now()" : "NULL")
+            + ")",
+        java.util.UUID.randomUUID(),
+        saved.getId(),
+        (username + "0000000000000000000000000000000000000000000000000000000000000000")
+            .substring(0, 64));
+    if (edited) {
+      jdbc.update("UPDATE qnop_user SET version = version + 1 WHERE id = ?", saved.getId());
+    }
+    if (loggedIn) {
+      jdbc.update("UPDATE qnop_user SET last_login_at = now() WHERE id = ?", saved.getId());
+    }
+    return saved.getId();
+  }
+
+  private boolean pendingFlag(java.util.UUID id) {
+    return Boolean.TRUE.equals(
+        jdbc.queryForObject(
+            "SELECT email_verification_pending FROM qnop_user WHERE id = ?", Boolean.class, id));
+  }
+
+  /** The backfill UPDATE exactly as shipped in the 0039 changelog. */
+  private static String backfillStatement() throws java.io.IOException {
+    String yaml;
+    try (java.io.InputStream in =
+        RegistrationVerificationIT.class.getResourceAsStream(
+            "/db/changelog/migrations/0039-user-email-verification-pending.yaml")) {
+      yaml = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+    }
+    int start = yaml.indexOf("UPDATE qnop_user");
+    return yaml.substring(start, yaml.indexOf(';', start));
+  }
+
+  private void ageVerificationTokens(java.time.Duration age) {
+    jdbc.update(
+        "UPDATE email_verification_token SET created_at = created_at - (? * interval '1 second')",
+        age.toSeconds());
   }
 
   private User internal(String username) {

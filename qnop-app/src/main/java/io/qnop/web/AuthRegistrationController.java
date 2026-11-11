@@ -89,7 +89,11 @@ public class AuthRegistrationController implements AuthRegistrationApi {
   /** Its own code, so the SPA can tell a mistyped password from a dead link (issue #900). */
   @ExceptionHandler(VerificationPasswordMismatchException.class)
   ResponseEntity<ErrorResponse> passwordMismatch(VerificationPasswordMismatchException e) {
-    return verificationError("VERIFICATION_PASSWORD_MISMATCH", e.getMessage());
+    // The attempt that reaches the cap spent the link: from here on it is a dead link like any
+    // other, and the remedy is the same — register again (issue #900).
+    return verificationError(
+        e.linkSpent() ? "INVALID_VERIFICATION_TOKEN" : "VERIFICATION_PASSWORD_MISMATCH",
+        e.getMessage());
   }
 
   private static ResponseEntity<ErrorResponse> verificationError(String code, String message) {

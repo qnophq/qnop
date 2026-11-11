@@ -33,6 +33,8 @@ import io.qnop.service.mail.MailTemplateKey;
 import io.qnop.service.mail.RelativeTimePhrase;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -62,6 +64,13 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class RegistrationService {
+
+  /**
+   * How long a pending registration is protected from being superseded by a new registration of the
+   * same address (issue #900): long enough to read the mail and confirm, short enough that a
+   * registration by someone who does not own the address cannot block the owner for long.
+   */
+  static final Duration TAKEOVER_COOL_DOWN = Duration.ofMinutes(15);
 
   private final UserService userService;
   private final EmailVerificationTokenService verificationTokens;
@@ -109,6 +118,11 @@ public class RegistrationService {
       return;
     }
     if (byEmail.isPresent() && takesOverPending(byEmail.get(), byUsername)) {
+      if (withinTakeoverCoolDown(byEmail.get())) {
+        // The previous registration's link is still fresh: leave it alone (uniform no-op), so
+        // nobody can keep invalidating the link of whoever registered the address last.
+        return;
+      }
       User user =
           userService.replacePendingRegistration(
               byEmail.get().getId(), username, passwordHash, displayName);
@@ -116,6 +130,14 @@ public class RegistrationService {
       return;
     }
     queueAttemptNotice(email, byEmail.map(User::getId).orElse(null));
+  }
+
+  /** Whether the pending account's last (re)registration is younger than the cool-down. */
+  private boolean withinTakeoverCoolDown(User pending) {
+    return verificationTokens
+        .latestIssuedAt(pending.getId())
+        .map(issued -> issued.isAfter(Instant.now().minus(TAKEOVER_COOL_DOWN)))
+        .orElse(false);
   }
 
   /**
@@ -147,13 +169,14 @@ public class RegistrationService {
    * Verifies an address and activates its account (issue #900). The token must be usable, the
    * account must still be pending verification, and {@code password} must be the one chosen at
    * registration; only then is the single-use token spent. A mistyped password leaves the link
-   * usable.
+   * usable, up to {@value EmailVerificationTokenService#MAX_FAILED_ATTEMPTS} wrong passwords — then
+   * the link is spent and the registrant registers again.
    *
    * @throws InvalidVerificationTokenException for an unknown, expired or used token, or an account
    *     that is no longer pending verification (e.g. an administrator disabled it meanwhile)
    * @throws VerificationPasswordMismatchException when the password does not match
    */
-  @Transactional
+  @Transactional(noRollbackFor = VerificationPasswordMismatchException.class)
   public void verify(String rawToken, String password) {
     User user = verificationTokens.peek(rawToken);
     if (!user.isEmailVerificationPending()) {
@@ -162,7 +185,9 @@ public class RegistrationService {
     if (password == null
         || user.getPasswordHash() == null
         || !passwordEncoder.matches(password, user.getPasswordHash())) {
-      throw new VerificationPasswordMismatchException();
+      // Committed despite the exception (noRollbackFor): the count must survive the failed attempt.
+      boolean spent = verificationTokens.recordFailedAttempt(rawToken);
+      throw new VerificationPasswordMismatchException(spent);
     }
     UUID userId = user.getId();
     verificationTokens.consume(rawToken);
@@ -220,8 +245,19 @@ public class RegistrationService {
 
   /** The password presented at verification is not the one chosen at registration (issue #900). */
   public static class VerificationPasswordMismatchException extends RuntimeException {
-    public VerificationPasswordMismatchException() {
-      super("The password does not match the one chosen at registration");
+    private final boolean linkSpent;
+
+    public VerificationPasswordMismatchException(boolean linkSpent) {
+      super(
+          linkSpent
+              ? "Too many wrong passwords; this verification link can no longer be used"
+              : "The password does not match the one chosen at registration");
+      this.linkSpent = linkSpent;
+    }
+
+    /** Whether this attempt reached the cap and spent the verification link. */
+    public boolean linkSpent() {
+      return linkSpent;
     }
   }
 }
