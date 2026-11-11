@@ -144,5 +144,41 @@ class CheckVerificationMetadataDiffTest(unittest.TestCase):
         self.assert_rejected('<?xml version="1.0"?><something-else/>')
 
 
+class AgainstDefaultBranchTest(CheckVerificationMetadataDiffTest):
+    """--allow-missing: the baseline is main's file, the branch may be behind it."""
+
+    def verdict(self, candidate, base=BASE):
+        return checker.main(
+            [
+                "check",
+                "--allow-missing",
+                self.write("base.xml", base),
+                self.write("new.xml", candidate),
+            ]
+        )
+
+    def test_removed_component_is_rejected(self):
+        # Inherited expectation does not hold here: see the test below.
+        pass
+
+    def test_component_missing_relative_to_main_is_accepted(self):
+        main = document(
+            [component("g:a:1", "a-1.jar", SHA_A), component("g:m:9", "m-9.jar", SHA_C)]
+        )
+        self.assertEqual(self.verdict(BASE, base=main), 0)
+
+    def test_weakening_committed_on_the_branch_is_still_rejected(self):
+        # The branch's own file already disables verification; against main the
+        # candidate (which carries that change) must fail.
+        weakened = BASE.replace(
+            "<verify-metadata>true</verify-metadata>",
+            "<verify-metadata>false</verify-metadata>",
+        )
+        self.assertEqual(self.verdict(weakened), 1)
+
+    def test_checksum_changed_relative_to_main_is_rejected(self):
+        self.assertEqual(self.verdict(document([component("g:a:1", "a-1.jar", SHA_B)])), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

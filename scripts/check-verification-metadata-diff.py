@@ -3,7 +3,16 @@
 #
 # Gate for automated updates of gradle/verification-metadata.xml (issue #925).
 #
-#   check-verification-metadata-diff.py <committed.xml> <candidate.xml>
+#   check-verification-metadata-diff.py [--allow-missing] <baseline.xml> <candidate.xml>
+#
+# The workflow runs it twice: against the file committed on the branch, and
+# against the DEFAULT branch's file with --allow-missing, so a weakening
+# committed straight to the branch is caught too. --allow-missing tolerates
+# components/artifacts the baseline has and the candidate lacks (a branch that
+# is behind main) — a missing entry can only make verification stricter. It
+# never tolerates a changed entry or a changed <configuration>. (Gradle's
+# --write-verification-metadata does not prune stale entries, so against the
+# branch's own file nothing may go missing.)
 #
 # The candidate is produced by a job that runs branch-controlled build code, so
 # before a privileged job commits it, this checker allows exactly one kind of
@@ -107,7 +116,7 @@ def check_added_artifact(artifact, where):
             raise Rejected(f"added artifact {where} has a malformed sha256 value")
 
 
-def check(committed_path, candidate_path):
+def check(committed_path, candidate_path, allow_missing=False):
     committed = parse(committed_path)
     candidate = parse(candidate_path)
 
@@ -129,6 +138,8 @@ def check(committed_path, candidate_path):
     for key, old in old_components.items():
         new = new_components.get(key)
         if new is None:
+            if allow_missing:
+                continue
             raise Rejected(f"component {gav(old)} was removed")
         if sorted(old.attrib.items()) != sorted(new.attrib.items()):
             raise Rejected(f"component {gav(old)} attributes changed")
@@ -136,6 +147,8 @@ def check(committed_path, candidate_path):
         new_artifacts = artifacts(new, candidate_path)
         for name, artifact in old_artifacts.items():
             if name not in new_artifacts:
+                if allow_missing:
+                    continue
                 raise Rejected(f"artifact {gav(old)}/{name} was removed")
             if canonical(artifact) != canonical(new_artifacts[name]):
                 raise Rejected(f"artifact {gav(old)}/{name} changed")
@@ -156,16 +169,22 @@ def check(committed_path, candidate_path):
 
 
 def main(argv):
+    allow_missing = len(argv) > 1 and argv[1] == "--allow-missing"
+    if allow_missing:
+        argv = argv[:1] + argv[2:]
     if len(argv) != 3:
         print(__doc__ or "usage: check-verification-metadata-diff.py <committed> <candidate>",
               file=sys.stderr)
         return 2
     try:
-        added = check(argv[1], argv[2])
+        added = check(argv[1], argv[2], allow_missing)
     except (Rejected, OSError) as e:
         print(f"::error::verification metadata rejected: {e}", file=sys.stderr)
         return 1
-    print(f"verification metadata accepted: {added} component(s) added, nothing else changed")
+    print(
+        f"verification metadata accepted against {argv[1]}: "
+        f"{added:+d} component(s), no existing entry or configuration changed"
+    )
     return 0
 
 
