@@ -20,6 +20,11 @@ TRUNCATE TABLE annotation_placement, comment, annotation, audit_event,
                review_participant, document_version, document
                RESTART IDENTITY CASCADE;
 
+-- The audit hash chain (issue #928) restarts with the emptied trail; TRUNCATE
+-- bypasses the row triggers, so the head would otherwise still point at the
+-- wiped rows and every later chain verification would report a break.
+UPDATE audit_chain_head SET last_seq = 0, last_hash = repeat('0', 64) WHERE id = 1;
+
 -- Test-created data without migration seeds; CASCADE also clears anything a
 -- test created that references these rows (e.g. team memberships).
 TRUNCATE TABLE team_membership, team, oidc_provider, user_setting, application_asset
