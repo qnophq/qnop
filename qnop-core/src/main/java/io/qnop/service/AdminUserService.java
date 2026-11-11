@@ -52,9 +52,11 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Lockout guards (all {@link AdminUserConflictException} / HTTP 409): an admin can neither
  * disable, demote nor delete their own account, and the last enabled admin can never be disabled,
- * demoted or deleted. Creating with an {@code initialPassword} yields an enabled account that must
- * change its password on first login; omitting it provisions the account behind a random, unusable
- * placeholder hash (the {@code INTERNAL ⇒ credentials} DB invariant) and emails an invitation link.
+ * demoted or deleted. The last-admin check locks the enabled-admin rows before counting them (issue
+ * #920), so two concurrent changes cannot both pass it and leave no admin behind. Creating with an
+ * {@code initialPassword} yields an enabled account that must change its password on first login;
+ * omitting it provisions the account behind a random, unusable placeholder hash (the {@code
+ * INTERNAL ⇒ credentials} DB invariant) and emails an invitation link.
  */
 @Service
 public class AdminUserService {
@@ -170,16 +172,14 @@ public class AdminUserService {
 
     boolean demoting = user.getRole() == UserRole.ADMIN && newRole != UserRole.ADMIN;
     boolean disabling = user.isEnabled() && !newEnabled;
+    boolean roleChanging = newRole != user.getRole();
 
     if (id.equals(actingUserId) && (demoting || disabling)) {
       throw new AdminUserConflictException(
           "SELF_LOCKOUT", "You cannot disable or change the role of your own account.");
     }
-    if ((demoting || disabling)
-        && user.getRole() == UserRole.ADMIN
-        && user.isEnabled()
-        && users.countByRoleAndEnabledTrue(UserRole.ADMIN) <= 1) {
-      throw new AdminUserConflictException("LAST_ADMIN", "At least one enabled admin must remain.");
+    if (demoting || disabling) {
+      requireAnotherEnabledAdmin(user);
     }
 
     if (displayName != null) {
@@ -188,12 +188,12 @@ public class AdminUserService {
     user.setRole(newRole);
     user.setEnabled(newEnabled);
 
-    // Disabling must end access immediately (mirrors the admin password reset): invalidate live
-    // access tokens and revoke refresh families, so a disabled user cannot keep using or refreshing
-    // a session. flush() persists the enabled change before bumpPasswordInvalidatedBefore clears
-    // the
-    // persistence context.
-    if (disabling) {
+    // Disabling or a role change must take effect immediately (mirrors the admin password reset):
+    // the role is a claim of the access token, so a demoted user would otherwise keep the old
+    // role until expiry (issue #901). Invalidate live access tokens and revoke refresh families;
+    // the user signs in again and gets a token with the current role. flush() persists the
+    // changes before bumpPasswordInvalidatedBefore clears the persistence context.
+    if (disabling || roleChanging) {
       users.flush();
       users.bumpPasswordInvalidatedBefore(id, Instant.now());
       refreshTokens.revokeAllForUser(id);
@@ -203,7 +203,9 @@ public class AdminUserService {
 
   /**
    * Permanently deletes a user; the database cascades their tokens, settings, OIDC identity and
-   * team memberships. Rejects (409) deleting your own account or the last enabled admin.
+   * team memberships. Their still-unexpired access tokens stop working at once, because a token
+   * whose user no longer exists counts as revoked (issue #901). Rejects (409) deleting your own
+   * account or the last enabled admin.
    */
   @Transactional
   public void delete(UUID id, UUID actingUserId) {
@@ -211,12 +213,24 @@ public class AdminUserService {
     if (id.equals(actingUserId)) {
       throw new AdminUserConflictException("SELF_DELETE", "You cannot delete your own account.");
     }
-    if (user.getRole() == UserRole.ADMIN
-        && user.isEnabled()
-        && users.countByRoleAndEnabledTrue(UserRole.ADMIN) <= 1) {
+    requireAnotherEnabledAdmin(user);
+    users.delete(user);
+  }
+
+  /**
+   * Rejects (409) a change that would remove {@code target} from the enabled admins when it is the
+   * last one. The enabled-admin rows are locked ({@code SELECT ... FOR UPDATE}) before they are
+   * counted, so concurrent demote/disable/delete requests are serialised: the second one waits for
+   * the first to commit and then counts what is really left (issue #920). A no-op for a target that
+   * is not an enabled admin.
+   */
+  private void requireAnotherEnabledAdmin(User target) {
+    if (target.getRole() != UserRole.ADMIN || !target.isEnabled()) {
+      return;
+    }
+    if (users.lockEnabledByRole(UserRole.ADMIN).size() <= 1) {
       throw new AdminUserConflictException("LAST_ADMIN", "At least one enabled admin must remain.");
     }
-    users.delete(user);
   }
 
   /**

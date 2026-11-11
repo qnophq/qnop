@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -159,7 +160,7 @@ class AdminUserServiceTest {
     User admin = User.internal("Admin", "admin@example.com", "admin", "h");
     admin.setRole(UserRole.ADMIN);
     when(users.findById(id)).thenReturn(Optional.of(admin));
-    when(users.countByRoleAndEnabledTrue(UserRole.ADMIN)).thenReturn(1L);
+    when(users.lockEnabledByRole(UserRole.ADMIN)).thenReturn(List.of(admin));
 
     assertThatThrownBy(() -> service.update(id, null, "MEMBER", null, UUID.randomUUID()))
         .isInstanceOf(AdminUserConflictException.class)
@@ -196,6 +197,57 @@ class AdminUserServiceTest {
     assertThat(member.isEnabled()).isFalse();
     verify(users).bumpPasswordInvalidatedBefore(eq(id), any());
     verify(refreshTokens).revokeAllForUser(id);
+  }
+
+  @Test
+  @DisplayName("demoting a user revokes their sessions, so the old role claim stops working (#901)")
+  void updateDemotingRevokesSessions() {
+    UUID id = UUID.randomUUID();
+    User admin = User.internal("Admin", "a@example.com", "a", "h");
+    admin.setRole(UserRole.ADMIN);
+    admin.setEnabled(true);
+    User otherAdmin = User.internal("Other", "o@example.com", "o", "h");
+    otherAdmin.setRole(UserRole.ADMIN);
+    when(users.findById(id)).thenReturn(Optional.of(admin));
+    when(users.lockEnabledByRole(UserRole.ADMIN)).thenReturn(List.of(admin, otherAdmin));
+
+    service.update(id, null, "MEMBER", null, UUID.randomUUID());
+
+    assertThat(admin.getRole()).isEqualTo(UserRole.MEMBER);
+    var order = inOrder(users, refreshTokens);
+    order.verify(users).flush();
+    order.verify(users).bumpPasswordInvalidatedBefore(eq(id), any());
+    order.verify(refreshTokens).revokeAllForUser(id);
+  }
+
+  @Test
+  @DisplayName("any role change revokes sessions, a promotion included (#901)")
+  void updatePromotingRevokesSessions() {
+    UUID id = UUID.randomUUID();
+    User member = User.internal("Member", "m@example.com", "m", "h");
+    member.setRole(UserRole.MEMBER);
+    when(users.findById(id)).thenReturn(Optional.of(member));
+
+    service.update(id, null, "AUDITOR", null, UUID.randomUUID());
+
+    verify(users).bumpPasswordInvalidatedBefore(eq(id), any());
+    verify(refreshTokens).revokeAllForUser(id);
+    // Not an admin-removing change: the admin rows are never locked.
+    verify(users, never()).lockEnabledByRole(any());
+  }
+
+  @Test
+  @DisplayName("re-sending the unchanged role is not a role change and keeps sessions")
+  void updateWithSameRoleKeepsSessions() {
+    UUID id = UUID.randomUUID();
+    User member = User.internal("Member", "m@example.com", "m", "h");
+    member.setRole(UserRole.MEMBER);
+    when(users.findById(id)).thenReturn(Optional.of(member));
+
+    service.update(id, "Renamed", "MEMBER", true, UUID.randomUUID());
+
+    verify(users, never()).bumpPasswordInvalidatedBefore(any(), any());
+    verify(refreshTokens, never()).revokeAllForUser(any());
   }
 
   @Test
@@ -268,7 +320,7 @@ class AdminUserServiceTest {
     User onlyAdmin = User.internal("Admin", "admin@example.com", "admin", "h");
     onlyAdmin.setRole(UserRole.ADMIN);
     when(users.findById(adminId)).thenReturn(Optional.of(onlyAdmin));
-    when(users.countByRoleAndEnabledTrue(UserRole.ADMIN)).thenReturn(1L);
+    when(users.lockEnabledByRole(UserRole.ADMIN)).thenReturn(List.of(onlyAdmin));
     assertThatThrownBy(() -> service.delete(adminId, UUID.randomUUID()))
         .isInstanceOf(AdminUserConflictException.class)
         .extracting("code")

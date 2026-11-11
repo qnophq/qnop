@@ -23,6 +23,7 @@ package io.qnop.repository;
 import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.entity.UserSource;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -97,6 +99,17 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
   /** Number of enabled users with the given role — guards the last-admin invariant (issue #104). */
   long countByRoleAndEnabledTrue(UserRole role);
+
+  /**
+   * The enabled users with {@code role}, row-locked for the rest of the transaction ({@code SELECT
+   * ... FOR UPDATE}, ordered by id so concurrent callers lock in the same order). Backs the
+   * race-free last-admin guard (issue #920): a concurrent transaction that demoted, disabled or
+   * deleted one of these rows makes this call wait for its commit, after which PostgreSQL re-checks
+   * the row and leaves it out.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT u FROM User u WHERE u.role = :role AND u.enabled = TRUE ORDER BY u.id")
+  List<User> lockEnabledByRole(@Param("role") UserRole role);
 
   /**
    * Enabled accounts on this instance — the figure the user quota is measured against (issue #673).
