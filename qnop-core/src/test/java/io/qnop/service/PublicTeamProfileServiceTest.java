@@ -23,6 +23,7 @@ package io.qnop.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -90,7 +91,7 @@ class PublicTeamProfileServiceTest {
     assertThat(profile.reviews()).isNull();
     // Hidden sections are never even computed — no roster or participation query runs.
     verify(memberships, never()).findMembersByTeamId(any());
-    verify(documents, never()).findTeamParticipationsVisibleTo(any(), any());
+    verify(documents, never()).findTeamParticipationsVisibleTo(any(), any(), anyBoolean());
   }
 
   @Test
@@ -111,13 +112,13 @@ class PublicTeamProfileServiceTest {
   void reviewsToggleUsesCallerVisibility() {
     team.setProfileShowReviews(true);
     when(memberships.existsByTeamIdAndUserId(teamId, caller)).thenReturn(false);
-    when(documents.findTeamParticipationsVisibleTo(teamId, caller)).thenReturn(List.of());
+    when(documents.findTeamParticipationsVisibleTo(teamId, caller, false)).thenReturn(List.of());
 
     var profile = service.getProfile(teamId, caller, false);
 
     assertThat(profile.reviews()).isNotNull();
     // The intersection query IS the leak protection — the caller id must be part of it.
-    verify(documents).findTeamParticipationsVisibleTo(teamId, caller);
+    verify(documents).findTeamParticipationsVisibleTo(teamId, caller, false);
   }
 
   @Test
@@ -125,7 +126,7 @@ class PublicTeamProfileServiceTest {
   void membersAlwaysSeeTheirOwnTeamInFull() {
     when(memberships.existsByTeamIdAndUserId(teamId, caller)).thenReturn(true);
     when(memberships.findMembersByTeamId(teamId)).thenReturn(List.of());
-    when(documents.findTeamParticipationsVisibleTo(teamId, caller)).thenReturn(List.of());
+    when(documents.findTeamParticipationsVisibleTo(teamId, caller, false)).thenReturn(List.of());
 
     var profile = service.getProfile(teamId, caller, false);
 
@@ -139,7 +140,7 @@ class PublicTeamProfileServiceTest {
   void adminsSeeEverything() {
     when(memberships.existsByTeamIdAndUserId(teamId, caller)).thenReturn(false);
     when(memberships.findMembersByTeamId(teamId)).thenReturn(List.of());
-    when(documents.findTeamParticipationsVisibleTo(teamId, caller)).thenReturn(List.of());
+    when(documents.findTeamParticipationsVisibleTo(teamId, caller, true)).thenReturn(List.of());
 
     var profile = service.getProfile(teamId, caller, true);
 

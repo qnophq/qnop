@@ -115,10 +115,15 @@ public interface DocumentRepository
    * profile's participation list is this intersection by construction, so it can never leak a
    * review the caller cannot reach (ADR-0038) — same visibility predicate as {@link
    * #findVisibleTo}, narrowed to the team's participations.
+   *
+   * <p>Anonymous reviews are listed only to their owner or an admin (issue #915): the roster of an
+   * anonymous review masks reviewer teams, so naming the review on a team's profile would unmask
+   * exactly that team to every other participant.
    */
   @Query(
       "SELECT d FROM Document d WHERE EXISTS (SELECT 1 FROM ReviewParticipant tp"
           + "   WHERE tp.documentId = d.id AND tp.teamId = :teamId)"
+          + " AND (d.anonymous = false OR d.ownerId = :actor OR :admin = true)"
           + " AND (d.ownerId = :actor"
           + " OR EXISTS (SELECT 1 FROM ReviewParticipant p"
           + "   WHERE p.documentId = d.id AND p.userId = :actor)"
@@ -126,7 +131,7 @@ public interface DocumentRepository
           + "   WHERE pt.documentId = d.id AND pt.teamId = m.teamId AND m.userId = :actor))"
           + " ORDER BY d.updatedAt DESC")
   List<Document> findTeamParticipationsVisibleTo(
-      @Param("teamId") UUID teamId, @Param("actor") UUID actor);
+      @Param("teamId") UUID teamId, @Param("actor") UUID actor, @Param("admin") boolean admin);
 
   /**
    * Everyone who owns a review, for the moderation listing's owner facet (issue #563).

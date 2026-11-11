@@ -109,7 +109,7 @@ public class PublicTeamProfileService {
             : null;
 
     List<TeamReviewView> reviews =
-        insider || team.isProfileShowReviews() ? loadReviews(teamId, actorId) : null;
+        insider || team.isProfileShowReviews() ? loadReviews(teamId, actorId, admin) : null;
 
     return new PublicTeamProfileView(
         teamId,
@@ -122,8 +122,8 @@ public class PublicTeamProfileService {
         reviews);
   }
 
-  private List<TeamReviewView> loadReviews(UUID teamId, UUID actorId) {
-    List<Document> visible = documents.findTeamParticipationsVisibleTo(teamId, actorId);
+  private List<TeamReviewView> loadReviews(UUID teamId, UUID actorId, boolean admin) {
+    List<Document> visible = documents.findTeamParticipationsVisibleTo(teamId, actorId, admin);
     // Latest-version MIME types in one batch (the reviews overview's recipe) —
     // the document-type icon needs them, and a profile must not go N+1.
     Map<UUID, String> contentTypes =

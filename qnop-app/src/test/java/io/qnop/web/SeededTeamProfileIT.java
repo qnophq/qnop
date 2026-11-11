@@ -20,10 +20,16 @@
  */
 package io.qnop.web;
 
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.qnop.entity.Document;
+import io.qnop.entity.ReviewParticipant;
+import io.qnop.repository.DocumentRepository;
+import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.testsupport.SeededIntegrationTest;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -41,6 +47,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class SeededTeamProfileIT extends SeededIntegrationTest {
 
   @Autowired JdbcTemplate jdbc;
+  @Autowired DocumentRepository documents;
+  @Autowired ReviewParticipantRepository participants;
 
   private MockHttpServletRequestBuilder as(UUID userId, MockHttpServletRequestBuilder builder) {
     return builder.header("Authorization", "Bearer " + token(userId));
@@ -96,6 +104,36 @@ class SeededTeamProfileIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.viewerIsMember").value(false))
         .andExpect(jsonPath("$.members.length()").value(2))
         .andExpect(jsonPath("$.reviews").isArray());
+  }
+
+  /** A review owned by MEMBER2 (not in Alpha) with team Alpha as reviewer. */
+  private UUID alphaReview(String title, boolean anonymous) {
+    Document document = new Document(MEMBER2_ID, title);
+    document.setAnonymous(anonymous);
+    UUID id = documents.save(document).getId();
+    participants.save(ReviewParticipant.forTeam(id, TEAM_ALPHA_ID));
+    return id;
+  }
+
+  @Test
+  void anonymousReviewsStayOffTeamProfilesForNonOwnerParticipants() throws Exception {
+    UUID named = alphaReview("Named review", false);
+    UUID anonymous = alphaReview("Anonymous review", true);
+
+    // AUDITOR participates in both through team Alpha — but an anonymous review masks its
+    // reviewer teams, so the team profile must not name it (issue #915).
+    mockMvc
+        .perform(as(AUDITOR_ID, get("/api/v1/teams/" + TEAM_ALPHA_ID + "/profile")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.reviews[*].id", hasItem(named.toString())))
+        .andExpect(jsonPath("$.reviews[*].id", not(hasItem(anonymous.toString()))));
+
+    // The owner already knows the roster and still sees it.
+    enableToggles(TEAM_ALPHA_ID);
+    mockMvc
+        .perform(as(MEMBER2_ID, get("/api/v1/teams/" + TEAM_ALPHA_ID + "/profile")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.reviews[*].id", hasItem(anonymous.toString())));
   }
 
   @Test
