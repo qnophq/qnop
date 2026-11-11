@@ -213,7 +213,7 @@ class TokenSchemaIT extends AbstractIntegrationTest {
     consumed.setConsumedAt(Instant.now());
     emailTokens.saveAndFlush(consumed);
 
-    var unconsumed = emailTokens.findUnconsumedTokensForUser(user.getId());
+    var unconsumed = emailTokens.findUnconsumedTokensForUserOldestFirst(user.getId());
 
     assertThat(unconsumed)
         .singleElement()

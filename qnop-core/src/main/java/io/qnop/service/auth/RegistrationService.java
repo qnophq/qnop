@@ -27,17 +27,15 @@ import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.InvalidTextException;
 import io.qnop.service.UserService;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
+import io.qnop.service.auth.EmailVerificationTokenService.PendingVerification;
 import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailTemplateKey;
 import io.qnop.service.mail.RelativeTimePhrase;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,10 +50,14 @@ import org.springframework.transaction.annotation.Transactional;
  * <ul>
  *   <li>A new account is <em>pending verification</em> — a state of its own, distinct from an
  *       administrator-disabled account — and {@link #verify} activates only a pending account.
- *   <li>Verification requires the password chosen at registration, so a password only becomes a
- *       credential once the mailbox owner, who receives the link, confirms it. Whoever registered
- *       an address they do not control gains nothing: the owner cannot confirm a password they do
- *       not know, and their own registration of that address replaces the unverified one.
+ *   <li>The credentials a registration asks for are bound to <em>its</em> verification token, not
+ *       to the account row. Registering an address that is still pending issues one more token and
+ *       leaves the others valid; verifying a token with its password activates the account with
+ *       exactly that token's credentials and spends all other tokens. Nobody can block or
+ *       invalidate somebody else's registration, and only the mailbox owner, who receives the
+ *       links, can complete any of them.
+ *   <li>Each link allows a capped number of password attempts, reserved atomically before the
+ *       comparison.
  *   <li>A registration that collides with an existing account sends a neutral notice to the entered
  *       address instead of nothing; the response stays uniform either way.
  *   <li>Every branch encodes the password once and every mail is sent after commit off the request
@@ -64,13 +66,6 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class RegistrationService {
-
-  /**
-   * How long a pending registration is protected from being superseded by a new registration of the
-   * same address (issue #900): long enough to read the mail and confirm, short enough that a
-   * registration by someone who does not own the address cannot block the owner for long.
-   */
-  static final Duration TAKEOVER_COOL_DOWN = Duration.ofMinutes(15);
 
   private final UserService userService;
   private final EmailVerificationTokenService verificationTokens;
@@ -96,9 +91,10 @@ public class RegistrationService {
 
   /**
    * Registers a local user pending verification and queues the verification email. When the address
-   * belongs to an account still pending verification, this registration replaces the unverified
-   * one; when the address or the username belongs to any other account, nothing is created and the
-   * entered address receives a neutral notice instead. The caller cannot tell the outcomes apart.
+   * belongs to an account still pending verification, this registration gets a verification link of
+   * its own next to the existing ones; when the address or the username belongs to any other
+   * account, nothing is created and the entered address receives a neutral notice instead. The
+   * caller cannot tell the outcomes apart.
    */
   @Transactional
   public void register(String username, String email, String password, String displayName) {
@@ -107,6 +103,7 @@ public class RegistrationService {
     // Encoded up front on every branch: the BCrypt cost dominates the request, so paying it only
     // when an account is created would let response times tell the branches apart (issue #903).
     String passwordHash = passwordEncoder.encode(password);
+    String name = displayName == null || displayName.isBlank() ? username : displayName;
     Optional<User> byEmail = userService.findInternalByEmail(email);
     Optional<User> byUsername = userService.findInternalByUsername(username);
 
@@ -114,37 +111,22 @@ public class RegistrationService {
       User user =
           userService.createPendingRegistration(
               username, email, passwordHash, displayName, defaultRole());
-      queueVerificationEmail(user);
+      queueVerificationEmail(user, username, name, passwordHash);
       return;
     }
-    if (byEmail.isPresent() && takesOverPending(byEmail.get(), byUsername)) {
-      if (withinTakeoverCoolDown(byEmail.get())) {
-        // The previous registration's link is still fresh: leave it alone (uniform no-op), so
-        // nobody can keep invalidating the link of whoever registered the address last.
-        return;
-      }
-      User user =
-          userService.replacePendingRegistration(
-              byEmail.get().getId(), username, passwordHash, displayName);
-      queueVerificationEmail(user);
+    if (byEmail.isPresent() && joinsPending(byEmail.get(), byUsername)) {
+      queueVerificationEmail(byEmail.get(), username, name, passwordHash);
       return;
     }
     queueAttemptNotice(email, byEmail.map(User::getId).orElse(null));
   }
 
-  /** Whether the pending account's last (re)registration is younger than the cool-down. */
-  private boolean withinTakeoverCoolDown(User pending) {
-    return verificationTokens
-        .latestIssuedAt(pending.getId())
-        .map(issued -> issued.isAfter(Instant.now().minus(TAKEOVER_COOL_DOWN)))
-        .orElse(false);
-  }
-
   /**
-   * Whether a registration for the address of {@code existing} replaces it: only while that account
-   * is still pending verification, and only if the requested username is free or already its own.
+   * Whether a registration for the address of {@code existing} gets a link of its own: only while
+   * that account is still pending verification, and only if the requested username is free or is
+   * the pending account's own.
    */
-  private static boolean takesOverPending(User existing, Optional<User> byUsername) {
+  private static boolean joinsPending(User existing, Optional<User> byUsername) {
     return existing.isEmailVerificationPending()
         && byUsername.map(other -> other.getId().equals(existing.getId())).orElse(true);
   }
@@ -166,62 +148,70 @@ public class RegistrationService {
   }
 
   /**
-   * Verifies an address and activates its account (issue #900). The token must be usable, the
-   * account must still be pending verification, and {@code password} must be the one chosen at
-   * registration; only then is the single-use token spent. A mistyped password leaves the link
-   * usable, up to {@value EmailVerificationTokenService#MAX_FAILED_ATTEMPTS} wrong passwords — then
-   * the link is spent and the registrant registers again.
+   * Verifies an address and activates its account (issue #900) with the credentials of the
+   * registration this token belongs to. The token must be usable, the account must still be pending
+   * verification, and {@code password} must be that registration's password. One attempt is
+   * reserved atomically before the comparison, so no more than {@value
+   * EmailVerificationTokenService#MAX_FAILED_ATTEMPTS} passwords are ever compared against one
+   * link, concurrency included; the attempt that uses up the allowance spends the link. On success
+   * all other links of the address are spent.
    *
-   * @throws InvalidVerificationTokenException for an unknown, expired or used token, or an account
-   *     that is no longer pending verification (e.g. an administrator disabled it meanwhile)
+   * @throws InvalidVerificationTokenException for an unknown, expired, used or spent token, or an
+   *     account that is no longer pending verification (e.g. an administrator disabled it)
    * @throws VerificationPasswordMismatchException when the password does not match
    */
   @Transactional(noRollbackFor = VerificationPasswordMismatchException.class)
   public void verify(String rawToken, String password) {
-    User user = verificationTokens.peek(rawToken);
-    if (!user.isEmailVerificationPending()) {
+    PendingVerification pending = verificationTokens.peek(rawToken);
+    if (!pending.accountPending()) {
+      throw new InvalidVerificationTokenException("Verification token is no longer valid");
+    }
+    if (!verificationTokens.reserveAttempt(pending.tokenId())) {
       throw new InvalidVerificationTokenException("Verification token is no longer valid");
     }
     if (password == null
-        || user.getPasswordHash() == null
-        || !passwordEncoder.matches(password, user.getPasswordHash())) {
-      // Committed despite the exception (noRollbackFor): the count must survive the failed attempt.
-      boolean spent = verificationTokens.recordFailedAttempt(rawToken);
-      throw new VerificationPasswordMismatchException(spent);
+        || pending.passwordHash() == null
+        || !passwordEncoder.matches(password, pending.passwordHash())) {
+      // Committed despite the exception (noRollbackFor): the reserved attempt stays counted.
+      throw new VerificationPasswordMismatchException(
+          verificationTokens.spendIfExhausted(pending.tokenId()));
     }
-    UUID userId = user.getId();
-    verificationTokens.consume(rawToken);
-    // Conditional on the pending flag in the database, so an administrator's decision taken after
-    // the checks above still wins; the throw rolls the token consumption back with it.
-    if (!userService.activatePendingVerification(userId)) {
+    verificationTokens.consume(pending.tokenId());
+    // Conditional on the pending flag in the database, so an administrator's decision or another
+    // link verified concurrently still wins; the throw rolls the consumption back with it.
+    if (!userService.activateVerifiedRegistration(
+        pending.userId(), pending.username(), pending.displayName(), pending.passwordHash())) {
       throw new InvalidVerificationTokenException("Verification token is no longer valid");
     }
+    verificationTokens.consumeAllForUser(pending.userId());
   }
 
   /**
-   * A brand-new account has no language preference yet, so this resolves to the application default
-   * (issue #853) — through the same resolver as every other mail, so a preference stored in the
-   * same transaction would be honoured too.
+   * Issues this registration's own link and queues the mail. The greeting uses the name given in
+   * this registration — the mail is the registrant's own. The language is the account's (a
+   * brand-new account has none yet, so the application default applies, issue #853).
    */
-  private void queueVerificationEmail(User user) {
-    var issued = verificationTokens.issue(user);
+  private void queueVerificationEmail(
+      User user, String username, String displayName, String passwordHash) {
+    var issued = verificationTokens.issueForRegistration(user, username, displayName, passwordHash);
     String locale = mailLocales.forUser(user.getId());
     mailService.sendMailFromTemplateAfterCommit(
         MailTemplateKey.REGISTRATION_VERIFICATION,
         user.getEmail(),
         Map.of(
             "siteName", siteName(),
-            "recipientName", user.getDisplayName(),
+            "recipientName", displayName,
             "actionUrl", verifyUrl(issued.rawToken()),
             "expiresAtHuman", RelativeTimePhrase.until(issued.expiresAt(), locale)),
         locale);
   }
 
   /**
-   * The neutral notice for a registration that collided with an existing account. In the account
-   * owner's language when the address belongs to one, the application default otherwise.
+   * The neutral notice for a registration that collided with an existing account: no text from the
+   * request, only the site name and the sign-in link. In the account owner's language when the
+   * address belongs to one, the application default otherwise.
    */
-  private void queueAttemptNotice(String email, UUID existingUserId) {
+  private void queueAttemptNotice(String email, java.util.UUID existingUserId) {
     String locale = mailLocales.forUser(existingUserId);
     mailService.sendMailFromTemplateAfterCommit(
         MailTemplateKey.REGISTRATION_ATTEMPT,
@@ -255,7 +245,7 @@ public class RegistrationService {
       this.linkSpent = linkSpent;
     }
 
-    /** Whether this attempt reached the cap and spent the verification link. */
+    /** Whether this attempt used up the allowance and spent the verification link. */
     public boolean linkSpent() {
       return linkSpent;
     }

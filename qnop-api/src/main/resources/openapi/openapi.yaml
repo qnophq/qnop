@@ -1925,9 +1925,10 @@ paths:
       description: |
         Confirms a self-registration and activates the account (issue #900). Public.
         Requires the single-use token from the emailed link **and** the password chosen
-        at registration: a password only becomes a credential once the owner of the
-        mailbox confirms it. Only an account still pending verification can be
-        activated — never one an administrator has disabled. A wrong password leaves
+        in the registration that link belongs to: the account is activated with exactly
+        that registration's credentials, and every other link of the address is spent.
+        Only an account still pending verification can be activated — never one an
+        administrator has disabled. A wrong password leaves
         the token usable (`VERIFICATION_PASSWORD_MISMATCH`) up to five times; the fifth
         spends it. An unknown, expired, used or spent token, or an account no longer
         pending, is `INVALID_VERIFICATION_TOKEN` — the registrant registers again.

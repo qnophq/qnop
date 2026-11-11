@@ -73,6 +73,7 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
   @Autowired private ApplicationSettingsService settings;
   @Autowired private UserRepository users;
   @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+  @Autowired private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
   @BeforeEach
   void enableSelfRegistration() {
@@ -133,33 +134,86 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
 
   @Test
   @DisplayName(
-      "re-registering a pending address replaces the unverified password; only the newest"
-          + " registration's link and password activate the account")
-  void reRegistrationReplacesAnUnverifiedPassword() throws Exception {
-    register("first", "contested@qnop.test", "First-Pass-1234!").andExpect(status().isOk());
-    String firstToken = lastVerificationToken("contested@qnop.test");
+      "squatter and owner both register a pending address: each link keeps its own credentials,"
+          + " the owner verifies theirs, the owner's password is active and the squatter's link is"
+          + " dead")
+  void ownerWinsOverASquatterRegardlessOfOrder() throws Exception {
+    register("squatter", "contested@qnop.test", "Squat-Pass-1234!").andExpect(status().isOk());
+    String squatterToken = lastVerificationToken("contested@qnop.test");
     clearInvocations(mail);
 
-    // Within the cool-down a second registration changes nothing and mails nobody.
-    register("second", "contested@qnop.test", PASSWORD).andExpect(status().isOk());
-    verify(mail, never()).sendMailFromTemplateAfterCommit(any(), any(), anyMap(), any());
-    assertThat(internal("first").isEmailVerificationPending()).isTrue();
+    // No cool-down and no invalidation: the owner's registration gets a link of its own.
+    register("owner", "contested@qnop.test", PASSWORD).andExpect(status().isOk());
+    String ownerToken = lastVerificationToken("contested@qnop.test");
 
-    // Once the first link has aged past the cool-down, the new registration replaces it.
-    ageVerificationTokens(java.time.Duration.ofMinutes(16));
-    register("second", "contested@qnop.test", PASSWORD).andExpect(status().isOk());
-    String secondToken = lastVerificationToken("contested@qnop.test");
+    // A later registration by the squatter does not kill the owner's link either.
+    register("squatter", "contested@qnop.test", "Squat-Pass-1234!").andExpect(status().isOk());
 
-    verifyEmail(firstToken, "First-Pass-1234!")
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
-    verifyEmail(secondToken, "First-Pass-1234!")
+    // Each link checks its own registration's password.
+    verifyEmail(ownerToken, "Squat-Pass-1234!")
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VERIFICATION_PASSWORD_MISMATCH"));
-    verifyEmail(secondToken, PASSWORD).andExpect(status().isOk());
+    verifyEmail(ownerToken, PASSWORD).andExpect(status().isOk());
 
-    assertThat(users.findByUsernameAndSource("first", UserSource.INTERNAL)).isEmpty();
-    assertThat(internal("second").isEnabled()).isTrue();
+    User account =
+        users
+            .findByEmailIgnoreCaseAndSource("contested@qnop.test", UserSource.INTERNAL)
+            .orElseThrow();
+    assertThat(account.isEnabled()).isTrue();
+    assertThat(account.getUsername()).isEqualTo("owner");
+    assertThat(passwordEncoder.matches(PASSWORD, account.getPasswordHash())).isTrue();
+    assertThat(passwordEncoder.matches("Squat-Pass-1234!", account.getPasswordHash())).isFalse();
+
+    // Every other link of the address is spent.
+    verifyEmail(squatterToken, "Squat-Pass-1234!")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
+  }
+
+  @Test
+  @DisplayName(
+      "concurrent wrong passwords against one link: never more than five are compared, the"
+          + " link ends spent")
+  void concurrentAttemptsRespectTheCap() throws Exception {
+    register("racer", "racer@qnop.test", PASSWORD).andExpect(status().isOk());
+    String token = lastVerificationToken("racer@qnop.test");
+
+    int requests = 12;
+    java.util.concurrent.ExecutorService pool =
+        java.util.concurrent.Executors.newFixedThreadPool(requests);
+    java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+    List<java.util.concurrent.Future<String>> codes = new java.util.ArrayList<>();
+    try {
+      for (int i = 0; i < requests; i++) {
+        String guess = "Wrong-Pass-" + i;
+        codes.add(
+            pool.submit(
+                () -> {
+                  start.await();
+                  String body =
+                      verifyEmail(token, guess).andReturn().getResponse().getContentAsString();
+                  return com.jayway.jsonpath.JsonPath.read(body, "$.code");
+                }));
+      }
+      start.countDown();
+      List<String> results = new java.util.ArrayList<>();
+      for (java.util.concurrent.Future<String> code : codes) {
+        results.add(code.get(60, java.util.concurrent.TimeUnit.SECONDS));
+      }
+      // Four plain mismatches; the fifth reserved attempt spends the link, every other request
+      // finds no attempt left and is rejected without a comparison.
+      assertThat(results).filteredOn("VERIFICATION_PASSWORD_MISMATCH"::equals).hasSize(4);
+      assertThat(results).filteredOn("INVALID_VERIFICATION_TOKEN"::equals).hasSize(requests - 4);
+    } finally {
+      pool.shutdownNow();
+    }
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT max(failed_attempts) FROM email_verification_token t JOIN qnop_user u"
+                    + " ON u.id = t.user_id WHERE u.username = 'racer'",
+                Integer.class))
+        .isEqualTo(5);
+    verifyEmail(token, PASSWORD).andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
   }
 
   @Test
@@ -272,12 +326,6 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
     }
     int start = yaml.indexOf("UPDATE qnop_user");
     return yaml.substring(start, yaml.indexOf(';', start));
-  }
-
-  private void ageVerificationTokens(java.time.Duration age) {
-    jdbc.update(
-        "UPDATE email_verification_token SET created_at = created_at - (? * interval '1 second')",
-        age.toSeconds());
   }
 
   private User internal(String username) {

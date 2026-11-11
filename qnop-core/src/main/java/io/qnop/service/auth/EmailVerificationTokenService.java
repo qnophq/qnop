@@ -33,7 +33,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
-import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -43,9 +43,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Issues and consumes single-use email-verification tokens (issue #20). A token is 32 random bytes,
  * surfaced once to the user (in the verification email) and stored only as its SHA-256 hex digest
- * (issue #12), so a DB leak cannot reconstruct a usable link. Tokens live 24h and are single-use;
- * issuing a fresh token supersedes any earlier unconsumed one for the same user. A daily scheduled
- * sweep purges expired rows.
+ * (issue #12), so a DB leak cannot reconstruct a usable link. Tokens live 24h and are single-use.
+ * Each token carries the credentials of the registration it was issued for (issue #900); several
+ * registrations of one pending address hold separate, independent tokens until one is verified. A
+ * daily scheduled sweep purges expired rows.
  */
 @Service
 public class EmailVerificationTokenService {
@@ -53,8 +54,11 @@ public class EmailVerificationTokenService {
   static final int TOKEN_BYTES = 32;
   static final Duration TOKEN_TTL = Duration.ofHours(24);
 
-  /** Wrong registration passwords a verification link tolerates before it is spent (#900). */
+  /** Password attempts a verification link allows before it is spent (#900). */
   public static final int MAX_FAILED_ATTEMPTS = 5;
+
+  /** Verification links one pending address may have outstanding at once (#900). */
+  public static final int MAX_OUTSTANDING_TOKENS = 3;
 
   private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -67,60 +71,76 @@ public class EmailVerificationTokenService {
     this.scheduler = scheduler;
   }
 
-  /** Issues a fresh token for {@code user}, superseding any earlier unconsumed one. */
+  /**
+   * Issues a token for one registration of {@code user}'s pending address, carrying the credentials
+   * that registration asked for (issue #900). Other outstanding tokens stay valid — two
+   * registrations of one address cannot invalidate each other — except that at most {@value
+   * #MAX_OUTSTANDING_TOKENS} are kept: the oldest beyond that are spent.
+   */
   @Transactional
-  public IssuedToken issue(User user) {
+  public IssuedToken issueForRegistration(
+      User user, String username, String displayName, String passwordHash) {
     Instant now = Instant.now();
-    tokens.findUnconsumedTokensForUser(user.getId()).forEach(token -> token.setConsumedAt(now));
+    List<EmailVerificationToken> outstanding =
+        tokens.findUnconsumedTokensForUserOldestFirst(user.getId());
+    for (int i = 0; i <= outstanding.size() - MAX_OUTSTANDING_TOKENS; i++) {
+      outstanding.get(i).setConsumedAt(now);
+    }
     String rawToken = generateRawToken();
     Instant expiresAt = now.plus(TOKEN_TTL);
-    tokens.save(new EmailVerificationToken(user, sha256Hex(rawToken), expiresAt));
+    tokens.save(
+        new EmailVerificationToken(
+            user, sha256Hex(rawToken), expiresAt, username, displayName, passwordHash));
     return new IssuedToken(rawToken, expiresAt);
   }
 
   /**
-   * Validates a token WITHOUT consuming it and returns its owner (issue #900): the verification
-   * step checks the registrant's password before it spends the single-use token, so a mistyped
-   * password does not burn the link. Throws if unknown/expired/used.
+   * Validates a token WITHOUT consuming it (issue #900) and returns what verifying it would apply:
+   * the account and the registration's credentials — the account row's own for a token issued
+   * before candidates were stored. Throws if unknown/expired/used.
    */
   @Transactional(readOnly = true)
-  public User peek(String rawToken) {
-    return requireUsable(rawToken).getUser();
+  public PendingVerification peek(String rawToken) {
+    EmailVerificationToken token = requireUsable(rawToken);
+    User user = token.getUser();
+    boolean legacy = token.getCandidatePasswordHash() == null;
+    return new PendingVerification(
+        token.getId(),
+        user.getId(),
+        user.isEmailVerificationPending(),
+        legacy ? user.getUsername() : token.getCandidateUsername(),
+        legacy ? user.getDisplayName() : token.getCandidateDisplayName(),
+        legacy ? user.getPasswordHash() : token.getCandidatePasswordHash());
   }
 
   /**
-   * Records a wrong password presented with a usable token (issue #900) and spends the token once
-   * {@value #MAX_FAILED_ATTEMPTS} have been counted, so the registration password cannot be guessed
-   * with the link: the registrant then simply registers again. Returns whether the token is now
-   * spent.
+   * Reserves one password attempt BEFORE the comparison (issue #900): atomic and conditional, so
+   * concurrent requests can never compare more than {@value #MAX_FAILED_ATTEMPTS} passwords against
+   * one link. {@code false} when the token is spent, consumed or out of attempts.
    */
   @Transactional
-  public boolean recordFailedAttempt(String rawToken) {
-    EmailVerificationToken token = requireUsable(rawToken);
-    UUID id = token.getId();
-    tokens.incrementFailedAttempts(id);
-    return tokens.consumeIfAttemptsExhausted(id, MAX_FAILED_ATTEMPTS, Instant.now()) == 1;
+  public boolean reserveAttempt(UUID tokenId) {
+    return tokens.reserveAttempt(tokenId, MAX_FAILED_ATTEMPTS) == 1;
   }
 
-  /**
-   * When the user's newest verification token was issued, i.e. their last (re)registration (issue
-   * #900); empty when none is left (all swept).
-   */
-  @Transactional(readOnly = true)
-  public Optional<Instant> latestIssuedAt(UUID userId) {
-    return tokens.findLatestIssuedAt(userId);
-  }
-
-  /** Validates and consumes a token, returning its owner. Throws if unknown/expired/used. */
+  /** Spends a token whose attempts are used up; returns whether it is spent now (issue #900). */
   @Transactional
-  public User consume(String rawToken) {
-    EmailVerificationToken token = requireUsable(rawToken);
-    User user = token.getUser(); // resolve before the atomic update clears the persistence context
-    // Atomic single-use guard (issue #61): only one concurrent caller flips consumed_at from null.
-    if (tokens.markConsumed(token.getId(), Instant.now()) == 0) {
+  public boolean spendIfExhausted(UUID tokenId) {
+    return tokens.consumeIfAttemptsExhausted(tokenId, MAX_FAILED_ATTEMPTS, Instant.now()) == 1;
+  }
+
+  /** Consumes the token atomically (issue #61); throws if another request consumed it first. */
+  @Transactional
+  public void consume(UUID tokenId) {
+    if (tokens.markConsumed(tokenId, Instant.now()) == 0) {
       throw new InvalidVerificationTokenException("Verification token already used");
     }
-    return user;
+  }
+
+  /** Spends every outstanding token of the user — once one of them has been verified (#900). */
+  @Transactional
+  public void consumeAllForUser(UUID userId) {
+    tokens.consumeAllForUser(userId, Instant.now());
   }
 
   /**
@@ -173,6 +193,18 @@ public class EmailVerificationTokenService {
 
   /** A freshly issued token: the raw value (emailed once) and its absolute expiry. */
   public record IssuedToken(String rawToken, Instant expiresAt) {}
+
+  /**
+   * What verifying a token would do (issue #900): which account, whether it is still pending, and
+   * the credentials its registration asked for.
+   */
+  public record PendingVerification(
+      UUID tokenId,
+      UUID userId,
+      boolean accountPending,
+      String username,
+      String displayName,
+      String passwordHash) {}
 
   /** Raised when a presented verification token is unknown, expired, or already consumed. */
   public static class InvalidVerificationTokenException extends RuntimeException {

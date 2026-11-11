@@ -37,6 +37,7 @@ import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.InvalidTextException;
 import io.qnop.service.UserService;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
+import io.qnop.service.auth.EmailVerificationTokenService.PendingVerification;
 import io.qnop.service.auth.RegistrationService.VerificationPasswordMismatchException;
 import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailService;
@@ -82,6 +83,10 @@ class RegistrationServiceTest {
     lenient().when(passwordEncoder.encode("password1")).thenReturn("HASH");
     lenient().when(userService.findInternalByEmail(any())).thenReturn(Optional.empty());
     lenient().when(userService.findInternalByUsername(any())).thenReturn(Optional.empty());
+    lenient()
+        .when(verificationTokens.issueForRegistration(any(), any(), any(), any()))
+        .thenReturn(
+            new EmailVerificationTokenService.IssuedToken("RAW", Instant.now().plusSeconds(60)));
   }
 
   private static User withId(User user) {
@@ -95,6 +100,23 @@ class RegistrationServiceTest {
     return user;
   }
 
+  private static User pending(String username, String email) {
+    User user = withId(User.internal(username, email, username, "ROW-HASH"));
+    user.markPendingEmailVerification();
+    return user;
+  }
+
+  private static User active(String username, String email) {
+    User user = withId(User.internal(username, email, username, "ROW-HASH"));
+    user.setEnabled(true);
+    return user;
+  }
+
+  private static PendingVerification pendingVerification(UUID userId, boolean accountPending) {
+    return new PendingVerification(
+        UUID.randomUUID(), userId, accountPending, "jane", "Jane", "CAND-HASH");
+  }
+
   @Test
   @DisplayName("a display name with control characters is rejected before anything else")
   void displayNameWithControlCharactersRejected() {
@@ -106,28 +128,10 @@ class RegistrationServiceTest {
     verify(userService, never()).createPendingRegistration(any(), any(), any(), any(), any());
   }
 
-  private static User pending(String username, String email) {
-    User user = withId(User.internal(username, email, username, "OLD-HASH"));
-    user.markPendingEmailVerification();
-    return user;
-  }
-
-  private static User active(String username, String email) {
-    User user = withId(User.internal(username, email, username, "OLD-HASH"));
-    user.setEnabled(true);
-    return user;
-  }
-
-  private void tokenFor(User user) {
-    when(verificationTokens.issue(user))
-        .thenReturn(
-            new EmailVerificationTokenService.IssuedToken("RAW", Instant.now().plusSeconds(60)));
-  }
-
   @Test
   @DisplayName(
-      "a new account is created pending verification with the configured role and the"
-          + " verification mail is queued for after the commit")
+      "a new account is created pending verification with the configured role; its link carries"
+          + " the registration's credentials and the mail is queued for after the commit")
   void newAccountIsRegistered() {
     User user = pending("jane", "jane@example.com");
     when(settings.getString(ApplicationSettingKey.AUTH_SELF_REGISTRATION_DEFAULT_ROLE))
@@ -135,10 +139,10 @@ class RegistrationServiceTest {
     when(userService.createPendingRegistration(
             "jane", "jane@example.com", "HASH", "Jane", UserRole.AUDITOR))
         .thenReturn(user);
-    tokenFor(user);
 
     service.register("jane", "jane@example.com", "password1", "Jane");
 
+    verify(verificationTokens).issueForRegistration(user, "jane", "Jane", "HASH");
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
     verify(mailService)
@@ -148,8 +152,6 @@ class RegistrationServiceTest {
             vars.capture(),
             eq("en"));
     verify(mailService, never()).sendMailFromTemplate(any(), any(), anyMap(), any());
-    // Every placeholder the template uses is supplied (strict Mustache drops the mail otherwise),
-    // and the English expiry phrase is unchanged.
     assertThat(vars.getValue().keySet())
         .containsAll(MailTemplateKey.REGISTRATION_VERIFICATION.placeholders());
     assertThat(vars.getValue().get("expiresAtHuman")).isEqualTo("in 1 minute");
@@ -166,7 +168,6 @@ class RegistrationServiceTest {
     when(userService.createPendingRegistration(
             "jane", "jane@example.com", "HASH", "Jane", UserRole.MEMBER))
         .thenReturn(user);
-    tokenFor(user);
 
     service.register("jane", "jane@example.com", "password1", "Jane");
 
@@ -187,8 +188,7 @@ class RegistrationServiceTest {
 
     verify(passwordEncoder).encode("password1");
     verify(userService, never()).createPendingRegistration(any(), any(), any(), any(), any());
-    verify(userService, never()).replacePendingRegistration(any(), any(), any(), any());
-    verify(verificationTokens, never()).issue(any());
+    verify(verificationTokens, never()).issueForRegistration(any(), any(), any(), any());
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
     verify(mailService)
@@ -197,21 +197,22 @@ class RegistrationServiceTest {
             eq("jane@example.com"),
             vars.capture(),
             eq("de"));
-    assertThat(vars.getValue().keySet())
-        .containsAll(MailTemplateKey.REGISTRATION_ATTEMPT.placeholders());
-    assertThat(vars.getValue().get("actionUrl")).isEqualTo("https://qnop.example/login");
+    // No text from the request reaches the notice.
+    assertThat(vars.getValue())
+        .containsOnlyKeys("siteName", "actionUrl")
+        .containsEntry("actionUrl", "https://qnop.example/login");
   }
 
   @Test
-  @DisplayName("an administrator-disabled account is not taken over by a new registration")
-  void adminDisabledAccountIsNotTakenOver() {
+  @DisplayName("an administrator-disabled account gets no new link, only the notice")
+  void adminDisabledAccountGetsNoLink() {
     User existing = active("jane", "jane@example.com");
     existing.setEnabled(false); // an administrator's decision: not pending
     when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(existing));
 
     service.register("jane", "jane@example.com", "password1", "Jane");
 
-    verify(userService, never()).replacePendingRegistration(any(), any(), any(), any());
+    verify(verificationTokens, never()).issueForRegistration(any(), any(), any(), any());
     verify(mailService)
         .sendMailFromTemplateAfterCommit(
             eq(MailTemplateKey.REGISTRATION_ATTEMPT), eq("jane@example.com"), anyMap(), any());
@@ -234,26 +235,24 @@ class RegistrationServiceTest {
 
   @Test
   @DisplayName(
-      "re-registering an address still pending verification replaces the unverified password"
-          + " and re-sends the verification mail")
-  void pendingAccountIsTakenOver() {
+      "registering a pending address issues one more link with this registration's credentials"
+          + " and changes nothing else — no cool-down, nothing invalidated")
+  void pendingAddressGetsAnotherLink() {
     User existing = pending("squatter", "jane@example.com");
     when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(existing));
-    when(userService.replacePendingRegistration(existing.getId(), "jane", "HASH", "Jane"))
-        .thenReturn(existing);
-    tokenFor(existing);
 
-    service.register("jane", "jane@example.com", "password1", "Jane");
+    service.register("jane", "jane@example.com", "password1", null);
 
-    verify(userService).replacePendingRegistration(existing.getId(), "jane", "HASH", "Jane");
+    verify(verificationTokens).issueForRegistration(existing, "jane", "jane", "HASH");
+    verify(userService, never()).createPendingRegistration(any(), any(), any(), any(), any());
     verify(mailService)
         .sendMailFromTemplateAfterCommit(
             eq(MailTemplateKey.REGISTRATION_VERIFICATION), eq("jane@example.com"), anyMap(), any());
   }
 
   @Test
-  @DisplayName("a pending address cannot take over a username that belongs to another account")
-  void pendingTakeoverRespectsOtherUsernames() {
+  @DisplayName("a pending address cannot claim a username that belongs to another account")
+  void pendingAddressRespectsOtherUsernames() {
     User existing = pending("squatter", "jane@example.com");
     User other = active("bob", "bob@example.com");
     when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(existing));
@@ -261,117 +260,106 @@ class RegistrationServiceTest {
 
     service.register("bob", "jane@example.com", "password1", "Jane");
 
-    verify(userService, never()).replacePendingRegistration(any(), any(), any(), any());
+    verify(verificationTokens, never()).issueForRegistration(any(), any(), any(), any());
     verify(mailService)
         .sendMailFromTemplateAfterCommit(
             eq(MailTemplateKey.REGISTRATION_ATTEMPT), eq("jane@example.com"), anyMap(), any());
   }
 
   @Test
-  @DisplayName("verify with the registration password consumes the token and activates")
-  void verifyActivates() {
-    User user = pending("jane", "jane@example.com");
-    when(verificationTokens.peek("tok")).thenReturn(user);
-    when(passwordEncoder.matches("password1", "OLD-HASH")).thenReturn(true);
-    when(userService.activatePendingVerification(user.getId())).thenReturn(true);
+  @DisplayName(
+      "verify reserves an attempt, checks the token's own password, consumes it, activates with"
+          + " the token's credentials and spends the other links")
+  void verifyActivatesWithTheTokensCredentials() {
+    UUID userId = UUID.randomUUID();
+    PendingVerification pending = pendingVerification(userId, true);
+    when(verificationTokens.peek("tok")).thenReturn(pending);
+    when(verificationTokens.reserveAttempt(pending.tokenId())).thenReturn(true);
+    when(passwordEncoder.matches("password1", "CAND-HASH")).thenReturn(true);
+    when(userService.activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH"))
+        .thenReturn(true);
 
     service.verify("tok", "password1");
 
-    verify(verificationTokens).consume("tok");
-    verify(userService).activatePendingVerification(user.getId());
+    var order = org.mockito.Mockito.inOrder(verificationTokens, passwordEncoder, userService);
+    order.verify(verificationTokens).reserveAttempt(pending.tokenId());
+    order.verify(passwordEncoder).matches("password1", "CAND-HASH");
+    order.verify(verificationTokens).consume(pending.tokenId());
+    order.verify(userService).activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH");
+    order.verify(verificationTokens).consumeAllForUser(userId);
   }
 
   @Test
-  @DisplayName("verify with another password neither consumes the token nor activates")
+  @DisplayName("without an attempt left, no password is compared at all")
+  void verifyComparesNothingWhenAttemptsAreGone() {
+    PendingVerification pending = pendingVerification(UUID.randomUUID(), true);
+    when(verificationTokens.peek("tok")).thenReturn(pending);
+    when(verificationTokens.reserveAttempt(pending.tokenId())).thenReturn(false);
+
+    assertThatThrownBy(() -> service.verify("tok", "password1"))
+        .isInstanceOf(InvalidVerificationTokenException.class);
+
+    verify(passwordEncoder, never()).matches(any(), any());
+    verify(userService, never()).activateVerifiedRegistration(any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("a wrong password neither consumes the token nor activates")
   void verifyRejectsWrongPassword() {
-    User user = pending("jane", "jane@example.com");
-    when(verificationTokens.peek("tok")).thenReturn(user);
-    when(passwordEncoder.matches("guess", "OLD-HASH")).thenReturn(false);
+    PendingVerification pending = pendingVerification(UUID.randomUUID(), true);
+    when(verificationTokens.peek("tok")).thenReturn(pending);
+    when(verificationTokens.reserveAttempt(pending.tokenId())).thenReturn(true);
+    when(passwordEncoder.matches("guess", "CAND-HASH")).thenReturn(false);
 
     assertThatThrownBy(() -> service.verify("tok", "guess"))
         .isInstanceOf(VerificationPasswordMismatchException.class)
         .satisfies(
             e -> assertThat(((VerificationPasswordMismatchException) e).linkSpent()).isFalse());
 
-    verify(verificationTokens).recordFailedAttempt("tok");
     verify(verificationTokens, never()).consume(any());
-    verify(userService, never()).activatePendingVerification(any());
+    verify(userService, never()).activateVerifiedRegistration(any(), any(), any(), any());
   }
 
   @Test
-  @DisplayName("the wrong password that reaches the attempt cap reports the link as spent")
+  @DisplayName("the wrong password that uses up the allowance reports the link as spent")
   void verifyReportsSpentLinkAtTheCap() {
-    User user = pending("jane", "jane@example.com");
-    when(verificationTokens.peek("tok")).thenReturn(user);
-    when(passwordEncoder.matches("guess", "OLD-HASH")).thenReturn(false);
-    when(verificationTokens.recordFailedAttempt("tok")).thenReturn(true);
+    PendingVerification pending = pendingVerification(UUID.randomUUID(), true);
+    when(verificationTokens.peek("tok")).thenReturn(pending);
+    when(verificationTokens.reserveAttempt(pending.tokenId())).thenReturn(true);
+    when(passwordEncoder.matches("guess", "CAND-HASH")).thenReturn(false);
+    when(verificationTokens.spendIfExhausted(pending.tokenId())).thenReturn(true);
 
     assertThatThrownBy(() -> service.verify("tok", "guess"))
         .isInstanceOf(VerificationPasswordMismatchException.class)
         .satisfies(
             e -> assertThat(((VerificationPasswordMismatchException) e).linkSpent()).isTrue());
-    verify(userService, never()).activatePendingVerification(any());
-  }
-
-  @Test
-  @DisplayName(
-      "within the cool-down a re-registration of a pending address is a silent no-op:"
-          + " nothing replaced, no mail")
-  void pendingAccountIsProtectedDuringCoolDown() {
-    User existing = pending("first", "jane@example.com");
-    when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(existing));
-    when(verificationTokens.latestIssuedAt(existing.getId()))
-        .thenReturn(Optional.of(Instant.now().minusSeconds(60)));
-
-    service.register("second", "jane@example.com", "password1", "Someone");
-
-    verify(passwordEncoder).encode("password1"); // same cost as every other branch
-    verify(userService, never()).replacePendingRegistration(any(), any(), any(), any());
-    verify(verificationTokens, never()).issue(any());
-    verify(mailService, never()).sendMailFromTemplateAfterCommit(any(), any(), anyMap(), any());
-  }
-
-  @Test
-  @DisplayName("after the cool-down a re-registration of a pending address takes it over")
-  void pendingAccountIsTakenOverAfterCoolDown() {
-    User existing = pending("first", "jane@example.com");
-    when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(existing));
-    when(verificationTokens.latestIssuedAt(existing.getId()))
-        .thenReturn(
-            Optional.of(
-                Instant.now().minus(RegistrationService.TAKEOVER_COOL_DOWN).minusSeconds(1)));
-    when(userService.replacePendingRegistration(existing.getId(), "second", "HASH", "Someone"))
-        .thenReturn(existing);
-    tokenFor(existing);
-
-    service.register("second", "jane@example.com", "password1", "Someone");
-
-    verify(userService).replacePendingRegistration(existing.getId(), "second", "HASH", "Someone");
   }
 
   @Test
   @DisplayName("verify can never enable an administrator-disabled account")
   void verifyRejectsAdminDisabledAccount() {
-    User user = active("jane", "jane@example.com");
-    user.setEnabled(false);
-    when(verificationTokens.peek("tok")).thenReturn(user);
+    when(verificationTokens.peek("tok")).thenReturn(pendingVerification(UUID.randomUUID(), false));
 
     assertThatThrownBy(() -> service.verify("tok", "password1"))
         .isInstanceOf(InvalidVerificationTokenException.class);
 
-    verify(verificationTokens, never()).consume(any());
-    verify(userService, never()).activatePendingVerification(any());
+    verify(verificationTokens, never()).reserveAttempt(any());
+    verify(userService, never()).activateVerifiedRegistration(any(), any(), any(), any());
   }
 
   @Test
   @DisplayName("verify fails when the account stopped being pending after the checks (race)")
   void verifyFailsWhenActivationLosesTheRace() {
-    User user = pending("jane", "jane@example.com");
-    when(verificationTokens.peek("tok")).thenReturn(user);
-    when(passwordEncoder.matches("password1", "OLD-HASH")).thenReturn(true);
-    when(userService.activatePendingVerification(user.getId())).thenReturn(false);
+    UUID userId = UUID.randomUUID();
+    PendingVerification pending = pendingVerification(userId, true);
+    when(verificationTokens.peek("tok")).thenReturn(pending);
+    when(verificationTokens.reserveAttempt(pending.tokenId())).thenReturn(true);
+    when(passwordEncoder.matches("password1", "CAND-HASH")).thenReturn(true);
+    when(userService.activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH"))
+        .thenReturn(false);
 
     assertThatThrownBy(() -> service.verify("tok", "password1"))
         .isInstanceOf(InvalidVerificationTokenException.class);
+    verify(verificationTokens, never()).consumeAllForUser(any());
   }
 }

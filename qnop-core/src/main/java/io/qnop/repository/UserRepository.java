@@ -140,25 +140,31 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   boolean existsByEmailIgnoreCaseAndSource(String email, UserSource source);
 
   /**
-   * Atomically activates an account whose e-mail verification is still pending (issue #900) and
-   * bumps {@code version}. Conditional on the pending flag, so it is a no-op (returns 0) for an
-   * account an administrator has decided about in the meantime — a verification link can never
-   * re-enable an administrator-disabled account, not even in a race with that decision.
+   * Atomically activates an account whose e-mail verification is still pending, with the
+   * credentials of the verified registration, and bumps {@code version} (issue #900). Conditional
+   * on the pending flag, so it is a no-op (returns 0) for an account an administrator has decided
+   * about in the meantime, or one another verification link activated first — not even a race can
+   * re-enable an administrator-disabled account or apply two registrations.
    */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      "UPDATE User u SET u.enabled = true, u.emailVerificationPending = false,"
+          + " u.username = :username, u.displayName = :displayName, u.passwordHash = :hash,"
+          + " u.version = u.version + 1 WHERE u.id = :id AND u.emailVerificationPending = true")
+  int activateVerifiedRegistration(
+      @Param("id") UUID id,
+      @Param("username") String username,
+      @Param("displayName") String displayName,
+      @Param("hash") String passwordHash);
+
   /**
-   * Re-points the slug of a still-pending registration that was superseded (issue #900). Native
+   * Re-points the slug of a freshly verified registration to its display name (issue #900). Native
    * because the mapped column is not updatable; flushes first so pending entity changes are written
    * before, and are not lost to, this statement.
    */
   @Modifying(flushAutomatically = true)
   @Query(value = "UPDATE qnop_user SET slug = :slug WHERE id = :id", nativeQuery = true)
   int updateSlug(@Param("id") UUID id, @Param("slug") String slug);
-
-  @Modifying(clearAutomatically = true)
-  @Query(
-      "UPDATE User u SET u.enabled = true, u.emailVerificationPending = false,"
-          + " u.version = u.version + 1 WHERE u.id = :id AND u.emailVerificationPending = true")
-  int activatePendingVerification(@Param("id") UUID id);
 
   /**
    * Atomically stamps the last-login timestamp (issue #61) without a read-modify-write, so a login

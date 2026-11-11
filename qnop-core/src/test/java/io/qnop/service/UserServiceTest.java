@@ -136,37 +136,57 @@ class UserServiceTest {
   }
 
   @Test
-  @DisplayName("replacePendingRegistration swaps username, display name and password hash")
-  void replacePendingRegistrationReplacesCredentials() {
+  @DisplayName(
+      "activateVerifiedRegistration applies the verified credentials and moves the slug to the"
+          + " verified display name")
+  void activateVerifiedRegistrationAppliesCredentials() {
     UUID id = UUID.randomUUID();
     User pending = User.internal("Squatter Name", "jane@example.com", "old", "old-hash");
     pending.setSlug("squatter-name");
-    pending.markPendingEmailVerification();
+    when(users.activateVerifiedRegistration(id, "jane", "Jane Doe", "new-hash")).thenReturn(1);
     when(users.findById(id)).thenReturn(Optional.of(pending));
 
-    User replaced = service.replacePendingRegistration(id, "jane", "new-hash", "Jane Doe");
+    assertThat(service.activateVerifiedRegistration(id, "jane", "Jane Doe", "new-hash")).isTrue();
 
-    assertThat(replaced.getUsername()).isEqualTo("jane");
-    assertThat(replaced.getDisplayName()).isEqualTo("Jane Doe");
-    assertThat(replaced.getPasswordHash()).isEqualTo("new-hash");
-    assertThat(replaced.isEmailVerificationPending()).isTrue();
-    // The earlier registrant's name does not survive in the profile URL (issue #900, L4).
-    assertThat(replaced.getSlug()).isEqualTo("jane-doe");
+    // The earlier registrant's name does not survive in the profile URL (issue #900).
     verify(users).updateSlug(id, "jane-doe");
   }
 
   @Test
-  @DisplayName("replacePendingRegistration keeps a slug that already fits the new name")
-  void replacePendingRegistrationKeepsAFittingSlug() {
+  @DisplayName("activateVerifiedRegistration keeps a slug that already fits the name")
+  void activateVerifiedRegistrationKeepsAFittingSlug() {
     UUID id = UUID.randomUUID();
     User pending = User.internal("Jane Doe", "jane@example.com", "jane", "old-hash");
     pending.setSlug("jane-doe");
-    pending.markPendingEmailVerification();
+    when(users.activateVerifiedRegistration(id, "jane", "Jane Doe", "h")).thenReturn(1);
     when(users.findById(id)).thenReturn(Optional.of(pending));
 
-    service.replacePendingRegistration(id, "jane", "new-hash", "Jane Doe");
+    service.activateVerifiedRegistration(id, "jane", "Jane Doe", "h");
 
     verify(users, never()).updateSlug(any(), any());
+  }
+
+  @Test
+  @DisplayName(
+      "activateVerifiedRegistration changes nothing for an account that is no longer pending")
+  void activateVerifiedRegistrationIsConditional() {
+    UUID id = UUID.randomUUID();
+    when(users.activateVerifiedRegistration(id, "jane", "jane", "h")).thenReturn(0);
+
+    assertThat(service.activateVerifiedRegistration(id, "jane", null, "h")).isFalse();
+    verify(users, never()).updateSlug(any(), any());
+  }
+
+  @Test
+  @DisplayName("activateVerifiedRegistration refuses a username another account took meanwhile")
+  void activateVerifiedRegistrationRefusesTakenUsername() {
+    UUID id = UUID.randomUUID();
+    User other = User.internal("Jane", "other@example.com", "jane", "h");
+    when(users.findByUsernameAndSource("jane", UserSource.INTERNAL))
+        .thenReturn(Optional.of(other)); // a different (id-less) account
+
+    assertThat(service.activateVerifiedRegistration(id, "jane", "Jane", "h")).isFalse();
+    verify(users, never()).activateVerifiedRegistration(any(), any(), any(), any());
   }
 
   @Test
@@ -181,31 +201,6 @@ class UserServiceTest {
     admin.setPasswordChangeRequired(false);
     assertThat(service.internalPasswordChangeStillRequired("admin")).isFalse();
     assertThat(service.internalPasswordChangeStillRequired("ghost")).isFalse();
-  }
-
-  @Test
-  @DisplayName("replacePendingRegistration refuses an account that is no longer pending")
-  void replacePendingRegistrationRefusesDecidedAccounts() {
-    UUID id = UUID.randomUUID();
-    User disabled = User.internal("Jane", "jane@example.com", "jane", "hash");
-    disabled.setEnabled(false);
-    when(users.findById(id)).thenReturn(Optional.of(disabled));
-
-    assertThatThrownBy(() -> service.replacePendingRegistration(id, "x", "new-hash", "X"))
-        .isInstanceOf(IllegalStateException.class);
-    assertThat(disabled.getPasswordHash()).isEqualTo("hash");
-  }
-
-  @Test
-  @DisplayName("activatePendingVerification reports whether the conditional update hit a row")
-  void activatePendingVerificationIsConditional() {
-    UUID pending = UUID.randomUUID();
-    UUID decided = UUID.randomUUID();
-    when(users.activatePendingVerification(pending)).thenReturn(1);
-    when(users.activatePendingVerification(decided)).thenReturn(0);
-
-    assertThat(service.activatePendingVerification(pending)).isTrue();
-    assertThat(service.activatePendingVerification(decided)).isFalse();
   }
 
   @Test

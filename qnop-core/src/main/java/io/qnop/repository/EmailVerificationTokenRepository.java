@@ -38,14 +38,6 @@ public interface EmailVerificationTokenRepository
   Optional<EmailVerificationToken> findByTokenHash(String tokenHash);
 
   /**
-   * All in-flight (unconsumed) tokens for a user — used by the resend path to invalidate previous
-   * tokens before issuing a fresh one, so a user never has two valid verification links at once.
-   */
-  @Query(
-      "SELECT t FROM EmailVerificationToken t WHERE t.user.id = :userId AND t.consumedAt IS NULL")
-  List<EmailVerificationToken> findUnconsumedTokensForUser(@Param("userId") UUID userId);
-
-  /**
    * Atomically consumes a token (issue #61): sets {@code consumed_at} only if it is still null.
    * Returns 1 if this call won the race, 0 if the token was already consumed — so a verification
    * token cannot be consumed twice under concurrency.
@@ -56,17 +48,18 @@ public interface EmailVerificationTokenRepository
   int markConsumed(@Param("id") UUID id, @Param("at") Instant at);
 
   /**
-   * Counts one wrong password presented with a still-usable token (issue #900). Atomic, so
-   * concurrent attempts are all counted.
+   * Reserves one password attempt on a still-usable token BEFORE the password is compared (issue
+   * #900): atomic and conditional, so concurrent requests can never compare more than {@code max}
+   * passwords against one link. Returns 0 when the token is spent, consumed or out of attempts.
    */
   @Modifying(clearAutomatically = true)
   @Query(
       "UPDATE EmailVerificationToken t SET t.failedAttempts = t.failedAttempts + 1"
-          + " WHERE t.id = :id AND t.consumedAt IS NULL")
-  int incrementFailedAttempts(@Param("id") UUID id);
+          + " WHERE t.id = :id AND t.consumedAt IS NULL AND t.failedAttempts < :max")
+  int reserveAttempt(@Param("id") UUID id, @Param("max") int max);
 
   /**
-   * Spends a token whose wrong-password count reached {@code max} (issue #900). Returns 1 when this
+   * Spends a token whose reserved attempts reached {@code max} (issue #900). Returns 1 when this
    * call spent it.
    */
   @Modifying(clearAutomatically = true)
@@ -76,12 +69,18 @@ public interface EmailVerificationTokenRepository
   int consumeIfAttemptsExhausted(
       @Param("id") UUID id, @Param("max") int max, @Param("at") Instant at);
 
-  /**
-   * When the newest verification token of a user was issued — i.e. the last (re)registration (issue
-   * #900); empty when the user has none left.
-   */
-  @Query("SELECT MAX(t.createdAt) FROM EmailVerificationToken t WHERE t.user.id = :userId")
-  Optional<Instant> findLatestIssuedAt(@Param("userId") UUID userId);
+  /** Unconsumed tokens of a user, oldest first — to cap how many links are outstanding (#900). */
+  @Query(
+      "SELECT t FROM EmailVerificationToken t WHERE t.user.id = :userId AND t.consumedAt IS NULL"
+          + " ORDER BY t.createdAt ASC")
+  List<EmailVerificationToken> findUnconsumedTokensForUserOldestFirst(@Param("userId") UUID userId);
+
+  /** Spends every other unconsumed token of a user once one of them was verified (#900). */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      "UPDATE EmailVerificationToken t SET t.consumedAt = :at"
+          + " WHERE t.user.id = :userId AND t.consumedAt IS NULL")
+  int consumeAllForUser(@Param("userId") UUID userId, @Param("at") Instant at);
 
   /** Scheduled-sweep target: rows whose {@code expires_at} has passed. */
   long deleteByExpiresAtBefore(Instant cutoff);

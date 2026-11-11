@@ -131,22 +131,33 @@ comes into being without an authenticated session. Both are hardened:
   reopened for self-service verification.
 - **A password becomes a credential only once the mailbox owner confirms it.**
   `POST /auth/verify-email` takes the token **and** the password chosen at
-  registration (the former `GET ?token=` is gone). The token is checked without
-  being consumed, then the password, and only then is the single-use token spent,
-  so a typo does not burn the link (`VERIFICATION_PASSWORD_MISMATCH` vs.
-  `INVALID_VERIFICATION_TOKEN`). Guessing is bounded twice: each token counts wrong
-  passwords (`email_verification_token.failed_attempts`) and is spent at the fifth,
-  and the endpoint is rate-limited per client IP (default 10 per 15 minutes,
-  `qnop.auth.rate-limit.verify-email.*`; the auth rate-limit catalogue may absorb it
-  later). Whoever registers an address they do not control
-  gains nothing: the owner who receives the link cannot confirm a password they do
-  not know, and a new registration for an address that is still pending
-  **replaces** the unverified username, display name, password and profile slug and
-  supersedes the earlier link — but only once the last (re)registration is older
-  than a 15-minute cool-down; within it the request is a uniform no-op that sends
-  no mail, so a third party cannot keep killing the owner's fresh link or flood
-  the mailbox. Nobody has proven control of the mailbox at that point, so no
-  earlier registrant has a claim to protect.
+  registration (the former `GET ?token=` is gone).
+- **Credentials are bound to the verification token, not to the account row.**
+  Every (re)registration of a pending address issues a token that carries that
+  registration's candidate username, display name and password hash
+  (`email_verification_token.candidate_*`, migration 0039); it does **not**
+  invalidate the other outstanding tokens. Verifying a token with its own password
+  activates the account with exactly that token's credentials (one conditional,
+  version-bumping update; the profile slug follows the verified display name) and
+  spends every other token of the address. So neither party can block or
+  invalidate the other — a registration by someone who does not own the address
+  leaves the owner's link working, and only the mailbox owner, who receives the
+  links, can complete any of them. At most three links per address are
+  outstanding (the oldest are spent); volume per address is the job of the
+  register rate limits. Tokens issued before this change carry no candidate and
+  fall back to the account row. An earlier draft let the newest registration
+  replace the account row's credentials (and then a cool-down to stop it from
+  killing fresh links); both directions let a third party interfere, which the
+  token binding removes structurally.
+- **Guessing is bounded.** One attempt is reserved atomically **before** the
+  password comparison (`UPDATE … SET failed_attempts = failed_attempts + 1 WHERE
+  consumed_at IS NULL AND failed_attempts < 5`); no reservation, no comparison.
+  So even concurrent requests compare at most five passwords against one link,
+  and the attempt that uses up the allowance spends it. A mistyped password does
+  not burn the link before that (`VERIFICATION_PASSWORD_MISMATCH` vs.
+  `INVALID_VERIFICATION_TOKEN`). The endpoint is also rate-limited per client IP
+  (default 10 per 15 minutes, `qnop.auth.rate-limit.verify-email.*`; the auth
+  rate-limit catalogue may absorb it later).
 - **Duplicate registration sends a neutral notice** (`auth.registration_attempt`)
   to the entered address when the address or username belongs to any other
   account; nothing is created or changed and the response stays uniform.
@@ -159,8 +170,9 @@ comes into being without an authenticated session. Both are hardened:
   rendering nor SMTP runs in the request thread and a rolled-back request mails
   nobody. A full queue drops the mail with a WARN rather than running it on the
   caller (which would bring the timing signal back); queued mails are delivered on
-  shutdown (bounded wait), and the request's MDC travels with each task. Admin-initiated setup links stay synchronous because the admin UI needs
-  the send result. (Login timing: issue #903, first part.)
+  shutdown (bounded wait), and the request's MDC travels with each task.
+  Admin-initiated setup links stay synchronous because the admin UI needs the
+  send result. (Login timing: issue #903, first part.)
 - **First-boot admin credential.** A generated password is written to
   `admin-password.txt` inside a new `qnop-bootstrap-<random>` directory created
   with `rwx------` in one step, the file with `CREATE_NEW` + `rw-------` in one step:
@@ -173,8 +185,8 @@ comes into being without an authenticated session. Both are hardened:
   once the generated password has been changed.
 
 Accepted consequences: the verify step now asks for a password, so a user who
-forgot the password chosen minutes earlier registers again after the cool-down
-(which replaces the pending registration). An admin edit that decides the enabled
+forgot the password chosen minutes earlier registers again and uses the new link
+(a separate one; the forgotten one simply expires). An admin edit that decides the enabled
 state of a pending account turns it into an ordinary (possibly disabled) account
 the link can no longer activate. The admin user list does not yet show the pending
 state separately (follow-up).

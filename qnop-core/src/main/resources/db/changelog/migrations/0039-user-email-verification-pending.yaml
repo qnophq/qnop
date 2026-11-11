@@ -61,3 +61,18 @@ databaseChangeLog:
                   type: INTEGER
                   defaultValueNumeric: 0
                   constraints: { nullable: false }
+  - changeSet:
+      id: 0039-email-verification-token-candidate
+      author: qnop
+      comment: >-
+        The credentials a registration asks for live on its verification token
+        (issue #900): the token that is verified decides the account's username,
+        display name and password. Null on tokens issued before this change; the
+        account row's values apply to those.
+      changes:
+        - addColumn:
+            tableName: email_verification_token
+            columns:
+              - column: { name: candidate_username, type: VARCHAR(64) }
+              - column: { name: candidate_display_name, type: VARCHAR(255) }
+              - column: { name: candidate_password_hash, type: VARCHAR(255) }

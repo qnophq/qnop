@@ -81,36 +81,6 @@ public class UserService {
     return users.save(user);
   }
 
-  /**
-   * Re-registration of an address whose account is still pending verification (issue #900): the
-   * newest registration's username, display name and password replace the unverified ones. Nobody
-   * has proven control of the mailbox yet, so no earlier registrant has a claim to keep — and the
-   * verification step requires the password, so only a registrant who knows the stored password and
-   * receives the mail can activate the account. Refuses an account that is no longer pending.
-   */
-  @Transactional
-  public User replacePendingRegistration(
-      UUID id, String username, String passwordHash, String displayName) {
-    User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
-    if (!user.isEmailVerificationPending()) {
-      throw new IllegalStateException("account " + id + " is not pending verification");
-    }
-    InvalidTextException.requireNoControlCharacters("displayName", displayName);
-    String name = displayNameOrUsername(displayName, username);
-    user.setUsername(username);
-    user.setDisplayName(name);
-    user.setPasswordHash(passwordHash);
-    // The earlier registrant's name must not live on in the public profile URL (#473): the slug
-    // follows the new display name unless it already is that name's natural slug.
-    String naturalSlug = UserSlugs.candidate(UserSlugs.derive(name), 1);
-    if (!naturalSlug.equalsIgnoreCase(user.getSlug())) {
-      String slug = slugs.allocate(name);
-      users.updateSlug(id, slug);
-      user.setSlug(slug);
-    }
-    return user;
-  }
-
   /** An internal user by exact username, if one exists. */
   @Transactional(readOnly = true)
   public Optional<User> findInternalByUsername(String username) {
@@ -156,13 +126,35 @@ public class UserService {
    * a colleague — display name and tenure, nothing more (no email, role or source).
    */
   /**
-   * Activates an account after a successful e-mail verification (issue #900) — only while it is
-   * still pending. Returns {@code false} when it is not (an administrator decided about it, or it
-   * was activated already), in which case nothing changes.
+   * Activates an account after a successful e-mail verification (issue #900) with exactly the
+   * credentials of the verified registration — only while the account is still pending. Returns
+   * {@code false} without changing anything when it is not (an administrator decided about it, or
+   * another link was verified first) or when the registration's username has meanwhile been taken
+   * by another account. The profile slug follows the verified display name, so an earlier
+   * registrant's text does not survive into the public profile URL (#473).
    */
   @Transactional
-  public boolean activatePendingVerification(UUID id) {
-    return users.activatePendingVerification(id) == 1;
+  public boolean activateVerifiedRegistration(
+      UUID id, String username, String displayName, String passwordHash) {
+    InvalidTextException.requireNoControlCharacters("displayName", displayName);
+    boolean usernameTaken =
+        users
+            .findByUsernameAndSource(username, UserSource.INTERNAL)
+            .filter(other -> !id.equals(other.getId()))
+            .isPresent();
+    if (usernameTaken) {
+      return false;
+    }
+    String name = displayNameOrUsername(displayName, username);
+    if (users.activateVerifiedRegistration(id, username, name, passwordHash) != 1) {
+      return false;
+    }
+    User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
+    String naturalSlug = UserSlugs.candidate(UserSlugs.derive(name), 1);
+    if (!naturalSlug.equalsIgnoreCase(user.getSlug())) {
+      users.updateSlug(id, slugs.allocate(name));
+    }
+    return true;
   }
 
   /**
