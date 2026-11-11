@@ -42,6 +42,12 @@ public class AuthService {
   private final TokenRevocationService tokenRevocationService;
   private final RefreshTokenService refreshTokenService;
 
+  /**
+   * A hash of a random, never-disclosed secret, compared against on every login that has no usable
+   * stored hash (issue #903), so every path pays exactly one password comparison.
+   */
+  private final String dummyPasswordHash;
+
   public AuthService(
       UserRepository userRepository,
       PasswordEncoder passwordEncoder,
@@ -51,12 +57,17 @@ public class AuthService {
     this.passwordEncoder = passwordEncoder;
     this.tokenRevocationService = tokenRevocationService;
     this.refreshTokenService = refreshTokenService;
+    this.dummyPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
   }
 
   /**
    * Verifies local credentials. Accepts the username or the (case-insensitive) email. Returns the
    * user id on success, or empty on any failure (unknown user, disabled, wrong password) — the
    * caller must not distinguish the reasons.
+   *
+   * <p>Exactly one password comparison runs on every path (issue #903): an unknown, disabled or
+   * password-less account is compared against a dummy hash, so the response time does not reveal
+   * whether an account exists.
    */
   @Transactional(readOnly = true)
   public Optional<UUID> authenticate(String usernameOrEmail, String password) {
@@ -68,13 +79,10 @@ public class AuthService {
                     userRepository.findByEmailIgnoreCaseAndSource(
                         usernameOrEmail, UserSource.INTERNAL))
             .orElse(null);
-    if (user == null
-        || !user.isEnabled()
-        || user.getPasswordHash() == null
-        || !passwordEncoder.matches(password, user.getPasswordHash())) {
-      return Optional.empty();
-    }
-    return Optional.of(user.getId());
+    boolean usable = user != null && user.isEnabled() && user.getPasswordHash() != null;
+    boolean matches =
+        passwordEncoder.matches(password, usable ? user.getPasswordHash() : dummyPasswordHash);
+    return usable && matches ? Optional.of(user.getId()) : Optional.empty();
   }
 
   /**

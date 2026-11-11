@@ -66,6 +66,7 @@ public class UserService {
   @Transactional
   public User createSelfRegistered(
       String username, String email, String rawPassword, String displayName, UserRole role) {
+    InvalidTextException.requireNoControlCharacters("displayName", displayName);
     // Self-registration is the one path a stranger can walk (issue #673).
     limits.requireUserCapacity();
     String name = displayName == null || displayName.isBlank() ? username : displayName;
@@ -147,23 +148,29 @@ public class UserService {
     // A first OIDC login creates an account like any other; a quota the identity
     // provider walks around is not a quota (issue #673).
     limits.requireUserCapacity();
-    User user = User.external(displayName, normalizeEmail(email));
+    // Claims from the identity provider are not ours to reject — a login must not
+    // fail over a stray line break — so they are neutralised instead (issue #909).
+    String name = singleLine(displayName, emailLocalPart(email));
+    User user = User.external(name, normalizeEmail(email));
     user.setEnabled(true);
-    user.setSlug(slugs.allocate(displayName));
+    user.setSlug(slugs.allocate(name));
     return users.save(user);
   }
 
   /**
    * Applies a reset/new password: re-hashes, clears any forced-change flag, and stamps {@code
-   * password_invalidated_before} so previously issued access tokens are rejected (issue #17).
+   * password_invalidated_before} so previously issued access tokens are rejected (issue #17). Both
+   * writes are atomic, version-bumping updates (issue #61) rather than a dirty entity, so a later
+   * bulk update in the same transaction (the refresh-token revocation of issue #897, which clears
+   * the persistence context) can never discard them. Returns the freshly re-read user.
    */
   @Transactional
   public User applyPasswordReset(UUID id, String rawPassword) {
-    User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
-    user.setPasswordHash(passwordEncoder.encode(rawPassword));
-    user.setPasswordChangeRequired(false);
-    user.setPasswordInvalidatedBefore(Instant.now());
-    return user;
+    if (users.updatePasswordHash(id, passwordEncoder.encode(rawPassword)) == 0) {
+      throw new UserNotFoundException(id);
+    }
+    users.bumpPasswordInvalidatedBefore(id, Instant.now());
+    return users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
   }
 
   /** Whether an internal user with the given username exists (bootstrap idempotency). */
@@ -180,14 +187,32 @@ public class UserService {
       String email,
       String rawPassword,
       boolean passwordChangeRequired) {
+    String name = singleLine(displayName, username);
     User admin =
-        User.internal(
-            displayName, normalizeEmail(email), username, passwordEncoder.encode(rawPassword));
+        User.internal(name, normalizeEmail(email), username, passwordEncoder.encode(rawPassword));
     admin.setRole(UserRole.ADMIN);
     admin.setEnabled(true);
     admin.setPasswordChangeRequired(passwordChangeRequired);
-    admin.setSlug(slugs.allocate(displayName));
+    admin.setSlug(slugs.allocate(name));
     return users.save(admin);
+  }
+
+  /**
+   * Control characters as spaces, for names this service may not reject (issue #909); {@code
+   * fallback} when nothing printable is left, so no account ends up with an empty name.
+   */
+  private static String singleLine(String value, String fallback) {
+    String cleaned = value == null ? "" : ControlCharacters.toSpaces(value).strip();
+    return cleaned.isEmpty() ? fallback : cleaned;
+  }
+
+  /** The part of an e-mail address before the {@code @}, or a generic label without one. */
+  private static String emailLocalPart(String email) {
+    String local = email == null ? "" : email.strip();
+    int at = local.indexOf('@');
+    local = at >= 0 ? local.substring(0, at) : local;
+    local = ControlCharacters.toSpaces(local).strip();
+    return local.isEmpty() ? "user" : local;
   }
 
   private String normalizeEmail(String email) {

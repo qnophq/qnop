@@ -39,6 +39,7 @@ import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.NotificationRepository;
 import io.qnop.repository.ReviewParticipantRepository;
+import io.qnop.repository.ReviewPseudonymRepository;
 import io.qnop.service.review.ReviewDeletionService;
 import io.qnop.service.storage.StorageService;
 import io.qnop.testsupport.SeededIntegrationTest;
@@ -67,6 +68,7 @@ class ReviewDeletionIT extends SeededIntegrationTest {
   @Autowired private AuditEventRepository auditEvents;
   @Autowired private NotificationRepository notifications;
   @Autowired private StorageService storage;
+  @Autowired private ReviewPseudonymRepository pseudonyms;
 
   private MockHttpServletRequestBuilder as(MockHttpServletRequestBuilder builder, UUID user) {
     return builder.header("Authorization", "Bearer " + token(user));
@@ -74,7 +76,13 @@ class ReviewDeletionIT extends SeededIntegrationTest {
 
   /** A review owned by MEMBER, reviewed by MEMBER2, with one version at {@code storageKey}. */
   private UUID review(String title, String storageKey) {
+    return review(title, storageKey, false);
+  }
+
+  /** As {@link #review(String, String)}; anonymity is fixed at creation (ADR-0038). */
+  private UUID review(String title, String storageKey, boolean anonymous) {
     Document document = new Document(MEMBER_ID, title);
+    document.setAnonymous(anonymous);
     document.setWorkflowState(WorkflowState.IN_REVIEW);
     UUID documentId = documents.save(document).getId();
     versions.save(
@@ -115,6 +123,20 @@ class ReviewDeletionIT extends SeededIntegrationTest {
     mockMvc
         .perform(as(get("/api/v1/documents/" + documentId), ADMIN_ID))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("deleting an anonymous review also removes its pseudonyms (#914, no FK)")
+  void anonymousReviewPseudonymsGoToo() throws Exception {
+    UUID documentId = review("Anonymous and deleted", storeObject("anonymous review bytes"), true);
+    annotate(documentId, MEMBER2_ID);
+    assertThat(pseudonyms.findByDocumentId(documentId)).isNotEmpty();
+
+    mockMvc
+        .perform(as(delete("/api/v1/documents/" + documentId), ADMIN_ID))
+        .andExpect(status().isNoContent());
+
+    assertThat(pseudonyms.findByDocumentId(documentId)).isEmpty();
   }
 
   @Test

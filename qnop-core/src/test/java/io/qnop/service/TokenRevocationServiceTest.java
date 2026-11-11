@@ -156,12 +156,23 @@ class TokenRevocationServiceTest {
   }
 
   @Test
-  @DisplayName("isRevoked returns false when the user no longer exists")
-  void isRevokedFalseWhenUserMissing() {
+  @DisplayName("isRevoked returns true when the user no longer exists (#901)")
+  void isRevokedTrueWhenUserMissing() {
     when(revokedTokens.existsByJti(anyString())).thenReturn(false);
     when(users.findById(userId)).thenReturn(Optional.empty());
 
-    assertThat(service.isRevoked("raw-jti", userId.toString(), Instant.now())).isFalse();
+    assertThat(service.isRevoked("raw-jti", userId.toString(), Instant.now())).isTrue();
+  }
+
+  @Test
+  @DisplayName("isRevoked returns true when the user is disabled, whatever the timestamps (#901)")
+  void isRevokedTrueWhenUserDisabled() {
+    User user = org.mockito.Mockito.mock(User.class);
+    when(user.isEnabled()).thenReturn(false);
+    when(revokedTokens.existsByJti(anyString())).thenReturn(false);
+    when(users.findById(userId)).thenReturn(Optional.of(user));
+
+    assertThat(service.isRevoked("raw-jti", userId.toString(), Instant.now())).isTrue();
   }
 
   @Test
@@ -193,6 +204,7 @@ class TokenRevocationServiceTest {
 
   private static User mockUserInvalidatedAt(Instant invalidatedAt) {
     User user = org.mockito.Mockito.mock(User.class);
+    when(user.isEnabled()).thenReturn(true);
     when(user.getPasswordInvalidatedBefore()).thenReturn(invalidatedAt);
     return user;
   }

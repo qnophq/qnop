@@ -27,6 +27,7 @@ import io.qnop.service.document.DocumentAttachmentService.UploadedAttachment;
 import io.qnop.service.document.UploadSource;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
 import org.springframework.core.io.InputStreamResource;
@@ -99,7 +100,9 @@ public class DocumentAttachmentController {
         (DocumentAttachmentService.isInlineImage(metadata.contentType())
                 ? ContentDisposition.inline()
                 : ContentDisposition.attachment())
-            .filename(metadata.fileName())
+            // UTF-8 so non-Latin-1 names survive as RFC 5987 filename* — the SPA names
+            // downloads from this header (issue #911).
+            .filename(metadata.fileName(), StandardCharsets.UTF_8)
             .build();
     return ResponseEntity.ok()
         .eTag(etag)

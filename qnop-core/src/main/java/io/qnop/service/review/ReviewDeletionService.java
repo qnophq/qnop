@@ -26,6 +26,7 @@ import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentAttachmentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
+import io.qnop.repository.ReviewPseudonymRepository;
 import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.document.DocumentValidationException;
 import io.qnop.service.storage.StorageService;
@@ -73,6 +74,7 @@ public class ReviewDeletionService {
   private final DocumentVersionRepository versions;
   private final DocumentAttachmentRepository attachments;
   private final AuditEventRepository auditEvents;
+  private final ReviewPseudonymRepository pseudonyms;
   private final DocumentAccessService access;
   private final StorageService storage;
   private final ApplicationEventPublisher events;
@@ -83,6 +85,7 @@ public class ReviewDeletionService {
       DocumentVersionRepository versions,
       DocumentAttachmentRepository attachments,
       AuditEventRepository auditEvents,
+      ReviewPseudonymRepository pseudonyms,
       DocumentAccessService access,
       StorageService storage,
       ApplicationEventPublisher events,
@@ -91,6 +94,7 @@ public class ReviewDeletionService {
     this.versions = versions;
     this.attachments = attachments;
     this.auditEvents = auditEvents;
+    this.pseudonyms = pseudonyms;
     this.access = access;
     this.storage = storage;
     this.events = events;
@@ -166,6 +170,8 @@ public class ReviewDeletionService {
           // reactions, mentions, participants, visits, attachments, version diffs and the
           // per-document audit trail) — see DocumentReviewSchemaIT.
           documents.delete(document);
+          // The one per-document table without an FK (issue #914 — see migration 0038).
+          pseudonyms.deleteByDocumentId(documentId);
           return new DeletedAggregate(
               document.getTitle(), ownerId, document.isAnonymous(), referenced);
         });
