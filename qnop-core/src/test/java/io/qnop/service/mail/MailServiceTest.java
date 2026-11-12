@@ -151,4 +151,34 @@ class MailServiceTest {
                 "de"));
     verifyNoInteractions(senderProvider, templates);
   }
+
+  @Test
+  @DisplayName("the SMTP master switch still silences team-invitation mail (#948)")
+  void masterSwitchSilencesTeamInvitationMail() {
+    // The team-invitation mail is exempt from the review-mail switch, not from the mail
+    // layer's own one: with smtp.enabled off (or no host) there is no sender at all.
+    when(senderProvider.current()).thenReturn(null);
+    when(templates.render(any(), any(), any()))
+        .thenReturn(new RenderedMail("subject", "plain", "<p>html</p>"));
+    io.qnop.repository.UserSettingRepository userSettings =
+        org.mockito.Mockito.mock(io.qnop.repository.UserSettingRepository.class);
+    io.qnop.service.ApplicationSettingsService settings =
+        org.mockito.Mockito.mock(io.qnop.service.ApplicationSettingsService.class);
+    io.qnop.service.review.MailNotificationSink sink =
+        new io.qnop.service.review.MailNotificationSink(userSettings, settings, service);
+    io.qnop.entity.User recipient =
+        io.qnop.entity.User.internal("Ivy", "ivy@example.com", "ivy", "h");
+    io.qnop.service.review.ReviewNotificationIntent intent =
+        io.qnop.service.review.ReviewNotificationIntent.to(
+                recipient,
+                io.qnop.entity.NotificationType.TEAM_INVITATION,
+                MailTemplateKey.TEAM_INVITATION)
+            .mailLocale("en")
+            .build();
+
+    sink.deliver(intent);
+
+    verify(senderProvider).current();
+    verifyNoInteractions(sender);
+  }
 }

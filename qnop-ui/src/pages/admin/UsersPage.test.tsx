@@ -334,6 +334,20 @@ describe('UsersPage', () => {
     expect(await screen.findByText('Could not delete the user.')).toBeTruthy();
   });
 
+  it('explains a delete refused because the audit trail names the user (#948)', async () => {
+    deleteMutate.mockRejectedValue(conflictError('USER_HAS_AUDIT_HISTORY'));
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'delete-ben' }));
+    fireEvent.click(screen.getByRole('button', { name: 'stub-confirm-delete' }));
+
+    expect(
+      await screen.findByText(
+        "This account appears in the audit trail and can't be deleted. Disable it instead.",
+      ),
+    ).toBeTruthy();
+  });
+
   it('reports an emailed password reset as a success toast', async () => {
     resetMutate.mockResolvedValue({ emailSent: true });
     renderPage();

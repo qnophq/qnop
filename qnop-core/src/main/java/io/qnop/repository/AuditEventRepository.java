@@ -29,6 +29,8 @@ import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * Data access for the append-only per-document audit trail (issue #244, ADR-0011).
@@ -55,4 +57,29 @@ public interface AuditEventRepository
 
   /** The most recent event of one type, if any (issue #927: de-duplicating a repeated report). */
   Optional<AuditEvent> findFirstByEventTypeOrderByCreatedAtDesc(String eventType);
+
+  /**
+   * Whether any event names this user as its actor — such a user cannot be hard-deleted, because
+   * {@code fk_audit_event_actor} is {@code ON DELETE RESTRICT} (issue #948).
+   */
+  boolean existsByActorId(UUID actorId);
+
+  /**
+   * Whether {@code userId} declined an invitation into {@code teamId} after {@code since} — the
+   * re-invite cooldown (issue #948). Served by {@code ix_audit_event_actor}; the decliner is the
+   * actor of their own decline.
+   */
+  @Query(
+      value =
+          """
+          SELECT EXISTS (SELECT 1 FROM audit_event
+            WHERE actor_id = :userId AND event_type = :eventType
+              AND detail ->> 'teamId' = :teamId AND created_at > :since)
+          """,
+      nativeQuery = true)
+  boolean existsTeamEventByActorSince(
+      @Param("eventType") String eventType,
+      @Param("userId") UUID userId,
+      @Param("teamId") String teamId,
+      @Param("since") Instant since);
 }

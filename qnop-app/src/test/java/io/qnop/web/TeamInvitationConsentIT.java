@@ -120,7 +120,10 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
     documents.findById(documentId).ifPresent(documents::delete);
     teams.findById(teamId).ifPresent(teams::delete); // cascades memberships + invitations
     // Membership changes are audited now (issue #948), and an audit row keeps its actor
-    // (FK RESTRICT). TRUNCATE is the sanctioned wipe, as clean.sql does for the seeded suites.
+    // (FK RESTRICT). TRUNCATE is the sanctioned wipe, as clean.sql does for the seeded suites;
+    // the chain triggers block a scoped DELETE. This wipes EVERY audit row, so it assumes the
+    // IT classes run sequentially in one JVM (as configured today): a parallel IT, or one that
+    // counts audit rows across classes, would race it.
     jdbc.execute("TRUNCATE TABLE audit_event");
     jdbc.update("UPDATE audit_chain_head SET last_seq = 0, last_hash = repeat('0', 64)");
     createdUsers.forEach(id -> users.findById(id).ifPresent(users::delete));
@@ -188,18 +191,26 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
         .perform(post("/api/v1/teams/invitations/{id}/accept", teamId).with(asUser(invitee)))
         .andExpect(status().isNotFound());
 
-    invite(invitee).andExpect(status().isCreated());
+    // A decline is respected for a day (issue #948): the lead cannot simply invite again.
     invite(invitee)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("RECENTLY_DECLINED"));
+
+    invite(stranger).andExpect(status().isCreated());
+    invite(stranger)
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("ALREADY_INVITED"));
     mockMvc
-        .perform(delete("/api/v1/teams/{id}/invitations/{uid}", teamId, invitee).with(asUser(lead)))
+        .perform(
+            delete("/api/v1/teams/{id}/invitations/{uid}", teamId, stranger).with(asUser(lead)))
         .andExpect(status().isNoContent());
-    assertThat(invitations.existsByTeamIdAndUserId(teamId, invitee)).isFalse();
+    assertThat(invitations.existsByTeamIdAndUserId(teamId, stranger)).isFalse();
     mockMvc
-        .perform(post("/api/v1/teams/invitations/{id}/accept", teamId).with(asUser(invitee)))
+        .perform(post("/api/v1/teams/invitations/{id}/accept", teamId).with(asUser(stranger)))
         .andExpect(status().isNotFound());
-    assertThat(teamMemberships.existsByTeamIdAndUserId(teamId, invitee)).isFalse();
+    assertThat(teamMemberships.existsByTeamIdAndUserId(teamId, stranger)).isFalse();
+    // A revocation is the lead's own decision, so it does not block a new invitation.
+    invite(stranger).andExpect(status().isCreated());
   }
 
   @Test

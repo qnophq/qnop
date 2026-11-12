@@ -41,6 +41,7 @@
       "LAST_ADMIN": "Mindestens ein aktiver Admin muss erhalten bleiben.",
       "SELF_LOCKOUT": "Du kannst dein eigenes Konto nicht deaktivieren und seine Rolle nicht ändern.",
       "SELF_DELETE": "Du kannst dein eigenes Konto nicht löschen.",
+      "USER_HAS_AUDIT_HISTORY": "Dieses Konto steht im Audit-Trail und kann nicht gelöscht werden. Deaktiviere es stattdessen.",
       "EMAIL_TAKEN": "Es gibt bereits ein Konto mit dieser E-Mail-Adresse.",
       "USERNAME_TAKEN": "Dieser Benutzername ist bereits vergeben.",
       "USER_PENDING_VERIFICATION": "Dieses Konto wartet noch auf die Bestätigung seiner E-Mail-Adresse. Schicke stattdessen einen Link zum Zurücksetzen des Passworts — es wird aktiv, sobald der Inhaber ein Passwort setzt."
@@ -500,7 +501,7 @@
       },
       "notifications__review_emails_enabled": {
         "label": "Review-E-Mails aktiviert",
-        "description": "E-Mail-Benachrichtigungen bei Review-Aktivität senden (Reviewer hinzugefügt, Anmerkungen, Antworten, Statusänderungen)."
+        "description": "E-Mail-Benachrichtigungen bei Review-Aktivität senden (Reviewer hinzugefügt, Anmerkungen, Antworten, Statusänderungen). Team-Einladungen fallen nicht darunter: Sie haben ein eigenes Opt-out pro Person, und der SMTP-Hauptschalter stoppt sie weiterhin."
       },
       "notifications__retain_days": {
         "label": "Aufbewahrung (Tage)",

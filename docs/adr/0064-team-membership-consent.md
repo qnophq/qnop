@@ -57,9 +57,10 @@ mentions, notifications, the external-participant and review facades — each of
 6. **Pending cap.** A team holds at most 50 unanswered invitations
    (`TeamService.MAX_PENDING_INVITATIONS`); one more answers `409 TOO_MANY_PENDING_INVITATIONS`.
    A fixed cap rather than counting invitations against the member quota, because that quota may be
-   unlimited (0) and the point is to bound what a lead can leave outstanding. There is no
-   re-invite cooldown after a decline: an invitation grants nothing, so a repeat invite is a
-   nuisance at worst, and the user can decline again. This is an accepted residual.
+   unlimited (0) and the point is to bound what a lead can leave outstanding. A decline is
+   respected for 24 hours: a lead's re-invite of the same user into the same team inside that
+   window answers `409 RECENTLY_DECLINED` (see the amendment for #948, which replaced the earlier
+   "no cooldown" residual once invitations started sending mail).
 7. **Disabled teams.** Disabling a team (admin console) deletes its pending invitations. A disabled
    team therefore has none to list, accept or decline; re-enabling it does not bring them back —
    the lead invites again.
@@ -130,10 +131,28 @@ trail is read after the team was renamed or deleted and the user removed. The ad
 now pass the acting admin to the service so admin-side changes carry an actor. The audit page
 (AUDITOR/ADMIN) labels, describes and filters the seven types in all five UI languages.
 
-Consequence: like any audit actor, a user who invited, answered an invitation or changed a
-membership is referenced by `audit_event.actor_id` (`ON DELETE RESTRICT`). That restriction already
-applied to reviewers and administrators; it now also covers users whose only activity was answering
-an invitation.
+**Re-invite cooldown.** Once invitations send mail, invite → decline → invite became an unbounded
+stream of mails to somebody who said no. A lead's re-invite of the same user into the same team
+within `TeamService.REINVITE_COOLDOWN` (24 hours) of a decline is refused with
+`409 RECENTLY_DECLINED`. The decline is read from the audit trail itself
+(`team.invitation.declined`, actor = the decliner, served by the actor index), so no new column or
+migration was needed. A revocation does not start the cooldown, because it is the lead's own
+decision. An admin's direct add is not an invitation and is unaffected. We chose this over a
+per-recipient mail rate limit because it addresses the actual loop and needs no extra state.
+
+**Hard delete of audit actors.** Like any audit actor, a user who invited, answered an invitation or
+changed a membership is referenced by `audit_event.actor_id` (`ON DELETE RESTRICT`). That
+restriction already applied to reviewers and administrators; it now also covers users whose only
+activity was answering an invitation. `DELETE /admin/users/{id}` checks for such references and
+answers `409 USER_HAS_AUDIT_HISTORY` ("disable it instead"), and it maps a foreign-key failure that
+races the check to the same 409, never a 500. The residual: such an account can be disabled but
+not erased, and its name stays in the snapshotted audit detail. An erasure path (anonymising the
+actor and the snapshotted names) interacts with the hash chain (#928) and needs its own design; it
+is tracked as a follow-up.
+
+**Mail switches.** The invitation mail is exempt from `notifications.review_emails_enabled`, whose
+admin description now says so. It is not exempt from the mail layer's master switch: with
+`smtp.enabled` off or no host configured, the send is skipped like every other mail.
 
 No schema change was needed: `audit_event.event_type` and `notification.type` are open strings, and
 mail templates and user settings are registries in code.

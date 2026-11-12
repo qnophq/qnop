@@ -43,6 +43,7 @@
       "LAST_ADMIN": "Pelo menos um administrador ativo precisa permanecer.",
       "SELF_LOCKOUT": "Você não pode desativar sua própria conta nem alterar a função dela.",
       "SELF_DELETE": "Você não pode excluir sua própria conta.",
+      "USER_HAS_AUDIT_HISTORY": "Esta conta aparece na trilha de auditoria e não pode ser excluída. Desative-a em vez disso.",
       "EMAIL_TAKEN": "Já existe uma conta com este e-mail.",
       "USERNAME_TAKEN": "Este nome de usuário já está em uso.",
       "USER_PENDING_VERIFICATION": "Esta conta ainda aguarda a confirmação do e-mail. Envie um link de redefinição de senha — ela fica ativa assim que o titular definir uma senha."
@@ -507,7 +508,7 @@
       },
       "notifications__review_emails_enabled": {
         "label": "E-mails de revisão ativados",
-        "description": "Enviar notificações por e-mail sobre a atividade das revisões (revisor adicionado, anotações, respostas, mudanças de status)."
+        "description": "Enviar notificações por e-mail sobre a atividade das revisões (revisor adicionado, anotações, respostas, mudanças de status). Convites para equipes não estão incluídos: eles têm um opt-out próprio por pessoa, e a chave geral de SMTP continua a bloqueá-los."
       },
       "notifications__retain_days": {
         "label": "Retenção (dias)",

@@ -59,6 +59,10 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * Team invitations reach the invited user, and every membership change lands in the audit trail
  * (issue #948), end to end against PostgreSQL. Team Beta is led by Mia (MEMBER_ID) and has Max
  * (MEMBER2_ID) as a member; Avery (AUDITOR_ID) is the outsider being invited. Requires Docker.
+ *
+ * <p>The audit assertions read the whole {@code audit_event} table and rely on the seeded base
+ * truncating it before each test (clean.sql), so they assume the IT classes run sequentially in one
+ * JVM, as configured today.
  */
 class TeamMembershipNotificationAuditIT extends SeededIntegrationTest {
 
@@ -165,42 +169,48 @@ class TeamMembershipNotificationAuditIT extends SeededIntegrationTest {
   }
 
   @Test
-  @DisplayName("invite, decline, revoke and accept are each audited with their actor")
+  @DisplayName("invite, revoke, accept and decline are each audited with their actor")
   void invitationLifecycleIsAudited() throws Exception {
-    invite(AUDITOR_ID).andExpect(status().isCreated());
-    mockMvc
-        .perform(as(post("/api/v1/teams/invitations/{id}/decline", BETA), AUDITOR_ID))
-        .andExpect(status().isNoContent());
     invite(AUDITOR_ID).andExpect(status().isCreated());
     mockMvc
         .perform(as(delete("/api/v1/teams/{id}/invitations/{uid}", BETA, AUDITOR_ID), MEMBER_ID))
         .andExpect(status().isNoContent());
     invite(AUDITOR_ID).andExpect(status().isCreated());
     mockMvc
-        .perform(as(post("/api/v1/teams/invitations/{id}/accept", BETA), AUDITOR_ID))
+        .perform(as(post("/api/v1/teams/invitations/{id}/decline", BETA), AUDITOR_ID))
+        .andExpect(status().isNoContent());
+    // The decline holds for a day: no new invitation, no new mail (issue #948).
+    invite(AUDITOR_ID)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("RECENTLY_DECLINED"));
+    invite(ADMIN_ID).andExpect(status().isCreated());
+    mockMvc
+        .perform(as(post("/api/v1/teams/invitations/{id}/accept", BETA), ADMIN_ID))
         .andExpect(status().isOk());
 
     List<Map<String, Object>> rows = teamAudit();
     assertThat(types(rows))
         .containsExactly(
             TeamMembershipAudit.INVITATION_CREATED,
-            TeamMembershipAudit.INVITATION_DECLINED,
-            TeamMembershipAudit.INVITATION_CREATED,
             TeamMembershipAudit.INVITATION_REVOKED,
+            TeamMembershipAudit.INVITATION_CREATED,
+            TeamMembershipAudit.INVITATION_DECLINED,
             TeamMembershipAudit.INVITATION_CREATED,
             TeamMembershipAudit.INVITATION_ACCEPTED);
     assertThat(rows)
         .allSatisfy(
             row -> {
               assertThat(row.get("scope")).isEqualTo("SYSTEM");
-              assertThat(row.get("user_id")).isEqualTo(AUDITOR_ID.toString());
               assertThat(row.get("team_name")).isEqualTo("Beta");
             });
+    assertThat(rows.subList(0, 4))
+        .allSatisfy(row -> assertThat(row.get("user_id")).isEqualTo(AUDITOR_ID.toString()));
     assertThat(rows.get(0).get("actor_id")).isEqualTo(MEMBER_ID);
-    assertThat(rows.get(1).get("actor_id")).isEqualTo(AUDITOR_ID);
-    assertThat(rows.get(3).get("actor_id")).isEqualTo(MEMBER_ID);
-    assertThat(rows.get(3).get("reason")).isEqualTo(TeamMembershipAudit.REASON_REVOKED);
-    assertThat(rows.get(5).get("actor_id")).isEqualTo(AUDITOR_ID);
+    assertThat(rows.get(1).get("actor_id")).isEqualTo(MEMBER_ID);
+    assertThat(rows.get(1).get("reason")).isEqualTo(TeamMembershipAudit.REASON_REVOKED);
+    assertThat(rows.get(3).get("actor_id")).isEqualTo(AUDITOR_ID);
+    assertThat(rows.get(5).get("actor_id")).isEqualTo(ADMIN_ID);
+    assertThat(rows.get(5).get("user_id")).isEqualTo(ADMIN_ID.toString());
   }
 
   @Test
@@ -253,6 +263,24 @@ class TeamMembershipNotificationAuditIT extends SeededIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.total").value(2))
         .andExpect(jsonPath("$.items[0].scope").value("SYSTEM"));
+  }
+
+  @Test
+  @DisplayName("a user the audit trail names cannot be hard-deleted: 409, never a 500")
+  void auditActorDeleteIsAConflict() throws Exception {
+    invite(AUDITOR_ID).andExpect(status().isCreated());
+    mockMvc
+        .perform(as(post("/api/v1/teams/invitations/{id}/decline", BETA), AUDITOR_ID))
+        .andExpect(status().isNoContent());
+
+    mockMvc
+        .perform(as(delete("/api/v1/admin/users/{id}", AUDITOR_ID), ADMIN_ID))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("USER_HAS_AUDIT_HISTORY"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM qnop_user WHERE id = ?", Long.class, AUDITOR_ID))
+        .isEqualTo(1L);
   }
 
   @Test

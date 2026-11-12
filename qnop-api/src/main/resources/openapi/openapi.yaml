@@ -1113,7 +1113,10 @@ paths:
       description: |
         Permanently deletes the user and, by cascade, their tokens, settings,
         OIDC identity and team memberships. The self-lockout guard rejects (409)
-        deleting your own account or the last enabled admin.
+        deleting your own account or the last enabled admin. A user the audit
+        trail names as an actor cannot be deleted either (409
+        `USER_HAS_AUDIT_HISTORY`, issue #948): the trail keeps its actors, so
+        such an account is disabled instead.
       operationId: deleteUser
       security:
         - bearerAuth: []
@@ -1129,7 +1132,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: Self-lockout or last-admin guard violated
+          description: |
+            Self-lockout or last-admin guard violated (`SELF_DELETE`,
+            `LAST_ADMIN`), or the user is an actor in the audit trail
+            (`USER_HAS_AUDIT_HISTORY`)
           content:
             application/json:
               schema:
@@ -1903,7 +1909,8 @@ paths:
         `LEAD_GRANT_REQUIRES_ADMIN`. 409 `ALREADY_MEMBER` / `ALREADY_INVITED`
         when the user is already in the team or already invited, and 409
         `TOO_MANY_PENDING_INVITATIONS` when the team already holds 50 unanswered
-        invitations.
+        invitations. 409 `RECENTLY_DECLINED` when the user declined an
+        invitation into this team less than 24 hours ago (issue #948).
       operationId: addMyTeamMember
       security:
         - bearerAuth: []

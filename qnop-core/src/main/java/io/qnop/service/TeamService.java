@@ -472,6 +472,13 @@ public class TeamService {
       throw new TeamConflictException(
           "ALREADY_INVITED", "This user has already been invited to the team.");
     }
+    // A decline is respected for a while (issue #948): without it, invite -> decline ->
+    // invite is an unbounded stream of invitation mails to somebody who said no.
+    if (audit.declinedSince(teamId, userId, Instant.now().minus(REINVITE_COOLDOWN))) {
+      throw new TeamConflictException(
+          "RECENTLY_DECLINED",
+          "This user declined an invitation to this team less than a day ago — try again later.");
+    }
     if (invitations.countByTeamId(teamId) >= MAX_PENDING_INVITATIONS) {
       throw new TeamConflictException(
           "TOO_MANY_PENDING_INVITATIONS",
@@ -790,6 +797,12 @@ public class TeamService {
    * lead can leave outstanding, independent of whether a member quota is configured.
    */
   public static final int MAX_PENDING_INVITATIONS = 50;
+
+  /**
+   * How long a declined invitation blocks a lead's re-invite of the same user into the same team
+   * (issue #948, ADR-0064 amendment). An admin's direct add is not an invitation and is unaffected.
+   */
+  public static final java.time.Duration REINVITE_COOLDOWN = java.time.Duration.ofHours(24);
 
   /** {@link TeamMemberView#status()} of a membership (issue #936). */
   public static final String STATUS_ACTIVE = "ACTIVE";

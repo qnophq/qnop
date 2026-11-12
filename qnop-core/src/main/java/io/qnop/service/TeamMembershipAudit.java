@@ -24,6 +24,7 @@ import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Team;
 import io.qnop.entity.TeamRole;
 import io.qnop.repository.AuditEventRepository;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.springframework.stereotype.Component;
@@ -133,6 +134,12 @@ public class TeamMembershipAudit {
         team,
         user,
         detail -> detail.put("previousRole", previousRole.name()).put("role", role.name()));
+  }
+
+  /** Whether {@code userId} declined an invitation into {@code teamId} after {@code since}. */
+  public boolean declinedSince(UUID teamId, UUID userId, Instant since) {
+    return auditEvents.existsTeamEventByActorSince(
+        INVITATION_DECLINED, userId, teamId.toString(), since);
   }
 
   private void record(

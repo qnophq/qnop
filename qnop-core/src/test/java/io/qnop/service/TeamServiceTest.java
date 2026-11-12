@@ -878,6 +878,38 @@ class TeamServiceTest {
   }
 
   @Test
+  @DisplayName("a re-invite within a day of a decline is refused with RECENTLY_DECLINED (#948)")
+  void reinviteAfterDeclineIsCooledDown() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(teamWithId(teamId, "Core")));
+    when(users.findById(target))
+        .thenReturn(Optional.of(User.internal("Al", "al@example.com", "al", "h")));
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+    when(audit.declinedSince(eq(teamId), eq(target), any())).thenReturn(true);
+
+    assertThatThrownBy(() -> service.addMemberAsLead(teamId, lead, false, target, "MEMBER"))
+        .isInstanceOf(TeamConflictException.class)
+        .extracting("code")
+        .isEqualTo("RECENTLY_DECLINED");
+    verify(invitations, never()).saveAndFlush(any());
+    verify(events, never()).publishEvent(any(Object.class));
+    // The window is the documented cooldown, measured back from now.
+    verify(audit)
+        .declinedSince(
+            eq(teamId),
+            eq(target),
+            argThat(
+                since ->
+                    since.isAfter(
+                            Instant.now().minus(TeamService.REINVITE_COOLDOWN).minusSeconds(5))
+                        && since.isBefore(
+                            Instant.now().minus(TeamService.REINVITE_COOLDOWN).plusSeconds(5))));
+  }
+
+  @Test
   @DisplayName("a refused invitation is neither audited nor announced (#948)")
   void refusedInvitationLeavesNoTrace() {
     UUID teamId = UUID.randomUUID();

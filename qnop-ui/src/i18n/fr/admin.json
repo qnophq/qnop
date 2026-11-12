@@ -43,6 +43,7 @@
       "LAST_ADMIN": "Au moins un administrateur actif doit subsister.",
       "SELF_LOCKOUT": "Vous ne pouvez ni désactiver votre propre compte ni modifier son rôle.",
       "SELF_DELETE": "Vous ne pouvez pas supprimer votre propre compte.",
+      "USER_HAS_AUDIT_HISTORY": "Ce compte figure dans le journal d’audit et ne peut pas être supprimé. Désactivez-le plutôt.",
       "EMAIL_TAKEN": "Un compte existe déjà avec cette adresse e-mail.",
       "USERNAME_TAKEN": "Ce nom d’utilisateur est déjà pris.",
       "USER_PENDING_VERIFICATION": "Ce compte attend encore la confirmation de son adresse e-mail. Envoyez plutôt un lien de réinitialisation du mot de passe — il devient actif dès que son titulaire définit un mot de passe."
@@ -507,7 +508,7 @@
       },
       "notifications__review_emails_enabled": {
         "label": "E-mails de révision activés",
-        "description": "Envoyer des notifications par e-mail sur l’activité des révisions (réviseur ajouté, annotations, réponses, changements de statut)."
+        "description": "Envoyer des notifications par e-mail sur l’activité des révisions (réviseur ajouté, annotations, réponses, changements de statut). Les invitations d’équipe ne sont pas concernées : elles ont leur propre désinscription par personne, et l’interrupteur général SMTP les bloque toujours."
       },
       "notifications__retain_days": {
         "label": "Conservation (jours)",
