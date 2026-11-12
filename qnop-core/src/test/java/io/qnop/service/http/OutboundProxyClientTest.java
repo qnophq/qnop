@@ -25,13 +25,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -258,7 +253,7 @@ class OutboundProxyClientTest {
   @Test
   @DisplayName("an https destination is tunnelled with CONNECT to the unresolved name")
   void httpsDestinationUsesConnect() throws IOException {
-    try (ConnectRecorder recorder = new ConnectRecorder();
+    try (ConnectRecordingProxy recorder = new ConnectRecordingProxy();
         CloseableHttpClient client = client(viaProxy("127.0.0.1", recorder.port()), false)) {
       // The stub refuses the tunnel (HttpClient 5 hands the proxy's refusal back as the response);
       // what matters is what was asked of it.
@@ -279,70 +274,11 @@ class OutboundProxyClientTest {
       })
   @DisplayName("a blocked https destination is refused before any CONNECT is sent")
   void blockedHttpsDestinationNeverReachesTheProxy(String url) throws IOException {
-    try (ConnectRecorder recorder = new ConnectRecorder();
+    try (ConnectRecordingProxy recorder = new ConnectRecordingProxy();
         CloseableHttpClient client = client(viaProxy("127.0.0.1", recorder.port()), false)) {
       assertThatThrownBy(() -> get(client, url))
           .isInstanceOf(BlockedOutboundAddressException.class);
       assertThat(recorder.requestLines()).isEmpty();
-    }
-  }
-
-  /**
-   * A minimal proxy stub that records each request line and refuses every tunnel with a 403, so the
-   * CONNECT path can be observed without TLS.
-   */
-  private static final class ConnectRecorder implements AutoCloseable {
-
-    private final ServerSocket socket;
-    private final List<String> lines = new CopyOnWriteArrayList<>();
-    private final Thread acceptor;
-
-    ConnectRecorder() throws IOException {
-      socket = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
-      acceptor = new Thread(this::serve, "connect-recorder");
-      acceptor.setDaemon(true);
-      acceptor.start();
-    }
-
-    int port() {
-      return socket.getLocalPort();
-    }
-
-    List<String> requestLines() {
-      return lines;
-    }
-
-    private void serve() {
-      while (!socket.isClosed()) {
-        try (Socket connection = socket.accept()) {
-          String head = readHead(connection.getInputStream());
-          lines.add(head.lines().findFirst().orElse(""));
-          OutputStream out = connection.getOutputStream();
-          out.write(
-              "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-                  .getBytes(StandardCharsets.US_ASCII));
-          out.flush();
-        } catch (IOException closed) {
-          return;
-        }
-      }
-    }
-
-    private static String readHead(InputStream in) throws IOException {
-      StringBuilder head = new StringBuilder();
-      int b;
-      while ((b = in.read()) >= 0) {
-        head.append((char) b);
-        if (head.toString().endsWith("\r\n\r\n")) {
-          break;
-        }
-      }
-      return head.toString();
-    }
-
-    @Override
-    public void close() throws IOException {
-      socket.close();
     }
   }
 }

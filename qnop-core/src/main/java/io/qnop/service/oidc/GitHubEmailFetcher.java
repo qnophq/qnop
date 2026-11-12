@@ -29,6 +29,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 /**
  * Fetches a GitHub user's primary, verified email via {@code GET /user/emails} (issue #21). GitHub
@@ -55,7 +56,12 @@ public class GitHubEmailFetcher {
 
   @Autowired
   public GitHubEmailFetcher(OidcHttpTransport transport) {
-    this(transport.requestFactory(), EMAILS_ENDPOINT);
+    this(transport.requestFactory());
+  }
+
+  /** Over {@code requestFactory}, against GitHub's endpoint. */
+  GitHubEmailFetcher(ClientHttpRequestFactory requestFactory) {
+    this(requestFactory, EMAILS_ENDPOINT);
   }
 
   /** Over {@code requestFactory}, against {@code endpoint} (tests point both at a local server). */
@@ -95,8 +101,12 @@ public class GitHubEmailFetcher {
         }
       }
       return firstVerified;
+    } catch (RestClientResponseException e) {
+      // Status only: the exception message can carry part of the response body.
+      log.warn("Failed to fetch GitHub primary email: HTTP {}", e.getStatusCode().value());
+      return null;
     } catch (RuntimeException e) {
-      log.warn("Failed to fetch GitHub primary email: {}", e.getMessage());
+      log.warn("Failed to fetch GitHub primary email: {}", e.getClass().getName());
       return null;
     }
   }

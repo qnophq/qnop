@@ -23,6 +23,7 @@ package io.qnop.service.oidc;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sun.net.httpserver.HttpServer;
+import io.qnop.service.http.ConnectRecordingProxy;
 import io.qnop.service.http.HostResolver;
 import io.qnop.service.http.HttpClientProperties;
 import io.qnop.service.http.OutboundHttpClients;
@@ -61,6 +62,7 @@ class GitHubEmailFetcherTest {
   private HttpServer server;
   private final AtomicReference<String> body = new AtomicReference<>("[]");
   private final AtomicInteger status = new AtomicInteger(200);
+  private final AtomicReference<String> location = new AtomicReference<>("/elsewhere");
   private final List<String> requests = new CopyOnWriteArrayList<>();
   private final List<String> authorizations = new CopyOnWriteArrayList<>();
 
@@ -73,7 +75,7 @@ class GitHubEmailFetcherTest {
           requests.add(exchange.getRequestURI().toString());
           authorizations.add(exchange.getRequestHeaders().getFirst("Authorization"));
           if (status.get() == 302) {
-            exchange.getResponseHeaders().add("Location", "/elsewhere");
+            exchange.getResponseHeaders().add("Location", location.get());
             exchange.sendResponseHeaders(302, -1);
           } else {
             byte[] bytes = body.get().getBytes(StandardCharsets.UTF_8);
@@ -151,9 +153,33 @@ class GitHubEmailFetcherTest {
     body.set("{not json");
     assertThat(direct(true).fetchPrimaryEmail("tok")).isNull();
 
-    status.set(302);
-    assertThat(direct(true).fetchPrimaryEmail("tok")).isNull();
-    assertThat(requests).as("the redirect was not followed").hasSize(3);
+    assertThat(requests).hasSize(2);
+  }
+
+  @Test
+  @DisplayName("a redirect is not followed: its target receives nothing, so no token reaches it")
+  void redirectIsNotFollowed() throws IOException {
+    List<String> redirected = new CopyOnWriteArrayList<>();
+    HttpServer target =
+        HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+    target.createContext(
+        "/",
+        exchange -> {
+          redirected.add(exchange.getRequestHeaders().getFirst("Authorization"));
+          exchange.sendResponseHeaders(200, -1);
+          exchange.close();
+        });
+    target.start();
+    try {
+      location.set("http://elsewhere.test:" + target.getAddress().getPort() + "/user/emails");
+      status.set(302);
+
+      assertThat(direct(true).fetchPrimaryEmail("tok")).isNull();
+      assertThat(requests).hasSize(1);
+      assertThat(redirected).as("the Location target was never contacted").isEmpty();
+    } finally {
+      target.stop(0);
+    }
   }
 
   @Test
@@ -189,6 +215,28 @@ class GitHubEmailFetcherTest {
     assertThat(fetcher.fetchPrimaryEmail("tok")).isEqualTo("p@x.test");
     assertThat(requests).containsExactly(proxied);
     assertThat(authorizations).containsExactly("Bearer tok");
+  }
+
+  @Test
+  @DisplayName("proxy mode: the production https endpoint is tunnelled with CONNECT to its name")
+  void productionEndpointIsTunnelledThroughTheProxy() throws IOException {
+    try (ConnectRecordingProxy proxy = new ConnectRecordingProxy()) {
+      HttpClientProperties viaProxy =
+          new HttpClientProperties(
+              null,
+              null,
+              null,
+              null,
+              null,
+              new HttpClientProperties.Proxy("127.0.0.1", proxy.port(), List.of()));
+      // Default endpoint (https://api.github.com/user/emails) over a proxy-mode transport. The stub
+      // refuses the tunnel, so the lookup yields null; what matters is what was asked of the proxy.
+      GitHubEmailFetcher fetcher =
+          new GitHubEmailFetcher(OutboundHttpClients.requestFactory(viaProxy, false, NEVER));
+
+      assertThat(fetcher.fetchPrimaryEmail("tok")).isNull();
+      assertThat(proxy.requestLines()).containsExactly("CONNECT api.github.com:443 HTTP/1.1");
+    }
   }
 
   @Test
