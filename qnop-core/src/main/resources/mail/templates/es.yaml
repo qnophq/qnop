@@ -266,3 +266,21 @@ review.mention:
     <p style="margin:0;color:#9a9ea8;font-size:13px;">Abre el comentario para responder.</p>
   ctaLabel: "Abrir comentario"
   preheader: "{{actorName}} te mencionó en «{{documentTitle}}»."
+
+team.invitation:
+  subject: "{{actorName}} te invitó a unirte a «{{teamName}}»"
+  bodyPlain: |
+    Hola, {{recipientName}}:
+
+    {{actorName}} te invitó a unirte al equipo «{{teamName}}» en {{siteName}}.
+
+    Solo pasas a ser miembro cuando aceptas. Acepta o rechaza la invitación en Mis equipos:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Invitación a un equipo</h1>
+    <p style="margin:0 0 14px;">Hola, {{recipientName}}:</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> te invitó a unirte al equipo <strong style="color:#18191f;">&laquo;{{teamName}}&raquo;</strong>.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Solo pasas a ser miembro cuando aceptas. Acepta o rechaza la invitación en Mis equipos.</p>
+  ctaLabel: "Abrir Mis equipos"
+  preheader: "{{actorName}} te invitó a unirte a «{{teamName}}»."

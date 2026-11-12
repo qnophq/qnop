@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -70,6 +71,8 @@ public class TeamService {
   private final TeamInvitationRepository invitations;
   private final UserRepository users;
   private final TeamSlugService slugs;
+  private final TeamMembershipAudit audit;
+  private final ApplicationEventPublisher events;
 
   public TeamService(
       TeamRepository teams,
@@ -77,8 +80,12 @@ public class TeamService {
       TeamInvitationRepository invitations,
       UserRepository users,
       TeamSlugService slugs,
-      InstanceLimitService limits) {
+      InstanceLimitService limits,
+      TeamMembershipAudit audit,
+      ApplicationEventPublisher events) {
     this.limits = limits;
+    this.audit = audit;
+    this.events = events;
     this.teams = teams;
     this.memberships = memberships;
     this.invitations = invitations;
@@ -148,7 +155,8 @@ public class TeamService {
       UUID leadUserId,
       Boolean enabled,
       Boolean profileShowMembers,
-      Boolean profileShowReviews) {
+      Boolean profileShowReviews,
+      UUID actorId) {
     // Quota on teams (issue #673).
     limits.requireTeamCapacity();
     String trimmed = requireName(name);
@@ -162,7 +170,7 @@ public class TeamService {
     }
     applyProfileVisibility(team, profileShowMembers, profileShowReviews);
     Team saved = teams.save(team);
-    addMember(saved.getId(), leadUserId, TeamRole.LEAD.name());
+    addMember(saved.getId(), leadUserId, TeamRole.LEAD.name(), actorId);
     return toSummary(saved, 1L);
   }
 
@@ -173,7 +181,8 @@ public class TeamService {
       String description,
       Boolean enabled,
       Boolean profileShowMembers,
-      Boolean profileShowReviews) {
+      Boolean profileShowReviews,
+      UUID actorId) {
     Team team = teams.findById(id).orElseThrow(() -> TeamNotFoundException.team(id));
     if (name != null) {
       String trimmed = requireName(name);
@@ -194,7 +203,17 @@ public class TeamService {
       team.setEnabled(enabled);
       if (!enabled) {
         // A disabled team offers no invitations and accepts none; drop them rather
-        // than keep rows nobody can see or answer (issue #936, ADR-0064).
+        // than keep rows nobody can see or answer (issue #936, ADR-0064). Each one
+        // dropped is audited as revoked, with the reason (issue #948).
+        invitations
+            .findPendingByTeamId(id)
+            .forEach(
+                pending ->
+                    audit.invitationRevoked(
+                        actorId,
+                        team,
+                        new TeamMembershipAudit.Subject(pending.userId(), pending.displayName()),
+                        TeamMembershipAudit.REASON_TEAM_DISABLED));
         invitations.deleteAllOfTeam(id);
       }
     }
@@ -214,33 +233,36 @@ public class TeamService {
   }
 
   @Transactional
-  public TeamMemberView addMember(UUID teamId, UUID userId, String teamRole) {
+  public TeamMemberView addMember(UUID teamId, UUID userId, String teamRole, UUID actorId) {
     // The row lock comes first, and the quota is counted inside it (issues
     // #673/#691). The admin dialog submits one request per selected user in
     // parallel, so an unlocked count is read by all of them before any of them
     // has inserted: a team at 3 of 5 accepted four people and ended up at 7.
     // The same lock already serialises the last-lead guard (#470), and it is per
     // team, so it costs nothing to anybody working on a different one.
-    if (teams.findByIdForUpdate(teamId).isEmpty()) {
-      throw TeamNotFoundException.team(teamId);
-    }
+    Team team =
+        teams.findByIdForUpdate(teamId).orElseThrow(() -> TeamNotFoundException.team(teamId));
     limits.requireTeamMemberCapacity(teamId);
     User user = users.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
     if (memberships.existsByTeamIdAndUserId(teamId, userId)) {
       throw new TeamConflictException(
           "ALREADY_MEMBER", "This user is already a member of the team.");
     }
-    TeamMembership saved =
-        memberships.save(TeamMembership.of(teamId, userId, requireTeamRole(teamRole)));
+    TeamRole role = requireTeamRole(teamRole);
+    TeamMembership saved = memberships.save(TeamMembership.of(teamId, userId, role));
+    TeamMembershipAudit.Subject subject = subject(userId, user);
     // A direct add supersedes a pending invitation of the same user (issue #936).
-    invitations.deleteInvitation(teamId, userId);
+    if (invitations.deleteInvitation(teamId, userId) > 0) {
+      audit.invitationRevoked(actorId, team, subject, TeamMembershipAudit.REASON_SUPERSEDED);
+    }
+    audit.memberAdded(actorId, team, subject, role);
     return toMemberView(user, saved);
   }
 
   @Transactional
-  public TeamMemberView setMemberRole(UUID teamId, UUID userId, String teamRole) {
+  public TeamMemberView setMemberRole(UUID teamId, UUID userId, String teamRole, UUID actorId) {
     TeamRole target = requireTeamRole(teamRole);
-    lockTeam(teamId);
+    Optional<Team> team = lockTeam(teamId);
     TeamMembership membership =
         memberships
             .findByTeamIdAndUserId(teamId, userId)
@@ -249,14 +271,16 @@ public class TeamService {
       // Demoting the team's last lead would leave the team with members and no lead.
       guardKeepsALead(teamId, userId, false);
     }
+    TeamRole previous = membership.getTeamRole();
     membership.setTeamRole(target);
     User user = users.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
+    team.ifPresent(t -> audit.roleChanged(actorId, t, subject(userId, user), previous, target));
     return toMemberView(user, membership);
   }
 
   @Transactional
-  public void removeMember(UUID teamId, UUID userId) {
-    lockTeam(teamId);
+  public void removeMember(UUID teamId, UUID userId, UUID actorId) {
+    Optional<Team> team = lockTeam(teamId);
     TeamMembership membership =
         memberships
             .findByTeamIdAndUserId(teamId, userId)
@@ -265,6 +289,8 @@ public class TeamService {
     // sole member (who is that lead) empties the team, which is allowed (issue #542).
     guardKeepsALead(teamId, userId, true);
     memberships.delete(membership);
+    TeamMembershipAudit.Subject subject = subjectOf(userId);
+    team.ifPresent(t -> audit.memberRemoved(actorId, t, subject, membership.getTeamRole()));
   }
 
   // ---------------------------------------------------------------------------
@@ -423,7 +449,7 @@ public class TeamService {
       throw new UserNotFoundException(userId);
     }
     if (admin) {
-      return addMember(teamId, userId, role.name()).withoutEmail();
+      return addMember(teamId, userId, role.name(), actorId).withoutEmail();
     }
     requireAdminForLeadGrant(role);
     return invite(teamId, actorId, userId, user).withoutEmail();
@@ -435,9 +461,8 @@ public class TeamService {
    * is the moment the seat is actually taken.
    */
   private TeamMemberView invite(UUID teamId, UUID actorId, UUID userId, User user) {
-    if (teams.findByIdForUpdate(teamId).isEmpty()) {
-      throw TeamNotFoundException.team(teamId);
-    }
+    Team team =
+        teams.findByIdForUpdate(teamId).orElseThrow(() -> TeamNotFoundException.team(teamId));
     limits.requireTeamMemberCapacity(teamId);
     if (memberships.existsByTeamIdAndUserId(teamId, userId)) {
       throw new TeamConflictException(
@@ -453,6 +478,9 @@ public class TeamService {
           "This team has too many unanswered invitations — revoke some first.");
     }
     TeamInvitation saved = invitations.saveAndFlush(TeamInvitation.of(teamId, userId, actorId));
+    audit.invitationCreated(actorId, team, subject(userId, user));
+    // Heard after commit: the invited user is told in-app and by e-mail (issue #948).
+    events.publishEvent(new TeamInvitationCreated(teamId, userId, actorId));
     return new TeamMemberView(
         userId,
         user.getDisplayName(),
@@ -478,13 +506,16 @@ public class TeamService {
   @Transactional
   public void revokeInvitationAsLead(UUID teamId, UUID actorId, boolean admin, UUID userId) {
     requireLeadOrAdmin(teamId, actorId, admin);
-    revokeInvitation(teamId, userId);
+    revokeInvitation(teamId, userId, actorId);
   }
 
   /** Withdraw a pending invitation (admin surface, issue #936); an unknown one is a 404. */
   @Transactional
-  public void revokeInvitation(UUID teamId, UUID userId) {
-    removeInvitationLocked(teamId, userId);
+  public void revokeInvitation(UUID teamId, UUID userId, UUID actorId) {
+    Optional<Team> team = removeInvitationLocked(teamId, userId);
+    TeamMembershipAudit.Subject subject = subjectOf(userId);
+    team.ifPresent(
+        t -> audit.invitationRevoked(actorId, t, subject, TeamMembershipAudit.REASON_REVOKED));
   }
 
   /**
@@ -492,11 +523,12 @@ public class TeamService {
    * decline and accept of one invitation serialise — with a counted delete: an invitation already
    * answered or revoked by the racing request is a plain 404, never a stale-state error (#936).
    */
-  private void removeInvitationLocked(UUID teamId, UUID userId) {
-    teams.findByIdForUpdate(teamId);
+  private Optional<Team> removeInvitationLocked(UUID teamId, UUID userId) {
+    Optional<Team> team = teams.findByIdForUpdate(teamId);
     if (invitations.deleteInvitation(teamId, userId) == 0) {
       throw TeamNotFoundException.invitation(teamId, userId);
     }
+    return team;
   }
 
   /** The caller's own pending invitations into enabled teams, newest first (issue #936). */
@@ -533,6 +565,7 @@ public class TeamService {
                   limits.requireTeamMemberCapacity(teamId);
                   return memberships.save(TeamMembership.of(teamId, userId, TeamRole.MEMBER));
                 });
+    audit.invitationAccepted(team, subjectOf(userId));
     long count =
         memberships.countMembersByTeamIds(List.of(teamId)).stream()
             .findFirst()
@@ -545,7 +578,9 @@ public class TeamService {
   /** The invited user declines: the invitation is deleted; 404 when there is none (issue #936). */
   @Transactional
   public void declineInvitation(UUID teamId, UUID userId) {
-    removeInvitationLocked(teamId, userId);
+    Optional<Team> team = removeInvitationLocked(teamId, userId);
+    TeamMembershipAudit.Subject subject = subjectOf(userId);
+    team.ifPresent(t -> audit.invitationDeclined(t, subject));
   }
 
   /**
@@ -571,7 +606,7 @@ public class TeamService {
     }
     // The last-lead guard and the team lock live in the base setMemberRole (issue #542),
     // so this self-service path is covered by the same invariant as the admin path.
-    return setMemberRole(teamId, userId, teamRole).withoutEmail();
+    return setMemberRole(teamId, userId, teamRole, actorId).withoutEmail();
   }
 
   /**
@@ -588,7 +623,7 @@ public class TeamService {
           "SELF_REMOVAL", "You cannot remove yourself from a team; ask an administrator.");
     }
     // The last-lead guard and the team lock live in the base removeMember (issue #542).
-    removeMember(teamId, userId);
+    removeMember(teamId, userId, actorId);
   }
 
   /**
@@ -597,8 +632,19 @@ public class TeamService {
    * locking cannot (the racing requests touch different membership rows). A missing team is left
    * for the downstream mutation to surface as a 404.
    */
-  private void lockTeam(UUID teamId) {
-    teams.findByIdForUpdate(teamId);
+  private Optional<Team> lockTeam(UUID teamId) {
+    return teams.findByIdForUpdate(teamId);
+  }
+
+  /** The audit subject for a loaded user (issue #948). */
+  private static TeamMembershipAudit.Subject subject(UUID userId, User user) {
+    return new TeamMembershipAudit.Subject(userId, user.getDisplayName());
+  }
+
+  /** The audit subject for a user id; the name is null when the account is gone. */
+  private TeamMembershipAudit.Subject subjectOf(UUID userId) {
+    return new TeamMembershipAudit.Subject(
+        userId, users.findById(userId).map(User::getDisplayName).orElse(null));
   }
 
   private void requireLeadOrAdmin(UUID teamId, UUID actorId, boolean admin) {

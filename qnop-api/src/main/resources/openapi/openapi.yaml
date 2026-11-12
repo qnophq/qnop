@@ -7922,6 +7922,12 @@ components:
         `REVIEW_DELETED` (issue #421) is the one type whose review no longer
         exists: it carries no `documentId` and no action to follow, and its
         `documentTitle` is the deleted review's name rather than a link to it.
+
+        `TEAM_INVITATION` (issue #948) is the one type that is not about a
+        review: a team lead invited the recipient into a team. It carries no
+        `documentId`/`documentTitle`; `teamName` names the team, the actor is
+        the inviting lead, and `actionPath` opens "My Teams" (`actionTarget`
+        `TEAMS`), where the invitation is accepted or declined.
       enum:
         - PARTICIPANT_ADDED
         - ANNOTATION_CREATED
@@ -7931,6 +7937,7 @@ components:
         - VERSION_UPLOADED
         - WORKFLOW_CHANGED
         - REVIEW_DELETED
+        - TEAM_INVITATION
       example: COMMENT_ADDED
     NotificationSummary:
       type: object
@@ -8014,8 +8021,15 @@ components:
           type: string
           nullable: true
           description: |
-            What `actionPath` opens: `ANNOTATION` or `REVIEW`. Null when there
-            is nothing to open (a tombstone or a deleted review).
+            What `actionPath` opens: `ANNOTATION`, `REVIEW` or `TEAMS` (the
+            "My Teams" page, for a `TEAM_INVITATION`). Null when there is
+            nothing to open (a tombstone or a deleted review).
+        teamName:
+          type: string
+          nullable: true
+          description: |
+            The team the recipient was invited into, on `TEAM_INVITATION`
+            (snapshotted when the invitation was sent); null for other types.
         readAt:
           type: string
           format: date-time
@@ -8108,8 +8122,15 @@ components:
           type: string
           nullable: true
           description: |
-            What `actionPath` opens: `ANNOTATION` or `REVIEW`. Null when there
-            is nothing to open (a tombstone or a deleted review).
+            What `actionPath` opens: `ANNOTATION`, `REVIEW` or `TEAMS` (the
+            "My Teams" page, for a `TEAM_INVITATION`). Null when there is
+            nothing to open (a tombstone or a deleted review).
+        teamName:
+          type: string
+          nullable: true
+          description: |
+            The team the recipient was invited into, on `TEAM_INVITATION`
+            (snapshotted when the invitation was sent); null for other types.
         readAt:
           type: string
           format: date-time

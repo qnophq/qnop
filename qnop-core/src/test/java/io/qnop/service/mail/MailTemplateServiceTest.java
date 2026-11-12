@@ -69,6 +69,7 @@ class MailTemplateServiceTest {
           Map.entry("versionNumber", "3"),
           Map.entry("oldState", "In review"),
           Map.entry("newState", "Changes requested"),
+          Map.entry("teamName", "Legal review"),
           // The digest renders its per-document lines in the service and passes
           // them in as one block (issue #680) — Mustache cannot count.
           Map.entry("totalCount", 11),

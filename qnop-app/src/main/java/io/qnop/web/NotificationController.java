@@ -115,7 +115,8 @@ public class NotificationController implements NotificationsApi {
         .fromState(view.facts().fromState())
         .toState(view.facts().toState())
         .versionNumber(view.facts().versionNumber())
-        .actionTarget(view.facts().actionTarget());
+        .actionTarget(view.facts().actionTarget())
+        .teamName(view.facts().teamName());
   }
 
   private static NotificationDetail toDetail(NotificationView view) {
@@ -138,7 +139,8 @@ public class NotificationController implements NotificationsApi {
         .fromState(view.facts().fromState())
         .toState(view.facts().toState())
         .versionNumber(view.facts().versionNumber())
-        .actionTarget(view.facts().actionTarget());
+        .actionTarget(view.facts().actionTarget())
+        .teamName(view.facts().teamName());
   }
 
   /** Nullable {@link Instant} → {@link OffsetDateTime} at UTC for the wire model (#295). */

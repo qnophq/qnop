@@ -59,6 +59,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -83,6 +84,7 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
   @Autowired TeamMembershipRepository teamMemberships;
   @Autowired TeamInvitationRepository invitations;
   @Autowired PasswordEncoder passwordEncoder;
+  @Autowired JdbcTemplate jdbc;
 
   private final List<UUID> createdUsers = new ArrayList<>();
 
@@ -117,6 +119,10 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
   void cleanup() {
     documents.findById(documentId).ifPresent(documents::delete);
     teams.findById(teamId).ifPresent(teams::delete); // cascades memberships + invitations
+    // Membership changes are audited now (issue #948), and an audit row keeps its actor
+    // (FK RESTRICT). TRUNCATE is the sanctioned wipe, as clean.sql does for the seeded suites.
+    jdbc.execute("TRUNCATE TABLE audit_event");
+    jdbc.update("UPDATE audit_chain_head SET last_seq = 0, last_hash = repeat('0', 64)");
     createdUsers.forEach(id -> users.findById(id).ifPresent(users::delete));
     createdUsers.clear();
   }

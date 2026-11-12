@@ -365,7 +365,11 @@ class ReviewNotificationServiceTest {
         }
       }
     }
-    assertThat(seen).containsExactlyInAnyOrder(NotificationType.values());
+    // TEAM_INVITATION is the one type no review event produces; TeamInvitationNotifierTest
+    // checks its variables against its template (issue #948).
+    assertThat(seen)
+        .containsExactlyInAnyOrderElementsOf(
+            java.util.EnumSet.complementOf(java.util.EnumSet.of(NotificationType.TEAM_INVITATION)));
   }
 
   // --- fixtures ------------------------------------------------------------
