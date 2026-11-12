@@ -51,7 +51,12 @@ class MailSenderProviderTest {
     // Explicit non-default timeouts prove the transport picks them up from config.
     HttpClientProperties httpClient =
         new HttpClientProperties(
-            null, null, Duration.ofSeconds(8), Duration.ofSeconds(24), Duration.ofSeconds(42));
+            null,
+            null,
+            Duration.ofSeconds(8),
+            Duration.ofSeconds(24),
+            Duration.ofSeconds(42),
+            null);
     provider = new MailSenderProvider(settings, httpClient);
   }
 

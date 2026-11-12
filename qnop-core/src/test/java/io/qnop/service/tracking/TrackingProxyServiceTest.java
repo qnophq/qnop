@@ -101,7 +101,7 @@ class TrackingProxyServiceTest {
   }
 
   private static HttpClientProperties defaults() {
-    return new HttpClientProperties(null, null, null, null, null);
+    return new HttpClientProperties(null, null, null, null, null, null);
   }
 
   @Test

@@ -49,7 +49,7 @@ class DbClientRegistrationRepositoryTest {
           denyPrivate,
           new OidcDiscoveryClient(
               new OidcHttpTransport(
-                  denyPrivate, new HttpClientProperties(null, null, null, null, null))));
+                  denyPrivate, new HttpClientProperties(null, null, null, null, null, null))));
 
   @Test
   @DisplayName(

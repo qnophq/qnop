@@ -164,6 +164,16 @@ qnop:
     smtp-connect-timeout: ${QNOP_HTTP_CLIENT_SMTP_CONNECT_TIMEOUT:10s}
     smtp-read-timeout: ${QNOP_HTTP_CLIENT_SMTP_READ_TIMEOUT:30s}
     smtp-write-timeout: ${QNOP_HTTP_CLIENT_SMTP_WRITE_TIMEOUT:30s}
+    # Explicit outbound proxy for the SSRF-guarded OIDC and usage-tracking clients
+    # (issue #940, ADR-0056 amendment). Unset host = direct connections (default);
+    # the JVM http(s).proxyHost properties are ignored. A WEAKER mode: proxied
+    # destinations get the lexical check only and the proxy's egress ACL is the
+    # remaining control. non-proxy-hosts (exact names or *.suffix, comma-separated)
+    # stay direct with the full guard. No proxy authentication.
+    proxy:
+      host: ${QNOP_HTTP_CLIENT_PROXY_HOST:}
+      port: ${QNOP_HTTP_CLIENT_PROXY_PORT:}
+      non-proxy-hosts: ${QNOP_HTTP_CLIENT_PROXY_NON_PROXY_HOSTS:}
   # Re-anchoring cascade tunables (ADR-0009, issue #320). Advanced; the conservative
   # defaults live in ReanchoringProperties. Override per key via QNOP_REANCHORING_*:
   #   *_SIMILARITY_THRESHOLD (0.75), *_AMBIGUITY_MARGIN (0.05), *_CONTEXT_LENGTH (32),
