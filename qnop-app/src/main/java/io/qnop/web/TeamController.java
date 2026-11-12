@@ -30,6 +30,7 @@ import io.qnop.api.v1.model.AdminTeamMemberRoleUpdateRequest;
 import io.qnop.api.v1.model.AdminTeamSummary;
 import io.qnop.api.v1.model.AdminTeamUpdateRequest;
 import io.qnop.api.v1.model.ErrorResponse;
+import io.qnop.api.v1.model.TeamMembershipStatus;
 import io.qnop.api.v1.model.TeamRole;
 import io.qnop.service.TeamConflictException;
 import io.qnop.service.TeamNotFoundException;
@@ -48,6 +49,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -165,6 +167,12 @@ public class TeamController implements AdminTeamsApi {
     return ResponseEntity.noContent().build();
   }
 
+  @Override
+  public ResponseEntity<Void> revokeTeamInvitation(UUID teamId, UUID userId) {
+    teams.revokeInvitation(teamId, userId);
+    return ResponseEntity.noContent().build();
+  }
+
   @ExceptionHandler(TeamNotFoundException.class)
   public ResponseEntity<ErrorResponse> onTeamNotFound(TeamNotFoundException ex) {
     return error(HttpStatus.NOT_FOUND, "TEAM_NOT_FOUND", ex.getMessage());
@@ -208,7 +216,10 @@ public class TeamController implements AdminTeamsApi {
     // One batched avatar-timestamp lookup for the whole roster (same pattern as
     // the admin user list), so building URLs never streams image bytes per row.
     Map<UUID, Instant> avatarTimestamps =
-        avatars.updatedAt(v.members().stream().map(TeamMemberView::userId).toList());
+        avatars.updatedAt(
+            Stream.concat(v.members().stream(), v.pendingInvitations().stream())
+                .map(TeamMemberView::userId)
+                .toList());
     return new AdminTeamDetail()
         .id(v.id())
         .name(v.name())
@@ -220,7 +231,11 @@ public class TeamController implements AdminTeamsApi {
         .createdAt(toOffset(v.createdAt()))
         .updatedAt(toOffset(v.updatedAt()))
         .members(
-            v.members().stream().map(m -> toMember(m, avatarTimestamps.get(m.userId()))).toList());
+            v.members().stream().map(m -> toMember(m, avatarTimestamps.get(m.userId()))).toList())
+        .pendingInvitations(
+            v.pendingInvitations().stream()
+                .map(m -> toMember(m, avatarTimestamps.get(m.userId())))
+                .toList());
   }
 
   private AdminTeamMember toMember(TeamMemberView v) {
@@ -235,7 +250,8 @@ public class TeamController implements AdminTeamsApi {
         .avatarUrl(AvatarUrls.forUser(v.userId(), avatarUpdatedAt))
         .email(v.email())
         .teamRole(TeamRole.fromValue(v.teamRole()))
-        .joinedAt(toOffset(v.joinedAt()));
+        .joinedAt(toOffset(v.joinedAt()))
+        .status(TeamMembershipStatus.fromValue(v.status()));
   }
 
   private static OffsetDateTime toOffset(Instant instant) {

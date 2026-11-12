@@ -129,7 +129,7 @@
         "share": "Arbeit aufteilen",
         "rise": "Im Rang aufsteigen"
       },
-      "hint": "Eine Teamleitung oder ein Administrator kann dich hinzufügen — deine Teams erscheinen hier, sobald das passiert.",
+      "hint": "Eine Teamleitung oder ein Administrator kann dich einladen — nimm die Einladung hier an, und das Team erscheint.",
       "illustration": "Ein freier Platz, der in einem Team wartet"
     }
   },
@@ -138,6 +138,7 @@
     "publicProfile": "Öffentliches Profil",
     "editTeam": "Team bearbeiten",
     "addMember": "Mitglied hinzufügen",
+    "inviteMember": "Mitglied einladen",
     "columns": {
       "member": "Mitglied",
       "role": "Rolle",
@@ -192,6 +193,32 @@
     "cancel": "Abbrechen",
     "submit": "Hinzufügen",
     "submitCount": "{{number}} hinzufügen",
-    "failed": "Konnte nicht hinzugefügt werden: {{names}}."
+    "failed": "Konnte nicht hinzugefügt werden: {{names}}.",
+    "inviteTitle": "Mitglieder einladen",
+    "inviteHint": "Jede Person erhält eine Einladung und tritt dem Team als Mitglied bei, sobald sie annimmt. Nur ein Administrator kann jemanden zur Teamleitung machen.",
+    "invite": "Einladung senden",
+    "inviteCount": "{{number}} Einladungen senden"
+  },
+  "invitations": {
+    "title_one": "Team-Einladung",
+    "title_other": "{{count}} Team-Einladungen",
+    "hint": "Du trittst einem Team erst bei — und siehst seine Reviews —, wenn du annimmst.",
+    "invitedBy": "Eingeladen von {{name}} · {{date}}",
+    "invited": "Eingeladen am {{date}}",
+    "accept": "Annehmen",
+    "decline": "Ablehnen",
+    "acceptAria": "Einladung zu {{team}} annehmen",
+    "declineAria": "Einladung zu {{team}} ablehnen",
+    "failed": "Die Einladung konnte nicht beantwortet werden."
+  },
+  "pendingInvitations": {
+    "title_one": "Offene Einladung",
+    "title_other": "{{count}} offene Einladungen",
+    "hint": "Eingeladene haben keinen Zugriff auf das Team, bis sie annehmen.",
+    "status": "Eingeladen",
+    "invitedAt": "Eingeladen am {{date}}",
+    "revoke": "Zurückziehen",
+    "revokeAria": "Einladung für {{name}} zurückziehen",
+    "revokeFailed": "Die Einladung konnte nicht zurückgezogen werden."
   }
 }

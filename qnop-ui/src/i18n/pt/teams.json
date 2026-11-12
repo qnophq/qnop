@@ -134,7 +134,7 @@
         "share": "Divida o trabalho",
         "rise": "Suba de nível"
       },
-      "hint": "Um líder da equipe ou um administrador pode adicionar você — suas equipes aparecem aqui assim que isso acontecer.",
+      "hint": "Um líder da equipe ou um administrador pode convidar você — aceite o convite aqui e a equipe aparece.",
       "illustration": "Um lugar vago esperando em uma equipe"
     }
   },
@@ -143,6 +143,7 @@
     "publicProfile": "Perfil público",
     "editTeam": "Editar equipe",
     "addMember": "Adicionar membro",
+    "inviteMember": "Convidar membro",
     "columns": {
       "member": "Membro",
       "role": "Função",
@@ -197,6 +198,34 @@
     "cancel": "Cancelar",
     "submit": "Adicionar",
     "submitCount": "Adicionar {{number}}",
-    "failed": "Não foi possível adicionar: {{names}}."
+    "failed": "Não foi possível adicionar: {{names}}.",
+    "inviteTitle": "Convidar membros",
+    "inviteHint": "Cada pessoa recebe um convite e entra na equipe como membro assim que aceitar. Apenas um administrador pode tornar alguém líder.",
+    "invite": "Enviar convite",
+    "inviteCount": "Enviar {{number}} convites"
+  },
+  "invitations": {
+    "title_one": "Convite para equipe",
+    "title_many": "{{count}} convites para equipes",
+    "title_other": "{{count}} convites para equipes",
+    "hint": "Você só entra em uma equipe — e vê suas revisões — depois de aceitar.",
+    "invitedBy": "Convidado por {{name}} · {{date}}",
+    "invited": "Convidado em {{date}}",
+    "accept": "Aceitar",
+    "decline": "Recusar",
+    "acceptAria": "Aceitar o convite para {{team}}",
+    "declineAria": "Recusar o convite para {{team}}",
+    "failed": "Não foi possível responder ao convite."
+  },
+  "pendingInvitations": {
+    "title_one": "Convite pendente",
+    "title_many": "{{count}} convites pendentes",
+    "title_other": "{{count}} convites pendentes",
+    "hint": "Pessoas convidadas não têm acesso à equipe até aceitarem.",
+    "status": "Convidado",
+    "invitedAt": "Convidado em {{date}}",
+    "revoke": "Revogar",
+    "revokeAria": "Revogar o convite de {{name}}",
+    "revokeFailed": "Não foi possível revogar o convite."
   }
 }

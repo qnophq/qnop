@@ -49,6 +49,11 @@ interface AddMyTeamMemberDialogProps {
   open: boolean;
   teamId: string;
   existingMemberIds: string[];
+  /**
+   * Whether the caller may add directly and grant LEAD — an admin (issue #936).
+   * A lead who is not an admin only invites, always as a member.
+   */
+  canGrantLead: boolean;
   onClose: () => void;
 }
 
@@ -58,11 +63,16 @@ interface AddMyTeamMemberDialogProps {
  * only) rather than the admin user list, and adds them through the lead client.
  * Adds run in parallel; on a partial failure the dialog stays open with only the
  * users that could not be added still selected.
+ *
+ * Consent (issue #936, ADR-0064): for a lead who is not an admin this is an
+ * invite dialog — each person joins as a member only once they accept, and there
+ * is no role choice, since only an admin grants LEAD.
  */
 export function AddMyTeamMemberDialog({
   open,
   teamId,
   existingMemberIds,
+  canGrantLead,
   onClose,
 }: AddMyTeamMemberDialogProps) {
   const { t } = useTranslation('teams');
@@ -90,7 +100,13 @@ export function AddMyTeamMemberDialog({
     setError(null);
     setSubmitting(true);
     const results = await Promise.allSettled(
-      selected.map((user) => addMember.mutateAsync({ teamId, userId: user.id, teamRole })),
+      selected.map((user) =>
+        addMember.mutateAsync({
+          teamId,
+          userId: user.id,
+          teamRole: canGrantLead ? teamRole : 'MEMBER',
+        }),
+      ),
     );
     setSubmitting(false);
 
@@ -109,7 +125,9 @@ export function AddMyTeamMemberDialog({
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <Box component="form" onSubmit={onSubmit} noValidate>
-        <DialogTitle>{t('addMember.title')}</DialogTitle>
+        <DialogTitle>
+          {canGrantLead ? t('addMember.title') : t('addMember.inviteTitle')}
+        </DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
             <Autocomplete
@@ -145,17 +163,21 @@ export function AddMyTeamMemberDialog({
                 />
               )}
             />
-            <TextField
-              label={t('addMember.role')}
-              select
-              value={teamRole}
-              onChange={(e) => setTeamRole(e.target.value as TeamRole)}
-              fullWidth
-              helperText={t('addMember.roleHelper')}
-            >
-              <MenuItem value="MEMBER">{t('addMember.roles.MEMBER')}</MenuItem>
-              <MenuItem value="LEAD">{t('addMember.roles.LEAD')}</MenuItem>
-            </TextField>
+            {canGrantLead ? (
+              <TextField
+                label={t('addMember.role')}
+                select
+                value={teamRole}
+                onChange={(e) => setTeamRole(e.target.value as TeamRole)}
+                fullWidth
+                helperText={t('addMember.roleHelper')}
+              >
+                <MenuItem value="MEMBER">{t('addMember.roles.MEMBER')}</MenuItem>
+                <MenuItem value="LEAD">{t('addMember.roles.LEAD')}</MenuItem>
+              </TextField>
+            ) : (
+              <Alert severity="info">{t('addMember.inviteHint')}</Alert>
+            )}
             {error && (
               <Alert severity="error">
                 {apiErrorMessage(
@@ -171,9 +193,13 @@ export function AddMyTeamMemberDialog({
             {t('addMember.cancel')}
           </Button>
           <Button type="submit" variant="contained" disabled={submitting || selected.length === 0}>
-            {selected.length > 1
-              ? t('addMember.submitCount', { number: selected.length })
-              : t('addMember.submit')}
+            {canGrantLead
+              ? selected.length > 1
+                ? t('addMember.submitCount', { number: selected.length })
+                : t('addMember.submit')
+              : selected.length > 1
+                ? t('addMember.inviteCount', { number: selected.length })
+                : t('addMember.invite')}
           </Button>
         </DialogActions>
       </Box>

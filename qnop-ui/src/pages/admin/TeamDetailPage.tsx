@@ -40,7 +40,13 @@ import { Trans, useTranslation } from 'react-i18next';
 import { ArrowLeftRight, MoreVertical, SquarePen, UserMinus, UserPlus } from 'lucide-react';
 import { Link as RouterLink, useParams } from 'react-router';
 import type { AdminTeamMember } from '../../api/generated';
-import { useRemoveTeamMember, useSetTeamMemberRole, useTeam } from '../../api/hooks/useTeams';
+import {
+  useRemoveTeamMember,
+  useRevokeTeamInvitation,
+  useSetTeamMemberRole,
+  useTeam,
+} from '../../api/hooks/useTeams';
+import { PendingInvitationsList } from '../../components/admin/teams/PendingInvitationsList';
 import { AddMemberDialog } from '../../components/admin/teams/AddMemberDialog';
 import { TeamFormDialog } from '../../components/admin/teams/TeamFormDialog';
 import { TeamRoleBadge } from '../../components/admin/teams/TeamRoleBadge';
@@ -59,6 +65,7 @@ export function TeamDetailPage() {
   const { data: team, isLoading, isError } = useTeam(id);
   const setRole = useSetTeamMemberRole();
   const removeMember = useRemoveTeamMember();
+  const revokeInvitation = useRevokeTeamInvitation();
   const { formatDateTime } = useFormatters();
 
   const [editOpen, setEditOpen] = useState(false);
@@ -202,6 +209,15 @@ export function TeamDetailPage() {
           </TableBody>
         </Table>
       </Paper>
+
+      {/* A lead's invitations awaiting the user's consent (issue #936). */}
+      <PendingInvitationsList
+        invitations={team.pendingInvitations ?? []}
+        revokingUserId={revokeInvitation.isPending ? revokeInvitation.variables?.userId : null}
+        onRevoke={(invitation) =>
+          revokeInvitation.mutate({ teamId: id, userId: invitation.userId })
+        }
+      />
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
         <MenuItem

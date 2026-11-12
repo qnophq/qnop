@@ -41,4 +41,10 @@ public class TeamNotFoundException extends RuntimeException {
   public static TeamNotFoundException membership(UUID teamId, UUID userId) {
     return new TeamNotFoundException("User " + userId + " is not a member of team " + teamId);
   }
+
+  /** No pending invitation of the user into the team (issue #936). */
+  public static TeamNotFoundException invitation(UUID teamId, UUID userId) {
+    return new TeamNotFoundException(
+        "No pending invitation of user " + userId + " to team " + teamId);
+  }
 }

@@ -20,7 +20,12 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { MyTeamListResponse, TeamDetail, TeamRole } from '../generated';
+import type {
+  MyTeamInvitationListResponse,
+  MyTeamListResponse,
+  TeamDetail,
+  TeamRole,
+} from '../generated';
 import { teamsApi } from '../config';
 import { teamKeys } from './useTeams';
 
@@ -36,6 +41,7 @@ export const myTeamKeys = {
   all: ['my', 'teams'] as const,
   list: () => [...myTeamKeys.all, 'list'] as const,
   detail: (id: string) => [...myTeamKeys.all, 'detail', id] as const,
+  invitations: () => [...myTeamKeys.all, 'invitations'] as const,
 };
 
 /** The teams the caller belongs to, each flagged with the caller's team role. */
@@ -125,6 +131,54 @@ export function useRemoveMyTeamMember() {
   return useMutation({
     mutationFn: async (vars: { teamId: string; userId: string }) => {
       await teamsApi.removeMyTeamMember({ teamId: vars.teamId, userId: vars.userId });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: myTeamKeys.all }),
+  });
+}
+
+/**
+ * The caller's pending team invitations (issue #936): a lead's add needs the
+ * invited user's consent, and grants nothing until it is accepted.
+ */
+export function useMyTeamInvitations() {
+  return useQuery<MyTeamInvitationListResponse>({
+    queryKey: myTeamKeys.invitations(),
+    queryFn: async () => {
+      const response = await teamsApi.listMyTeamInvitations();
+      return response.data;
+    },
+  });
+}
+
+/** Accept an invitation — the caller joins the team as a member (issue #936). */
+export function useAcceptTeamInvitation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (teamId: string) => {
+      const response = await teamsApi.acceptMyTeamInvitation({ teamId });
+      return response.data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: myTeamKeys.all }),
+  });
+}
+
+/** Decline an invitation; it is deleted (issue #936). */
+export function useDeclineTeamInvitation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (teamId: string) => {
+      await teamsApi.declineMyTeamInvitation({ teamId });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: myTeamKeys.invitations() }),
+  });
+}
+
+/** A lead (or admin) withdraws a pending invitation of their team (issue #936). */
+export function useRevokeMyTeamInvitation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { teamId: string; userId: string }) => {
+      await teamsApi.revokeMyTeamInvitation({ teamId: vars.teamId, userId: vars.userId });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: myTeamKeys.all }),
   });

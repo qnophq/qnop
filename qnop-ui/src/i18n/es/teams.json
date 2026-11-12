@@ -134,7 +134,7 @@
         "share": "Reparte el trabajo",
         "rise": "Sube de rango"
       },
-      "hint": "Un responsable del equipo o un administrador puede añadirte — tus equipos aparecerán aquí en cuanto lo haga.",
+      "hint": "Un responsable del equipo o un administrador puede invitarte — acepta la invitación aquí y el equipo aparecerá.",
       "illustration": "Un lugar libre esperando en un equipo"
     }
   },
@@ -143,6 +143,7 @@
     "publicProfile": "Perfil público",
     "editTeam": "Editar equipo",
     "addMember": "Añadir miembro",
+    "inviteMember": "Invitar miembro",
     "columns": {
       "member": "Miembro",
       "role": "Rol",
@@ -197,6 +198,34 @@
     "cancel": "Cancelar",
     "submit": "Añadir",
     "submitCount": "Añadir {{number}}",
-    "failed": "No se pudo añadir a: {{names}}."
+    "failed": "No se pudo añadir a: {{names}}.",
+    "inviteTitle": "Invitar miembros",
+    "inviteHint": "Cada persona recibe una invitación y se une al equipo como miembro cuando la acepta. Solo un administrador puede nombrar a alguien responsable.",
+    "invite": "Enviar invitación",
+    "inviteCount": "Enviar {{number}} invitaciones"
+  },
+  "invitations": {
+    "title_one": "Invitación a un equipo",
+    "title_other": "{{count}} invitaciones a equipos",
+    "title_many": "{{count}} invitaciones a equipos",
+    "hint": "Solo te unes a un equipo — y ves sus revisiones — cuando aceptas.",
+    "invitedBy": "Invitación de {{name}} · {{date}}",
+    "invited": "Invitado el {{date}}",
+    "accept": "Aceptar",
+    "decline": "Rechazar",
+    "acceptAria": "Aceptar la invitación a {{team}}",
+    "declineAria": "Rechazar la invitación a {{team}}",
+    "failed": "No se pudo responder a la invitación."
+  },
+  "pendingInvitations": {
+    "title_one": "Invitación pendiente",
+    "title_other": "{{count}} invitaciones pendientes",
+    "title_many": "{{count}} invitaciones pendientes",
+    "hint": "Las personas invitadas no tienen acceso al equipo hasta que aceptan.",
+    "status": "Invitado",
+    "invitedAt": "Invitado el {{date}}",
+    "revoke": "Retirar",
+    "revokeAria": "Retirar la invitación de {{name}}",
+    "revokeFailed": "No se pudo retirar la invitación."
   }
 }

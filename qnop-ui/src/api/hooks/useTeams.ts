@@ -141,3 +141,14 @@ export function useRemoveTeamMember() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: teamKeys.all }),
   });
 }
+
+/** Withdraw a team lead's pending invitation from the admin console (issue #936). */
+export function useRevokeTeamInvitation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { teamId: string; userId: string }) => {
+      await adminTeamsApi.revokeTeamInvitation({ teamId: vars.teamId, userId: vars.userId });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: teamKeys.all }),
+  });
+}

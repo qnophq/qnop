@@ -38,6 +38,10 @@ const { myTeamsState } = vi.hoisted(() => ({
 
 vi.mock('../../api/hooks/useMyTeams', () => ({
   useMyTeams: () => myTeamsState,
+  // No pending invitations here; MyTeamInvitations.test.tsx covers them (#936).
+  useMyTeamInvitations: () => ({ data: { items: [] } }),
+  useAcceptTeamInvitation: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeclineTeamInvitation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 beforeEach(() => {
@@ -95,7 +99,7 @@ describe('MyTeamsPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Your seat is waiting' })).toBeTruthy();
     expect(screen.getByRole('img', { name: 'An open seat waiting in a team' })).toBeTruthy();
-    expect(screen.getByText(/A team lead or an administrator can add you/)).toBeTruthy();
+    expect(screen.getByText(/A team lead or an administrator can invite you/)).toBeTruthy();
   });
 
   it('surfaces a leadership rank and headline stats for the teams led', () => {

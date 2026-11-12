@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -33,6 +34,9 @@ import io.qnop.entity.Team;
 import io.qnop.entity.TeamMembership;
 import io.qnop.entity.TeamRole;
 import io.qnop.entity.User;
+import io.qnop.repository.TeamInvitationProjection;
+import io.qnop.repository.TeamInvitationRepository;
+import io.qnop.repository.TeamMemberCount;
 import io.qnop.repository.TeamMemberProjection;
 import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
@@ -53,9 +57,11 @@ class TeamServiceTest {
 
   private final TeamRepository teams = mock(TeamRepository.class);
   private final TeamMembershipRepository memberships = mock(TeamMembershipRepository.class);
+  private final TeamInvitationRepository invitations = mock(TeamInvitationRepository.class);
   private final UserRepository users = mock(UserRepository.class);
   private final TeamSlugService slugs = mock(TeamSlugService.class);
-  private final TeamService service = new TeamService(teams, memberships, users, slugs, noLimits());
+  private final TeamService service =
+      new TeamService(teams, memberships, invitations, users, slugs, noLimits());
 
   @Test
   @DisplayName("create rejects a team name with control or bidi-override characters")
@@ -386,45 +392,291 @@ class TeamServiceTest {
   }
 
   @Test
-  @DisplayName("a lead of the team may add a member; an admin passes without a lead check")
-  void leadOrAdminMayAdd() {
+  @DisplayName("a lead's add only invites the user; nothing grants access before acceptance (#936)")
+  void leadAddCreatesAnInvitation() {
     UUID teamId = UUID.randomUUID();
     UUID lead = UUID.randomUUID();
     UUID target = UUID.randomUUID();
     when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team(teamId)));
     when(users.findById(target))
         .thenReturn(Optional.of(User.internal("Al", "al@example.com", "al", "h")));
-    when(memberships.existsByTeamIdAndUserId(teamId, target)).thenReturn(false);
-    when(memberships.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
+    when(invitations.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
     when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
         .thenReturn(true);
-    assertThat(service.addMemberAsLead(teamId, lead, false, target, "LEAD").teamRole())
-        .isEqualTo("LEAD");
 
-    // An admin passes for a team they are not a lead of.
-    UUID admin = UUID.randomUUID();
-    assertThat(service.addMemberAsLead(teamId, admin, true, target, "MEMBER").teamRole())
-        .isEqualTo("MEMBER");
-    verify(memberships, never()).existsByTeamIdAndUserIdAndTeamRole(teamId, admin, TeamRole.LEAD);
+    TeamMemberView view = service.addMemberAsLead(teamId, lead, false, target, "MEMBER");
+
+    assertThat(view.status()).isEqualTo(TeamService.STATUS_INVITED);
+    assertThat(view.teamRole()).isEqualTo("MEMBER");
+    // The lead surface never returns an e-mail address (#917).
+    assertThat(view.email()).isNull();
+    verify(invitations)
+        .saveAndFlush(
+            argThat(
+                i ->
+                    teamId.equals(i.getTeamId())
+                        && target.equals(i.getUserId())
+                        && lead.equals(i.getInvitedBy())));
+    verify(memberships, never()).save(any());
   }
 
   @Test
-  @DisplayName("the lead surface never returns an e-mail address (#917)")
-  void leadAddOmitsEmail() {
+  @DisplayName("a lead cannot grant LEAD — neither on add nor by promotion (#936)")
+  void leadCannotGrantLead() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    when(users.findById(target))
+        .thenReturn(Optional.of(User.internal("Al", "al@example.com", "al", "h")));
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+
+    assertThatThrownBy(() -> service.addMemberAsLead(teamId, lead, false, target, "LEAD"))
+        .isInstanceOf(TeamAccessForbiddenException.class)
+        .extracting("code")
+        .isEqualTo("LEAD_GRANT_REQUIRES_ADMIN");
+    assertThatThrownBy(() -> service.setMemberRoleAsLead(teamId, lead, false, target, "LEAD"))
+        .isInstanceOf(TeamAccessForbiddenException.class)
+        .extracting("code")
+        .isEqualTo("LEAD_GRANT_REQUIRES_ADMIN");
+    verify(memberships, never()).save(any());
+    verify(invitations, never()).saveAndFlush(any());
+    verify(memberships, never()).findByTeamIdAndUserId(any(), any());
+  }
+
+  @Test
+  @DisplayName("an admin adds directly with any role and supersedes a pending invitation (#936)")
+  void adminAddIsImmediate() {
+    UUID teamId = UUID.randomUUID();
+    UUID admin = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team(teamId)));
+    when(users.findById(target))
+        .thenReturn(Optional.of(User.internal("Al", "al@example.com", "al", "h")));
+    when(memberships.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    TeamMemberView view = service.addMemberAsLead(teamId, admin, true, target, "LEAD");
+
+    assertThat(view.teamRole()).isEqualTo("LEAD");
+    assertThat(view.status()).isEqualTo(TeamService.STATUS_ACTIVE);
+    assertThat(view.email()).isNull();
+    verify(invitations).deleteInvitation(teamId, target);
+    verify(memberships, never()).existsByTeamIdAndUserIdAndTeamRole(teamId, admin, TeamRole.LEAD);
+    // The admin console keeps the address.
+    assertThat(service.addMember(teamId, target, "MEMBER").email()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("an admin may promote to LEAD through the team surface (#936)")
+  void adminMayPromote() {
+    UUID teamId = UUID.randomUUID();
+    UUID admin = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    TeamMembership membership = TeamMembership.of(teamId, target, TeamRole.MEMBER);
+    when(memberships.findByTeamIdAndUserId(teamId, target)).thenReturn(Optional.of(membership));
+    when(users.findById(target))
+        .thenReturn(Optional.of(User.internal("Al", "al@example.com", "al", "h")));
+
+    assertThat(service.setMemberRoleAsLead(teamId, admin, true, target, "LEAD").teamRole())
+        .isEqualTo("LEAD");
+    assertThat(membership.getTeamRole()).isEqualTo(TeamRole.LEAD);
+  }
+
+  @Test
+  @DisplayName("inviting a member or an already-invited user is a conflict (#936)")
+  void inviteConflicts() {
     UUID teamId = UUID.randomUUID();
     UUID lead = UUID.randomUUID();
     UUID target = UUID.randomUUID();
     when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team(teamId)));
     when(users.findById(target))
         .thenReturn(Optional.of(User.internal("Al", "al@example.com", "al", "h")));
-    when(memberships.save(any())).thenAnswer(inv -> inv.getArgument(0));
     when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
         .thenReturn(true);
 
-    assertThat(service.addMemberAsLead(teamId, lead, false, target, "MEMBER").email()).isNull();
-    // The admin console keeps the address.
-    assertThat(service.addMember(teamId, target, "MEMBER").email()).isNotNull();
+    when(invitations.existsByTeamIdAndUserId(teamId, target)).thenReturn(true);
+    assertThatThrownBy(() -> service.addMemberAsLead(teamId, lead, false, target, "MEMBER"))
+        .isInstanceOf(TeamConflictException.class)
+        .extracting("code")
+        .isEqualTo("ALREADY_INVITED");
+
+    when(memberships.existsByTeamIdAndUserId(teamId, target)).thenReturn(true);
+    assertThatThrownBy(() -> service.addMemberAsLead(teamId, lead, false, target, "MEMBER"))
+        .isInstanceOf(TeamConflictException.class)
+        .extracting("code")
+        .isEqualTo("ALREADY_MEMBER");
+    verify(invitations, never()).saveAndFlush(any());
+  }
+
+  @Test
+  @DisplayName("accepting turns the invitation into a MEMBER membership (#936)")
+  void acceptCreatesMembership() {
+    UUID teamId = UUID.randomUUID();
+    UUID user = UUID.randomUUID();
+    Team team = teamWithId(teamId, "Core");
+    team.setSlug("core");
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team));
+    when(invitations.deleteInvitation(teamId, user)).thenReturn(1);
+    when(memberships.findByTeamIdAndUserId(teamId, user)).thenReturn(Optional.empty());
+    when(memberships.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(memberships.countMembersByTeamIds(List.of(teamId)))
+        .thenReturn(List.of(new TeamMemberCount(teamId, 4L)));
+
+    var joined = service.acceptInvitation(teamId, user);
+
+    assertThat(joined.teamId()).isEqualTo(teamId);
+    assertThat(joined.teamRole()).isEqualTo("MEMBER");
+    assertThat(joined.memberCount()).isEqualTo(4L);
+    verify(invitations).deleteInvitation(teamId, user);
+    verify(memberships)
+        .save(argThat(m -> m.getTeamRole() == TeamRole.MEMBER && user.equals(m.getUserId())));
+  }
+
+  @Test
+  @DisplayName("only the invited user can accept or decline; others get 404 (#936)")
+  void acceptOrDeclineWithoutInvitation() {
+    UUID teamId = UUID.randomUUID();
+    UUID stranger = UUID.randomUUID();
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(teamWithId(teamId, "Core")));
+    when(invitations.findByTeamIdAndUserId(teamId, stranger)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.acceptInvitation(teamId, stranger))
+        .isInstanceOf(TeamNotFoundException.class);
+    assertThatThrownBy(() -> service.declineInvitation(teamId, stranger))
+        .isInstanceOf(TeamNotFoundException.class);
+    verify(memberships, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("an invitation into a disabled team cannot be accepted (#936)")
+  void acceptIntoDisabledTeamRefused() {
+    UUID teamId = UUID.randomUUID();
+    UUID user = UUID.randomUUID();
+    Team team = teamWithId(teamId, "Core");
+    team.setEnabled(false);
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team));
+
+    assertThatThrownBy(() -> service.acceptInvitation(teamId, user))
+        .isInstanceOf(TeamNotFoundException.class);
+    verify(memberships, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("declining and revoking delete the invitation; revoking needs a lead (#936)")
+  void declineAndRevoke() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    UUID user = UUID.randomUUID();
+    when(invitations.deleteInvitation(teamId, user)).thenReturn(1);
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+
+    service.declineInvitation(teamId, user);
+    service.revokeInvitationAsLead(teamId, lead, false, user);
+    verify(invitations, org.mockito.Mockito.times(2)).deleteInvitation(teamId, user);
+
+    UUID member = UUID.randomUUID();
+    assertThatThrownBy(() -> service.revokeInvitationAsLead(teamId, member, false, user))
+        .isInstanceOf(TeamAccessForbiddenException.class);
+  }
+
+  @Test
+  @DisplayName("revoke and decline take the team lock; a vanished invitation is a 404 (#936)")
+  void revokeAndDeclineAreLockedAndCounted() {
+    UUID teamId = UUID.randomUUID();
+    UUID user = UUID.randomUUID();
+    when(invitations.deleteInvitation(teamId, user)).thenReturn(0); // answered concurrently
+
+    assertThatThrownBy(() -> service.revokeInvitation(teamId, user))
+        .isInstanceOf(TeamNotFoundException.class);
+    assertThatThrownBy(() -> service.declineInvitation(teamId, user))
+        .isInstanceOf(TeamNotFoundException.class);
+    verify(teams, org.mockito.Mockito.times(2)).findByIdForUpdate(teamId);
+  }
+
+  @Test
+  @DisplayName("accepting as an existing member takes no seat, so the quota does not apply (#936)")
+  void acceptChecksMembershipBeforeCapacity() {
+    InstanceLimitService full = mock(InstanceLimitService.class);
+    org.mockito.Mockito.doThrow(new IllegalStateException("team full"))
+        .when(full)
+        .requireTeamMemberCapacity(any());
+    TeamService guarded = new TeamService(teams, memberships, invitations, users, slugs, full);
+    UUID teamId = UUID.randomUUID();
+    UUID member = UUID.randomUUID();
+    UUID newcomer = UUID.randomUUID();
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(teamWithId(teamId, "Core")));
+    when(invitations.deleteInvitation(eq(teamId), any())).thenReturn(1);
+    when(memberships.findByTeamIdAndUserId(teamId, member))
+        .thenReturn(Optional.of(TeamMembership.of(teamId, member, TeamRole.MEMBER)));
+    when(memberships.findByTeamIdAndUserId(teamId, newcomer)).thenReturn(Optional.empty());
+
+    assertThat(guarded.acceptInvitation(teamId, member).teamRole()).isEqualTo("MEMBER");
+    assertThatThrownBy(() -> guarded.acceptInvitation(teamId, newcomer))
+        .isInstanceOf(IllegalStateException.class);
+    verify(memberships, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("a team holds at most MAX_PENDING_INVITATIONS unanswered invitations (#936)")
+  void pendingInvitationsAreCapped() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team(teamId)));
+    when(users.findById(target))
+        .thenReturn(Optional.of(User.internal("Al", "al@example.com", "al", "h")));
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+    when(invitations.countByTeamId(teamId)).thenReturn((long) TeamService.MAX_PENDING_INVITATIONS);
+
+    assertThatThrownBy(() -> service.addMemberAsLead(teamId, lead, false, target, "MEMBER"))
+        .isInstanceOf(TeamConflictException.class)
+        .extracting("code")
+        .isEqualTo("TOO_MANY_PENDING_INVITATIONS");
+    verify(invitations, never()).saveAndFlush(any());
+  }
+
+  @Test
+  @DisplayName("disabling a team drops its pending invitations; enabling keeps them (#936)")
+  void disablingClearsInvitations() {
+    UUID teamId = UUID.randomUUID();
+    when(teams.findById(teamId)).thenReturn(Optional.of(teamWithId(teamId, "Core")));
+
+    service.update(teamId, null, null, true, null, null);
+    verify(invitations, never()).deleteAllOfTeam(any());
+
+    service.update(teamId, null, null, false, null, null);
+    verify(invitations).deleteAllOfTeam(teamId);
+  }
+
+  @Test
+  @DisplayName("pending invitations show only to whoever may manage the team (#936)")
+  void pendingInvitationsOnlyForManagers() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    UUID member = UUID.randomUUID();
+    when(teams.findById(teamId)).thenReturn(Optional.of(teamWithId(teamId, "Core")));
+    when(memberships.findMembersByTeamId(teamId)).thenReturn(List.of());
+    when(invitations.findPendingByTeamId(teamId))
+        .thenReturn(
+            List.of(
+                new TeamInvitationProjection(
+                    UUID.randomUUID(), "Ivy", "ivy", "ivy@example.com", Instant.now())));
+    when(memberships.findByTeamIdAndUserId(teamId, lead))
+        .thenReturn(Optional.of(TeamMembership.of(teamId, lead, TeamRole.LEAD)));
+    when(memberships.findByTeamIdAndUserId(teamId, member))
+        .thenReturn(Optional.of(TeamMembership.of(teamId, member, TeamRole.MEMBER)));
+
+    var asLead = service.viewTeam(teamId.toString(), lead, false);
+    assertThat(asLead.pendingInvitations())
+        .singleElement()
+        .satisfies(
+            p -> {
+              assertThat(p.status()).isEqualTo(TeamService.STATUS_INVITED);
+              assertThat(p.email()).isNull();
+            });
+    assertThat(service.viewTeam(teamId.toString(), member, false).pendingInvitations()).isEmpty();
   }
 
   @Test

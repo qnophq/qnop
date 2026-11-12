@@ -43,8 +43,10 @@ import type { TeamMember, TeamRole } from '../../api/generated';
 import {
   useMyTeam,
   useRemoveMyTeamMember,
+  useRevokeMyTeamInvitation,
   useSetMyTeamMemberRole,
 } from '../../api/hooks/useMyTeams';
+import { PendingInvitationsList } from '../../components/admin/teams/PendingInvitationsList';
 import { AddMyTeamMemberDialog } from '../../components/my-teams/AddMyTeamMemberDialog';
 import { EditMyTeamDialog } from '../../components/my-teams/EditMyTeamDialog';
 import { TeamRoleBadge } from '../../components/admin/teams/TeamRoleBadge';
@@ -55,7 +57,7 @@ import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { useToast } from '../../components/admin/layout/useToast';
 import { PersonLink } from '../../components/dashboard/PersonLink';
 import { useFormatters } from '../../hooks/useFormatters';
-import { useAuthStore } from '../../stores/authStore';
+import { selectIsAdmin, useAuthStore } from '../../stores/authStore';
 import { apiErrorMessage } from '../../utils/apiError';
 
 /**
@@ -77,7 +79,10 @@ export function MyTeamDetailPage() {
   const { data: team, isLoading, isError } = useMyTeam(id);
   const setRole = useSetMyTeamMemberRole();
   const removeMember = useRemoveMyTeamMember();
+  const revokeInvitation = useRevokeMyTeamInvitation();
   const currentUserId = useAuthStore((s) => s.userId);
+  // Only an admin adds directly or grants LEAD; a lead invites (issue #936).
+  const isAdmin = useAuthStore(selectIsAdmin);
   const { formatDateTime } = useFormatters();
   const { toast, notify, clear } = useToast();
 
@@ -108,6 +113,7 @@ export function MyTeamDetailPage() {
 
   const canManage = team.viewerCanManage;
   const members = team.members ?? [];
+  const pendingInvitations = team.pendingInvitations ?? [];
 
   const openMenu = (event: MouseEvent<HTMLElement>, member: TeamMember) => {
     setAnchorEl(event.currentTarget);
@@ -164,7 +170,7 @@ export function MyTeamDetailPage() {
                   {t('teamDetail.editTeam')}
                 </Button>
                 <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={openAdd}>
-                  {t('teamDetail.addMember')}
+                  {isAdmin ? t('teamDetail.addMember') : t('teamDetail.inviteMember')}
                 </Button>
               </>
             )}
@@ -244,22 +250,39 @@ export function MyTeamDetailPage() {
 
       {canManage && (
         <>
+          <PendingInvitationsList
+            invitations={pendingInvitations}
+            revokingUserId={revokeInvitation.isPending ? revokeInvitation.variables?.userId : null}
+            onRevoke={(invitation) =>
+              revokeInvitation.mutate(
+                { teamId, userId: invitation.userId },
+                {
+                  onError: (error) =>
+                    notify(apiErrorMessage(error, t('pendingInvitations.revokeFailed')), 'error'),
+                },
+              )
+            }
+          />
+
           <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
-            <MenuItem
-              onClick={() => {
-                setAnchorEl(null);
-                if (active) toggleRole(active);
-              }}
-            >
-              <ListItemIcon>
-                <ArrowLeftRight size={16} />
-              </ListItemIcon>
-              <ListItemText>
-                {active?.teamRole === 'LEAD'
-                  ? t('teamDetail.makeMember')
-                  : t('teamDetail.makeLead')}
-              </ListItemText>
-            </MenuItem>
+            {/* Demoting stays a lead's call; promoting to LEAD is an admin's (issue #936). */}
+            {(isAdmin || active?.teamRole === 'LEAD') && (
+              <MenuItem
+                onClick={() => {
+                  setAnchorEl(null);
+                  if (active) toggleRole(active);
+                }}
+              >
+                <ListItemIcon>
+                  <ArrowLeftRight size={16} />
+                </ListItemIcon>
+                <ListItemText>
+                  {active?.teamRole === 'LEAD'
+                    ? t('teamDetail.makeMember')
+                    : t('teamDetail.makeLead')}
+                </ListItemText>
+              </MenuItem>
+            )}
             <MenuItem
               onClick={() => {
                 setAnchorEl(null);
@@ -277,7 +300,8 @@ export function MyTeamDetailPage() {
             key={`add-${addSeq}`}
             open={addOpen}
             teamId={teamId}
-            existingMemberIds={members.map((m) => m.userId)}
+            existingMemberIds={[...members, ...pendingInvitations].map((m) => m.userId)}
+            canGrantLead={isAdmin}
             onClose={() => setAddOpen(false)}
           />
 
