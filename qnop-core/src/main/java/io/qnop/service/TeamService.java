@@ -472,12 +472,13 @@ public class TeamService {
       throw new TeamConflictException(
           "ALREADY_INVITED", "This user has already been invited to the team.");
     }
-    // A decline is respected for a while (issue #948): without it, invite -> decline ->
-    // invite is an unbounded stream of invitation mails to somebody who said no.
-    if (audit.declinedSince(teamId, userId, Instant.now().minus(REINVITE_COOLDOWN))) {
+    // At most one invitation per user and team a day (issue #948), however the last one
+    // ended: without it, invite -> decline/revoke -> invite is an unbounded stream of
+    // invitation mails and inbox rows to one person.
+    if (audit.invitedSince(teamId, userId, Instant.now().minus(REINVITE_COOLDOWN))) {
       throw new TeamConflictException(
-          "RECENTLY_DECLINED",
-          "This user declined an invitation to this team less than a day ago — try again later.");
+          "REINVITE_COOLDOWN",
+          "This user was already invited to this team in the last 24 hours — try again later.");
     }
     if (invitations.countByTeamId(teamId) >= MAX_PENDING_INVITATIONS) {
       throw new TeamConflictException(
@@ -799,8 +800,9 @@ public class TeamService {
   public static final int MAX_PENDING_INVITATIONS = 50;
 
   /**
-   * How long a declined invitation blocks a lead's re-invite of the same user into the same team
-   * (issue #948, ADR-0064 amendment). An admin's direct add is not an invitation and is unaffected.
+   * How long an invitation blocks a lead's next invitation of the same user into the same team,
+   * whatever became of it (issue #948, ADR-0064 amendment). An admin's direct add is not an
+   * invitation and is unaffected.
    */
   public static final java.time.Duration REINVITE_COOLDOWN = java.time.Duration.ofHours(24);
 

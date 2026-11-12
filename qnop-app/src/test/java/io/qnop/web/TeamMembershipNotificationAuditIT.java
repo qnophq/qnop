@@ -175,14 +175,10 @@ class TeamMembershipNotificationAuditIT extends SeededIntegrationTest {
     mockMvc
         .perform(as(delete("/api/v1/teams/{id}/invitations/{uid}", BETA, AUDITOR_ID), MEMBER_ID))
         .andExpect(status().isNoContent());
-    invite(AUDITOR_ID).andExpect(status().isCreated());
+    invite(ADMIN2_ID).andExpect(status().isCreated());
     mockMvc
-        .perform(as(post("/api/v1/teams/invitations/{id}/decline", BETA), AUDITOR_ID))
+        .perform(as(post("/api/v1/teams/invitations/{id}/decline", BETA), ADMIN2_ID))
         .andExpect(status().isNoContent());
-    // The decline holds for a day: no new invitation, no new mail (issue #948).
-    invite(AUDITOR_ID)
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("RECENTLY_DECLINED"));
     invite(ADMIN_ID).andExpect(status().isCreated());
     mockMvc
         .perform(as(post("/api/v1/teams/invitations/{id}/accept", BETA), ADMIN_ID))
@@ -203,12 +199,13 @@ class TeamMembershipNotificationAuditIT extends SeededIntegrationTest {
               assertThat(row.get("scope")).isEqualTo("SYSTEM");
               assertThat(row.get("team_name")).isEqualTo("Beta");
             });
-    assertThat(rows.subList(0, 4))
+    assertThat(rows.subList(0, 2))
         .allSatisfy(row -> assertThat(row.get("user_id")).isEqualTo(AUDITOR_ID.toString()));
     assertThat(rows.get(0).get("actor_id")).isEqualTo(MEMBER_ID);
     assertThat(rows.get(1).get("actor_id")).isEqualTo(MEMBER_ID);
     assertThat(rows.get(1).get("reason")).isEqualTo(TeamMembershipAudit.REASON_REVOKED);
-    assertThat(rows.get(3).get("actor_id")).isEqualTo(AUDITOR_ID);
+    assertThat(rows.get(3).get("actor_id")).isEqualTo(ADMIN2_ID);
+    assertThat(rows.get(3).get("user_id")).isEqualTo(ADMIN2_ID.toString());
     assertThat(rows.get(5).get("actor_id")).isEqualTo(ADMIN_ID);
     assertThat(rows.get(5).get("user_id")).isEqualTo(ADMIN_ID.toString());
   }
@@ -263,6 +260,44 @@ class TeamMembershipNotificationAuditIT extends SeededIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.total").value(2))
         .andExpect(jsonPath("$.items[0].scope").value("SYSTEM"));
+  }
+
+  @Test
+  @DisplayName("one invitation per user and team a day, however it ended: no revoke/decline loop")
+  void reinviteCooldownClosesTheLoops() throws Exception {
+    // invite -> revoke -> invite: the revoke must not reset the clock.
+    invite(AUDITOR_ID).andExpect(status().isCreated());
+    mockMvc
+        .perform(as(delete("/api/v1/teams/{id}/invitations/{uid}", BETA, AUDITOR_ID), MEMBER_ID))
+        .andExpect(status().isNoContent());
+    invite(AUDITOR_ID)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("REINVITE_COOLDOWN"));
+
+    // invite -> decline -> invite: the same.
+    invite(ADMIN2_ID).andExpect(status().isCreated());
+    mockMvc
+        .perform(as(post("/api/v1/teams/invitations/{id}/decline", BETA), ADMIN2_ID))
+        .andExpect(status().isNoContent());
+    invite(ADMIN2_ID)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("REINVITE_COOLDOWN"));
+
+    // Exactly one invitation mail per person reached the mail layer.
+    verify(mail, timeout(5000).times(1))
+        .sendMailFromTemplate(
+            eq(MailTemplateKey.TEAM_INVITATION), eq(INVITEE_EMAIL), anyMap(), any());
+    verify(mail, after(500).times(1))
+        .sendMailFromTemplate(
+            eq(MailTemplateKey.TEAM_INVITATION), eq("admin2@qnop.test"), anyMap(), any());
+
+    // An admin's direct add is not an invitation and stays possible.
+    mockMvc
+        .perform(
+            as(post("/api/v1/admin/teams/{id}/members", BETA), ADMIN_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"userId\":\"%s\",\"teamRole\":\"MEMBER\"}".formatted(AUDITOR_ID)))
+        .andExpect(status().isCreated());
   }
 
   @Test

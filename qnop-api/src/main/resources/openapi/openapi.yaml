@@ -1909,8 +1909,9 @@ paths:
         `LEAD_GRANT_REQUIRES_ADMIN`. 409 `ALREADY_MEMBER` / `ALREADY_INVITED`
         when the user is already in the team or already invited, and 409
         `TOO_MANY_PENDING_INVITATIONS` when the team already holds 50 unanswered
-        invitations. 409 `RECENTLY_DECLINED` when the user declined an
-        invitation into this team less than 24 hours ago (issue #948).
+        invitations. 409 `REINVITE_COOLDOWN` when the user was already invited
+        into this team in the last 24 hours, however that invitation ended
+        (accepted, declined, revoked or superseded; issue #948).
       operationId: addMyTeamMember
       security:
         - bearerAuth: []

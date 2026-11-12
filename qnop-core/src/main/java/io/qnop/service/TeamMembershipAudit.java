@@ -136,10 +136,13 @@ public class TeamMembershipAudit {
         detail -> detail.put("previousRole", previousRole.name()).put("role", role.name()));
   }
 
-  /** Whether {@code userId} declined an invitation into {@code teamId} after {@code since}. */
-  public boolean declinedSince(UUID teamId, UUID userId, Instant since) {
-    return auditEvents.existsTeamEventByActorSince(
-        INVITATION_DECLINED, userId, teamId.toString(), since);
+  /**
+   * Whether an invitation of {@code userId} into {@code teamId} was sent after {@code since},
+   * whatever became of it since — accepted, declined, revoked or superseded.
+   */
+  public boolean invitedSince(UUID teamId, UUID userId, Instant since) {
+    return auditEvents.existsTeamEventSince(
+        INVITATION_CREATED, teamId.toString(), userId.toString(), since);
   }
 
   private void record(

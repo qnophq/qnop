@@ -65,21 +65,21 @@ public interface AuditEventRepository
   boolean existsByActorId(UUID actorId);
 
   /**
-   * Whether {@code userId} declined an invitation into {@code teamId} after {@code since} — the
-   * re-invite cooldown (issue #948). Served by {@code ix_audit_event_actor}; the decliner is the
-   * actor of their own decline.
+   * Whether a SYSTEM event of {@code eventType} about {@code userId} in {@code teamId} was recorded
+   * after {@code since} — the re-invite cooldown (issue #948). The scope and time bound let {@code
+   * ix_audit_event_scope_created_at} narrow it to the window before the jsonb filter applies.
    */
   @Query(
       value =
           """
           SELECT EXISTS (SELECT 1 FROM audit_event
-            WHERE actor_id = :userId AND event_type = :eventType
-              AND detail ->> 'teamId' = :teamId AND created_at > :since)
+            WHERE scope = 'SYSTEM' AND created_at > :since AND event_type = :eventType
+              AND detail ->> 'teamId' = :teamId AND detail ->> 'userId' = :userId)
           """,
       nativeQuery = true)
-  boolean existsTeamEventByActorSince(
+  boolean existsTeamEventSince(
       @Param("eventType") String eventType,
-      @Param("userId") UUID userId,
       @Param("teamId") String teamId,
+      @Param("userId") String userId,
       @Param("since") Instant since);
 }

@@ -191,10 +191,10 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
         .perform(post("/api/v1/teams/invitations/{id}/accept", teamId).with(asUser(invitee)))
         .andExpect(status().isNotFound());
 
-    // A decline is respected for a day (issue #948): the lead cannot simply invite again.
+    // One invitation per user and team a day (issue #948): the lead cannot simply invite again.
     invite(invitee)
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("RECENTLY_DECLINED"));
+        .andExpect(jsonPath("$.code").value("REINVITE_COOLDOWN"));
 
     invite(stranger).andExpect(status().isCreated());
     invite(stranger)
@@ -209,8 +209,10 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
         .perform(post("/api/v1/teams/invitations/{id}/accept", teamId).with(asUser(stranger)))
         .andExpect(status().isNotFound());
     assertThat(teamMemberships.existsByTeamIdAndUserId(teamId, stranger)).isFalse();
-    // A revocation is the lead's own decision, so it does not block a new invitation.
-    invite(stranger).andExpect(status().isCreated());
+    // Nor after revoking it (issue #948): otherwise invite -> revoke -> invite loops freely.
+    invite(stranger)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("REINVITE_COOLDOWN"));
   }
 
   @Test
@@ -299,7 +301,9 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
     ExecutorService pool = Executors.newFixedThreadPool(2);
     try {
       for (int round = 0; round < 5; round++) {
-        invite(invitee).andExpect(status().isCreated());
+        // A fresh invitee per round: the same pair may be invited once a day (issue #948).
+        UUID candidate = createUser();
+        invite(candidate).andExpect(status().isCreated());
         CyclicBarrier start = new CyclicBarrier(2);
         Future<Integer> accept =
             pool.submit(
@@ -308,7 +312,7 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
                   return mockMvc
                       .perform(
                           post("/api/v1/teams/invitations/{id}/accept", teamId)
-                              .with(asUser(invitee)))
+                              .with(asUser(candidate)))
                       .andReturn()
                       .getResponse()
                       .getStatus();
@@ -319,7 +323,7 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
                   start.await(5, TimeUnit.SECONDS);
                   return mockMvc
                       .perform(
-                          delete("/api/v1/teams/{id}/invitations/{uid}", teamId, invitee)
+                          delete("/api/v1/teams/{id}/invitations/{uid}", teamId, candidate)
                               .with(asUser(lead)))
                       .andReturn()
                       .getResponse()
@@ -331,10 +335,10 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
         // Exactly one of them took the invitation; the loser saw it gone.
         assertThat(List.of(accepted, revoked)).containsAnyOf(200, 204);
         assertThat(accepted == 200 ? revoked : accepted).isEqualTo(404);
-        assertThat(teamMemberships.existsByTeamIdAndUserId(teamId, invitee))
+        assertThat(teamMemberships.existsByTeamIdAndUserId(teamId, candidate))
             .isEqualTo(accepted == 200);
-        assertThat(invitations.existsByTeamIdAndUserId(teamId, invitee)).isFalse();
-        teamMemberships.findByTeamIdAndUserId(teamId, invitee).ifPresent(teamMemberships::delete);
+        assertThat(invitations.existsByTeamIdAndUserId(teamId, candidate)).isFalse();
+        teamMemberships.findByTeamIdAndUserId(teamId, candidate).ifPresent(teamMemberships::delete);
       }
     } finally {
       pool.shutdownNow();
