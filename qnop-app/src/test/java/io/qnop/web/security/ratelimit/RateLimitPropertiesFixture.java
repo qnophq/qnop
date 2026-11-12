@@ -52,6 +52,7 @@ public final class RateLimitPropertiesFixture {
         null,
         null,
         null,
+        null,
         100_000L);
   }
 }

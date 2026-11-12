@@ -75,6 +75,22 @@ public class EmailVerificationToken {
   @Column(name = "consumed_at")
   private Instant consumedAt;
 
+  /*
+   * The credentials the registration behind this token asked for (issue #900). Verifying THIS
+   * token applies exactly these to the account, so two registrations of one pending address can
+   * neither overwrite nor invalidate each other — only the mailbox owner, who receives the links,
+   * completes one. Null on tokens issued before this design (the account row applies then), and
+   * nulled as soon as a link is spent.
+   */
+  @Column(name = "candidate_username", length = 64)
+  private String candidateUsername;
+
+  @Column(name = "candidate_display_name")
+  private String candidateDisplayName;
+
+  @Column(name = "candidate_password_hash")
+  private String candidatePasswordHash;
+
   protected EmailVerificationToken() {
     // for JPA
   }
@@ -83,6 +99,32 @@ public class EmailVerificationToken {
     this.user = user;
     this.tokenHash = tokenHash;
     this.expiresAt = expiresAt;
+  }
+
+  /** A token that carries the credentials of the registration it was issued for (issue #900). */
+  public EmailVerificationToken(
+      User user,
+      String tokenHash,
+      Instant expiresAt,
+      String candidateUsername,
+      String candidateDisplayName,
+      String candidatePasswordHash) {
+    this(user, tokenHash, expiresAt);
+    this.candidateUsername = candidateUsername;
+    this.candidateDisplayName = candidateDisplayName;
+    this.candidatePasswordHash = candidatePasswordHash;
+  }
+
+  public String getCandidateUsername() {
+    return candidateUsername;
+  }
+
+  public String getCandidateDisplayName() {
+    return candidateDisplayName;
+  }
+
+  public String getCandidatePasswordHash() {
+    return candidatePasswordHash;
   }
 
   public UUID getId() {

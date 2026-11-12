@@ -20,6 +20,11 @@ TRUNCATE TABLE annotation_placement, comment, annotation, audit_event,
                review_participant, document_version, document
                RESTART IDENTITY CASCADE;
 
+-- The audit hash chain (issue #928) restarts with the emptied trail; TRUNCATE
+-- bypasses the row triggers, so the head would otherwise still point at the
+-- wiped rows and every later chain verification would report a break.
+UPDATE audit_chain_head SET last_seq = 0, last_hash = repeat('0', 64) WHERE id = 1;
+
 -- Anonymous-review pseudonyms (issue #914) carry no FK to document, so the
 -- CASCADE above does not reach them.
 TRUNCATE TABLE review_pseudonym;

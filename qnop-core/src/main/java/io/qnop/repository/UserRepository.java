@@ -53,6 +53,15 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           + " WHERE u.id IN :ids")
   List<UserDisplayName> findDisplayNamesByIdIn(@Param("ids") Collection<UUID> ids);
 
+  /** Reads a user with a row lock held until the transaction ends (issue #900). */
+  @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT u FROM User u WHERE u.id = :id")
+  Optional<User> findByIdForUpdate(@Param("id") UUID id);
+
+  /** The pending flag straight from the database, bypassing a loaded entity (issue #900). */
+  @Query("SELECT u.emailVerificationPending FROM User u WHERE u.id = :id")
+  boolean isEmailVerificationPending(@Param("id") UUID id);
+
   /** Finds an internal user by exact username. */
   Optional<User> findByUsernameAndSource(String username, UserSource source);
 
@@ -138,6 +147,33 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   long countByEnabledTrue();
 
   boolean existsByEmailIgnoreCaseAndSource(String email, UserSource source);
+
+  /**
+   * Atomically activates an account whose e-mail verification is still pending, with the
+   * credentials of the verified registration, and bumps {@code version} (issue #900). Conditional
+   * on the pending flag, so it is a no-op (returns 0) for an account an administrator has decided
+   * about in the meantime, or one another verification link activated first — not even a race can
+   * re-enable an administrator-disabled account or apply two registrations.
+   */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      "UPDATE User u SET u.enabled = true, u.emailVerificationPending = false,"
+          + " u.username = :username, u.displayName = :displayName, u.passwordHash = :hash,"
+          + " u.version = u.version + 1 WHERE u.id = :id AND u.emailVerificationPending = true")
+  int activateVerifiedRegistration(
+      @Param("id") UUID id,
+      @Param("username") String username,
+      @Param("displayName") String displayName,
+      @Param("hash") String passwordHash);
+
+  /**
+   * Re-points the slug of a freshly verified registration to its display name (issue #900). Native
+   * because the mapped column is not updatable; flushes first so pending entity changes are written
+   * before, and are not lost to, this statement.
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(value = "UPDATE qnop_user SET slug = :slug WHERE id = :id", nativeQuery = true)
+  int updateSlug(@Param("id") UUID id, @Param("slug") String slug);
 
   /**
    * Atomically stamps the last-login timestamp (issue #61) without a read-modify-write, so a login

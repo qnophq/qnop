@@ -46,7 +46,7 @@ class AuthIdentifierRateLimiterTest {
 
   private final RateLimitProperties properties =
       new RateLimitProperties(
-          List.of(), null, null, null, null, null, null, TWO, FIVE, TWO, TWO, FIVE, TWO, null,
+          List.of(), null, null, null, null, null, null, TWO, FIVE, TWO, TWO, FIVE, TWO, null, null,
           100_000L);
   private final BucketRateLimitService buckets = new BucketRateLimitService(properties);
   private final LoginDeviceCookies deviceCookies =

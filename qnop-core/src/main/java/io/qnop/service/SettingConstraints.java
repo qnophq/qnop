@@ -34,7 +34,12 @@ public record SettingConstraints(Integer min, Integer max, ValueFormat format, I
     URL,
     TIMEZONE,
     /** A lowercase ISO 639-1 language code, e.g. {@code en} or {@code de} (issue #464). */
-    LANGUAGE
+    LANGUAGE,
+    /**
+     * An http(s) URL that must use https unless its host is lexically private — the analytics host
+     * (issue #910).
+     */
+    HTTPS_URL_UNLESS_PRIVATE
   }
 
   /** No extra constraints beyond the declared type. */

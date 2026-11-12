@@ -20,6 +20,7 @@
  */
 package io.qnop.service.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -35,16 +36,28 @@ import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.InvalidTextException;
 import io.qnop.service.UserService;
+import io.qnop.service.UserService.ActivationOutcome;
+import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
+import io.qnop.service.auth.EmailVerificationTokenService.PendingVerification;
+import io.qnop.service.auth.RegistrationService.VerificationPasswordMismatchException;
+import io.qnop.service.auth.RegistrationService.VerificationSetNewExpiredException;
+import io.qnop.service.auth.RegistrationService.VerificationUsernameTakenException;
 import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailTemplateKey;
+import java.lang.reflect.Field;
 import java.time.Instant;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class RegistrationServiceTest {
@@ -54,6 +67,7 @@ class RegistrationServiceTest {
   @Mock private MailService mailService;
   @Mock private ApplicationSettingsService settings;
   @Mock private MailLocaleResolver mailLocales;
+  @Mock private PasswordEncoder passwordEncoder;
 
   private RegistrationService service;
 
@@ -61,7 +75,7 @@ class RegistrationServiceTest {
   void setUp() {
     service =
         new RegistrationService(
-            userService, verificationTokens, mailService, settings, mailLocales);
+            userService, verificationTokens, mailService, settings, mailLocales, passwordEncoder);
     lenient()
         .when(settings.getString(ApplicationSettingKey.GENERAL_BASE_URL))
         .thenReturn("https://qnop.example/");
@@ -69,6 +83,45 @@ class RegistrationServiceTest {
         .when(settings.getString(ApplicationSettingKey.GENERAL_APPLICATION_NAME))
         .thenReturn("qnop");
     lenient().when(mailLocales.forUser(any())).thenReturn("en");
+    lenient().when(passwordEncoder.encode("password1")).thenReturn("HASH");
+    lenient()
+        .when(settings.getInteger(ApplicationSettingKey.AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES))
+        .thenReturn(30);
+    lenient().when(userService.lockAndCheckPending(any())).thenReturn(true);
+    lenient().when(userService.findInternalByEmail(any())).thenReturn(Optional.empty());
+    lenient().when(userService.findInternalByUsername(any())).thenReturn(Optional.empty());
+    lenient()
+        .when(verificationTokens.issueForRegistration(any(), any(), any(), any()))
+        .thenReturn(
+            new EmailVerificationTokenService.IssuedToken("RAW", Instant.now().plusSeconds(60)));
+  }
+
+  private static User withId(User user) {
+    try {
+      Field id = User.class.getDeclaredField("id");
+      id.setAccessible(true);
+      id.set(user, UUID.randomUUID());
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalStateException(e);
+    }
+    return user;
+  }
+
+  private static User pending(String username, String email) {
+    User user = withId(User.internal(username, email, username, "ROW-HASH"));
+    user.markPendingEmailVerification();
+    return user;
+  }
+
+  private static User active(String username, String email) {
+    User user = withId(User.internal(username, email, username, "ROW-HASH"));
+    user.setEnabled(true);
+    return user;
+  }
+
+  private static PendingVerification pendingVerification(UUID userId, boolean accountPending) {
+    return new PendingVerification(
+        UUID.randomUUID(), Instant.now(), userId, accountPending, "jane", "Jane", "CAND-HASH");
   }
 
   @Test
@@ -78,87 +131,333 @@ class RegistrationServiceTest {
             () -> service.register("jane", "jane@example.com", "password1", "Jane\r\nDoe"))
         .isInstanceOf(InvalidTextException.class);
 
-    verify(userService, never()).internalUserExists(any(), any());
-    verify(userService, never()).createSelfRegistered(any(), any(), any(), any(), any());
-  }
-
-  @Test
-  @DisplayName("anti-enumeration: an existing account is a silent no-op (no create, no email)")
-  void existingAccountIsNoOp() {
-    when(userService.internalUserExists("jane", "jane@example.com")).thenReturn(true);
-
-    service.register("jane", "jane@example.com", "password1", "Jane");
-
-    verify(userService, never()).createSelfRegistered(any(), any(), any(), any(), any());
-    verify(verificationTokens, never()).issue(any());
-    verify(mailService, never()).sendMailFromTemplate(any(), any(), anyMap(), any());
+    verify(userService, never()).findInternalByEmail(any());
+    verify(userService, never()).createPendingRegistration(any(), any(), any(), any());
   }
 
   @Test
   @DisplayName(
-      "a new account is created with the configured default role, token issued, email sent")
+      "a new account is created pending verification with the configured role; its link carries"
+          + " the registration's credentials and the mail is queued for after the commit")
   void newAccountIsRegistered() {
-    User user = User.internal("Jane", "jane@example.com", "jane", "hash");
-    when(userService.internalUserExists("jane", "jane@example.com")).thenReturn(false);
+    User user = pending("jane", "jane@example.com");
     when(settings.getString(ApplicationSettingKey.AUTH_SELF_REGISTRATION_DEFAULT_ROLE))
         .thenReturn("AUDITOR");
-    when(userService.createSelfRegistered(
-            "jane", "jane@example.com", "password1", "Jane", UserRole.AUDITOR))
+    when(userService.createPendingRegistration(
+            "jane", "jane@example.com", "Jane", UserRole.AUDITOR))
         .thenReturn(user);
-    when(verificationTokens.issue(user))
-        .thenReturn(
-            new EmailVerificationTokenService.IssuedToken("RAW", Instant.now().plusSeconds(60)));
 
     service.register("jane", "jane@example.com", "password1", "Jane");
 
-    verify(userService)
-        .createSelfRegistered("jane", "jane@example.com", "password1", "Jane", UserRole.AUDITOR);
-    verify(verificationTokens).issue(user);
+    verify(verificationTokens).issueForRegistration(user, "jane", "Jane", "HASH");
     @SuppressWarnings("unchecked")
-    org.mockito.ArgumentCaptor<java.util.Map<String, Object>> vars =
-        org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
+    ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
     verify(mailService)
-        .sendMailFromTemplate(
+        .sendMailFromTemplateAfterCommit(
             eq(MailTemplateKey.REGISTRATION_VERIFICATION),
             eq("jane@example.com"),
             vars.capture(),
             eq("en"));
-    // Every placeholder the template uses is supplied (strict Mustache drops the mail otherwise),
-    // and the English expiry phrase is unchanged.
-    org.assertj.core.api.Assertions.assertThat(vars.getValue().keySet())
+    verify(mailService, never()).sendMailFromTemplate(any(), any(), anyMap(), any());
+    assertThat(vars.getValue().keySet())
         .containsAll(MailTemplateKey.REGISTRATION_VERIFICATION.placeholders());
-    org.assertj.core.api.Assertions.assertThat(vars.getValue().get("expiresAtHuman"))
-        .isEqualTo("in 1 minute");
+    assertThat(vars.getValue().get("expiresAtHuman")).isEqualTo("in 1 minute");
+    assertThat(vars.getValue().get("actionUrl"))
+        .isEqualTo("https://qnop.example/verify-email?token=RAW");
+    // The greeting is the address's own local part, never a name from the request.
+    assertThat(vars.getValue().get("recipientName")).isEqualTo("jane");
   }
 
   @Test
   @DisplayName("self-registration never mints an ADMIN, even if the setting says so")
   void adminDefaultRoleIsDowngradedToMember() {
-    User user = User.internal("Jane", "jane@example.com", "jane", "hash");
-    when(userService.internalUserExists("jane", "jane@example.com")).thenReturn(false);
+    User user = pending("jane", "jane@example.com");
     when(settings.getString(ApplicationSettingKey.AUTH_SELF_REGISTRATION_DEFAULT_ROLE))
         .thenReturn("ADMIN");
-    when(userService.createSelfRegistered(
-            "jane", "jane@example.com", "password1", "Jane", UserRole.MEMBER))
+    when(userService.createPendingRegistration("jane", "jane@example.com", "Jane", UserRole.MEMBER))
         .thenReturn(user);
-    when(verificationTokens.issue(user))
-        .thenReturn(
-            new EmailVerificationTokenService.IssuedToken("RAW", Instant.now().plusSeconds(60)));
 
     service.register("jane", "jane@example.com", "password1", "Jane");
 
     verify(userService)
-        .createSelfRegistered("jane", "jane@example.com", "password1", "Jane", UserRole.MEMBER);
+        .createPendingRegistration("jane", "jane@example.com", "Jane", UserRole.MEMBER);
   }
 
   @Test
-  @DisplayName("verify consumes the token and activates the account")
-  void verifyActivates() {
-    User user = User.internal("Jane", "jane@example.com", "jane", "hash");
-    when(verificationTokens.consume("tok")).thenReturn(user);
+  @DisplayName(
+      "an address of an active account: nothing is created, the address gets a neutral notice"
+          + " in the owner's language, and the password is still encoded (equal cost)")
+  void existingActiveAccountGetsNotice() {
+    User existing = active("jane", "jane@example.com");
+    when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(existing));
+    when(mailLocales.forUser(existing.getId())).thenReturn("de");
 
-    service.verify("tok");
+    service.register("other", "jane@example.com", "password1", "Someone");
 
-    verify(userService).enable(user.getId());
+    verify(passwordEncoder).encode("password1");
+    verify(userService, never()).createPendingRegistration(any(), any(), any(), any());
+    verify(verificationTokens, never()).issueForRegistration(any(), any(), any(), any());
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
+    verify(mailService)
+        .sendMailFromTemplateAfterCommit(
+            eq(MailTemplateKey.REGISTRATION_ATTEMPT),
+            eq("jane@example.com"),
+            vars.capture(),
+            eq("de"));
+    // No text from the request reaches the notice.
+    assertThat(vars.getValue())
+        .containsOnlyKeys("siteName", "actionUrl")
+        .containsEntry("actionUrl", "https://qnop.example/login");
+  }
+
+  @Test
+  @DisplayName("an administrator-disabled account gets no new link, only the notice")
+  void adminDisabledAccountGetsNoLink() {
+    User existing = active("jane", "jane@example.com");
+    existing.setEnabled(false); // an administrator's decision: not pending
+    when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(existing));
+
+    service.register("jane", "jane@example.com", "password1", "Jane");
+
+    verify(verificationTokens, never()).issueForRegistration(any(), any(), any(), any());
+    verify(mailService)
+        .sendMailFromTemplateAfterCommit(
+            eq(MailTemplateKey.REGISTRATION_ATTEMPT), eq("jane@example.com"), anyMap(), any());
+  }
+
+  @Test
+  @DisplayName("a taken username with a fresh address: the entered address gets the notice")
+  void usernameTakenGetsNotice() {
+    User other = active("jane", "jane@example.com");
+    when(userService.findInternalByUsername("jane")).thenReturn(Optional.of(other));
+
+    service.register("jane", "fresh@example.com", "password1", "Jane");
+
+    verify(userService, never()).createPendingRegistration(any(), any(), any(), any());
+    verify(mailLocales).forUser(null);
+    verify(mailService)
+        .sendMailFromTemplateAfterCommit(
+            eq(MailTemplateKey.REGISTRATION_ATTEMPT), eq("fresh@example.com"), anyMap(), eq("en"));
+  }
+
+  @Test
+  @DisplayName(
+      "registering a pending address issues one more link with this registration's credentials"
+          + " and changes nothing else — no cool-down, nothing invalidated")
+  void pendingAddressGetsAnotherLink() {
+    User existing = pending("squatter", "jane@example.com");
+    when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(existing));
+
+    service.register("jane", "jane@example.com", "password1", null);
+
+    verify(userService).lockAndCheckPending(existing.getId());
+    verify(verificationTokens).issueForRegistration(existing, "jane", "jane", "HASH");
+    verify(userService, never()).createPendingRegistration(any(), any(), any(), any());
+    verify(mailService)
+        .sendMailFromTemplateAfterCommit(
+            eq(MailTemplateKey.REGISTRATION_VERIFICATION), eq("jane@example.com"), anyMap(), any());
+  }
+
+  @Test
+  @DisplayName(
+      "within the issuance throttle a registration of a pending address is a silent no-op:"
+          + " no link, no mail, but the same password-hashing cost")
+  void pendingAddressIsThrottled() {
+    User existing = pending("squatter", "jane@example.com");
+    when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(existing));
+    when(verificationTokens.issuedWithin(existing.getId(), RegistrationService.ISSUE_THROTTLE))
+        .thenReturn(true);
+
+    service.register("jane", "jane@example.com", "password1", "Jane");
+
+    verify(passwordEncoder).encode("password1");
+    verify(verificationTokens, never()).issueForRegistration(any(), any(), any(), any());
+    verify(mailService, never()).sendMailFromTemplateAfterCommit(any(), any(), anyMap(), any());
+  }
+
+  @Test
+  @DisplayName("a pending address cannot claim a username that belongs to another account")
+  void pendingAddressRespectsOtherUsernames() {
+    User existing = pending("squatter", "jane@example.com");
+    User other = active("bob", "bob@example.com");
+    when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(existing));
+    when(userService.findInternalByUsername("bob")).thenReturn(Optional.of(other));
+
+    service.register("bob", "jane@example.com", "password1", "Jane");
+
+    verify(verificationTokens, never()).issueForRegistration(any(), any(), any(), any());
+    verify(mailService)
+        .sendMailFromTemplateAfterCommit(
+            eq(MailTemplateKey.REGISTRATION_ATTEMPT), eq("jane@example.com"), anyMap(), any());
+  }
+
+  @Test
+  @DisplayName(
+      "confirming: the token's own password activates the account with exactly the token's"
+          + " credentials and spends the other links")
+  void verifyConfirmsTheRegistration() {
+    UUID userId = UUID.randomUUID();
+    PendingVerification pending = pendingVerification(userId, true);
+    when(verificationTokens.peek("tok")).thenReturn(pending);
+    when(passwordEncoder.matches("password1", "CAND-HASH")).thenReturn(true);
+    when(userService.activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH"))
+        .thenReturn(ActivationOutcome.ACTIVATED);
+
+    service.verify("tok", "password1", false, null);
+
+    var order = org.mockito.Mockito.inOrder(verificationTokens, passwordEncoder, userService);
+    order.verify(userService).lockForUpdate(userId);
+    order.verify(passwordEncoder).matches("password1", "CAND-HASH");
+    order.verify(userService).activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH");
+    order.verify(verificationTokens).consume(pending.tokenId());
+    order.verify(verificationTokens).consumeAllForUser(userId);
+  }
+
+  @Test
+  @DisplayName("confirming with another password changes nothing and keeps the link usable")
+  void verifyRejectsWrongPassword() {
+    PendingVerification pending = pendingVerification(UUID.randomUUID(), true);
+    when(verificationTokens.peek("tok")).thenReturn(pending);
+    when(passwordEncoder.matches("guess", "CAND-HASH")).thenReturn(false);
+
+    assertThatThrownBy(() -> service.verify("tok", "guess", false, null))
+        .isInstanceOf(VerificationPasswordMismatchException.class);
+
+    verify(verificationTokens, never()).consume(any());
+    verify(userService, never()).activateVerifiedRegistration(any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName(
+      "setting new credentials: the link holder's own password and username win over whatever"
+          + " the registration asked for; the username is also the display name")
+  void verifySetsNewCredentials() {
+    UUID userId = UUID.randomUUID();
+    PendingVerification pending = pendingVerification(userId, true);
+    when(verificationTokens.peek("tok")).thenReturn(pending);
+    when(passwordEncoder.encode("owner-pass-1")).thenReturn("OWNER-HASH");
+    when(userService.activateVerifiedRegistration(userId, "owner", "owner", "OWNER-HASH"))
+        .thenReturn(ActivationOutcome.ACTIVATED);
+
+    service.verify("tok", "owner-pass-1", true, "owner");
+
+    verify(passwordEncoder, never()).matches(any(), any());
+    verify(verificationTokens).consume(pending.tokenId());
+    verify(verificationTokens).consumeAllForUser(userId);
+  }
+
+  @Test
+  @DisplayName("new credentials follow the registration policy")
+  void verifySetNewEnforcesThePolicy() {
+    when(verificationTokens.peek("tok")).thenReturn(pendingVerification(UUID.randomUUID(), true));
+
+    assertThatThrownBy(() -> service.verify("tok", "short", true, "owner"))
+        .isInstanceOf(InvalidTextException.class);
+    // 73 UTF-8 bytes in 37 characters: past BCrypt's limit, a validation error rather than a 500.
+    assertThatThrownBy(() -> service.verify("tok", "ä".repeat(36) + "x", true, "owner"))
+        .isInstanceOf(InvalidTextException.class);
+    assertThatThrownBy(() -> service.verify("tok", "long-enough-1", true, "ab"))
+        .isInstanceOf(InvalidTextException.class);
+    // The username is typed by the link holder; nothing is taken over from a registration.
+    assertThatThrownBy(() -> service.verify("tok", "long-enough-1", true, "  "))
+        .isInstanceOf(InvalidTextException.class);
+    verify(userService, never()).activateVerifiedRegistration(any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("a taken username is reported and the link stays usable")
+  void verifyReportsATakenUsername() {
+    UUID userId = UUID.randomUUID();
+    PendingVerification pending = pendingVerification(userId, true);
+    when(verificationTokens.peek("tok")).thenReturn(pending);
+    when(passwordEncoder.matches("password1", "CAND-HASH")).thenReturn(true);
+    when(userService.activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH"))
+        .thenReturn(ActivationOutcome.USERNAME_TAKEN);
+
+    assertThatThrownBy(() -> service.verify("tok", "password1", false, null))
+        .isInstanceOf(VerificationUsernameTakenException.class);
+
+    verify(verificationTokens, never()).consume(any());
+  }
+
+  @Test
+  @DisplayName("verify can never enable an administrator-disabled account")
+  void verifyRejectsAdminDisabledAccount() {
+    when(verificationTokens.peek("tok")).thenReturn(pendingVerification(UUID.randomUUID(), false));
+
+    assertThatThrownBy(() -> service.verify("tok", "password1", true, "owner"))
+        .isInstanceOf(InvalidVerificationTokenException.class);
+
+    verify(userService, never()).activateVerifiedRegistration(any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("verify fails when the account stopped being pending after the checks (race)")
+  void verifyFailsWhenActivationLosesTheRace() {
+    UUID userId = UUID.randomUUID();
+    PendingVerification pending = pendingVerification(userId, true);
+    when(verificationTokens.peek("tok")).thenReturn(pending);
+    when(passwordEncoder.matches("password1", "CAND-HASH")).thenReturn(true);
+    when(userService.activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH"))
+        .thenReturn(ActivationOutcome.NOT_PENDING);
+
+    assertThatThrownBy(() -> service.verify("tok", "password1", false, null))
+        .isInstanceOf(InvalidVerificationTokenException.class);
+    verify(verificationTokens, never()).consumeAllForUser(any());
+  }
+
+  @Test
+  @DisplayName(
+      "an older link can still confirm its registration but no longer set new credentials:"
+          + " that is a reset link's trust, so it gets a reset link's lifetime")
+  void setNewIsLimitedToTheResetLinkLifetime() {
+    UUID userId = UUID.randomUUID();
+    PendingVerification old =
+        new PendingVerification(
+            UUID.randomUUID(),
+            Instant.now().minus(java.time.Duration.ofMinutes(31)),
+            userId,
+            true,
+            "jane",
+            "Jane",
+            "CAND-HASH");
+    when(verificationTokens.peek("tok")).thenReturn(old);
+
+    assertThatThrownBy(() -> service.verify("tok", "owner-pass-1", true, "owner"))
+        .isInstanceOf(VerificationSetNewExpiredException.class);
+    verify(userService, never()).activateVerifiedRegistration(any(), any(), any(), any());
+
+    when(passwordEncoder.matches("password1", "CAND-HASH")).thenReturn(true);
+    when(userService.activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH"))
+        .thenReturn(ActivationOutcome.ACTIVATED);
+    service.verify("tok", "password1", false, null);
+    verify(userService).activateVerifiedRegistration(userId, "jane", "Jane", "CAND-HASH");
+  }
+
+  @Test
+  @DisplayName(
+      "an address activated while the registration waited for the lock gets the notice, not a"
+          + " dead verification link")
+  void pendingStateIsReCheckedUnderTheLock() {
+    User existing = pending("squatter", "jane@example.com");
+    when(userService.findInternalByEmail("jane@example.com")).thenReturn(Optional.of(existing));
+    when(userService.lockAndCheckPending(existing.getId())).thenReturn(false);
+
+    service.register("jane", "jane@example.com", "password1", "Jane");
+
+    verify(verificationTokens, never()).issueForRegistration(any(), any(), any(), any());
+    verify(mailService)
+        .sendMailFromTemplateAfterCommit(
+            eq(MailTemplateKey.REGISTRATION_ATTEMPT), eq("jane@example.com"), anyMap(), any());
+  }
+
+  @Test
+  @DisplayName("registration applies the password policy, including the 72-byte limit")
+  void registerAppliesThePasswordPolicy() {
+    assertThatThrownBy(
+            () -> service.register("jane", "jane@example.com", "ä".repeat(36) + "x", "Jane"))
+        .isInstanceOf(InvalidTextException.class);
+    verify(passwordEncoder, never()).encode(any());
   }
 }

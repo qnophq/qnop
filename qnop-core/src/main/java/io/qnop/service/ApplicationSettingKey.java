@@ -75,8 +75,9 @@ public enum ApplicationSettingKey {
       SettingValueType.BOOLEAN,
       "false",
       "Whether anonymous usage tracking is enabled. Measurement runs through this server, never"
-          + " past it: the browser loads the analytics script from qnop and sends its events to"
-          + " qnop, which forwards them. Visitors never talk to the analytics backend directly."),
+          + " past it: qnop builds each measurement itself and sends it to qnop, which forwards it."
+          + " No analytics script is loaded, and visitors never talk to the analytics backend"
+          + " directly."),
   TRACKING_PROVIDER(
       "tracking.provider",
       SettingValueType.ENUM,
@@ -87,9 +88,10 @@ public enum ApplicationSettingKey {
       "tracking.host",
       SettingValueType.STRING,
       "",
-      "Base URL of the analytics backend, e.g. https://matomo.internal. Empty uses the provider's"
-          + " own cloud where it has one (Plausible, PostHog, Pirsch); Matomo and Umami are"
-          + " self-hosted and always need this."),
+      "Base URL of the analytics backend, e.g. https://matomo.example.com. Empty uses the"
+          + " provider's own cloud where it has one (Plausible, PostHog US, Pirsch); for a PostHog"
+          + " EU project enter https://eu.i.posthog.com. Matomo and Umami are self-hosted and"
+          + " always need this. Must be https unless the host is a private address."),
   TRACKING_SITE_ID(
       "tracking.site_id",
       SettingValueType.STRING,
@@ -120,7 +122,10 @@ public enum ApplicationSettingKey {
       "How much of a visitor's IP address is passed on to your analytics backend. Anonymised"
           + " shortens it, so visitors stay countable without being identifiable. Not forwarded"
           + " means the backend counts everyone as a single visitor. Full sends the exact address,"
-          + " which is personal data — you need your own legal basis for it.",
+          + " which is personal data — you need your own legal basis for it. The backend must be"
+          + " told to trust the forwarded address: Matomo only uses it when its config.ini lists"
+          + " the header in proxy_client_headers[], and Pirsch may count every visitor at this"
+          + " server's address — see the deployment guide.",
       List.of("anonymized", "none", "full")),
   SMTP_ENABLED(
       "smtp.enabled",
@@ -307,10 +312,12 @@ public enum ApplicationSettingKey {
               SettingConstraints.format(SettingConstraints.ValueFormat.URL).withMaxLength(500)),
           // The analytics host is a URL this server will call (issue #666), so it is
           // checked like every other outbound target: http(s) only, and the SSRF
-          // policy decides at call time whether the address itself is allowed.
+          // policy decides at call time whether the address itself is allowed. It
+          // must be https unless the host is private (issue #910).
           Map.entry(
               TRACKING_HOST,
-              SettingConstraints.format(SettingConstraints.ValueFormat.URL).withMaxLength(300)),
+              SettingConstraints.format(SettingConstraints.ValueFormat.HTTPS_URL_UNLESS_PRIVATE)
+                  .withMaxLength(300)),
           Map.entry(TRACKING_SITE_ID, SettingConstraints.maxLength(200)));
 
   private final String key;

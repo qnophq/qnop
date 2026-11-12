@@ -34,8 +34,8 @@ import org.springframework.stereotype.Service;
  *
  * <p>Nothing is the common answer and the safe one. Tracking has to be switched on, name a backend,
  * carry a site id, and — for the self-hosted backends — point at a host that this deployment is
- * allowed to call. Any gap and the whole feature stays dark: no script tag, no endpoint, no
- * half-configured measurement quietly failing in the console.
+ * allowed to call. Any gap and the whole feature stays dark: nothing measured, nothing forwarded,
+ * no half-configured measurement quietly failing in the console.
  *
  * <p>Whether a private address may be called at all is a deployment property, not a setting. A
  * self-hosted Matomo usually lives on one, and that is legitimate — but "an admin can point this
@@ -82,14 +82,18 @@ public class TrackingConfigService {
       return Optional.empty();
     }
     String collectBase = trimTrailingSlash(host.isEmpty() ? backend.defaultHost() : host);
-    String scriptBase = trimTrailingSlash(host.isEmpty() ? backend.defaultScriptHost() : host);
 
     try {
       // Checked here rather than only on save: the setting may predate a change to
       // this deployment's policy, and the request path must never be the first
       // place that question is asked.
       OutboundUriGuard.requireAllowedHttpUri(collectBase, "tracking.host", true, allowPrivateHost);
-      OutboundUriGuard.requireAllowedHttpUri(scriptBase, "tracking.host", true, allowPrivateHost);
+      // Also refused when the setting is saved; checked here too because a value
+      // saved before the rule existed must not keep measuring over plain http.
+      if (!TrackingHostPolicy.hasAcceptableTransport(collectBase)) {
+        throw new IllegalArgumentException(
+            "tracking.host must use https unless it is a private address");
+      }
     } catch (IllegalArgumentException e) {
       log.warn("Usage tracking is disabled: {}", e.getMessage());
       return Optional.empty();
@@ -99,7 +103,6 @@ public class TrackingConfigService {
         new TrackingRuntimeConfig(
             backend,
             siteId,
-            scriptBase + backend.scriptPath(),
             collectBase,
             settings.getBoolean(ApplicationSettingKey.TRACKING_CONSENT_REQUIRED),
             settings.getBoolean(ApplicationSettingKey.TRACKING_RESPECT_DNT),

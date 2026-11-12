@@ -29,6 +29,7 @@ import io.qnop.web.security.ratelimit.RefreshRateLimitFilter;
 import io.qnop.web.security.ratelimit.RegisterRateLimitFilter;
 import io.qnop.web.security.ratelimit.ResetPasswordRateLimitFilter;
 import io.qnop.web.security.ratelimit.TrackingRateLimitFilter;
+import io.qnop.web.security.ratelimit.VerifyEmailRateLimitFilter;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -98,6 +99,7 @@ public class SecurityConfiguration {
       RegisterRateLimitFilter registerRateLimitFilter,
       ForgotPasswordRateLimitFilter forgotPasswordRateLimitFilter,
       ResetPasswordRateLimitFilter resetPasswordRateLimitFilter,
+      VerifyEmailRateLimitFilter verifyEmailRateLimitFilter,
       TrackingRateLimitFilter trackingRateLimitFilter,
       PasswordChangeRequiredFilter passwordChangeRequiredFilter)
       throws Exception {
@@ -120,6 +122,7 @@ public class SecurityConfiguration {
         .addFilterBefore(registerRateLimitFilter, CsrfFilter.class)
         .addFilterBefore(forgotPasswordRateLimitFilter, CsrfFilter.class)
         .addFilterBefore(resetPasswordRateLimitFilter, CsrfFilter.class)
+        .addFilterBefore(verifyEmailRateLimitFilter, CsrfFilter.class)
         // The measurement endpoint is unauthenticated by necessity (the sign-in
         // screen is measured too), so its ceiling is enforced before anything else
         // touches the request (issue #666).
@@ -169,7 +172,7 @@ public class SecurityConfiguration {
                     // too, so its proxy cannot require a token. It reaches exactly
                     // one configured backend on exactly the paths that backend
                     // declares, and it is rate-limited per IP.
-                    .requestMatchers("/t/s.js", "/t/c/**")
+                    .requestMatchers("/t/c/**")
                     .permitAll()
                     .requestMatchers("/api/v1/admin/**")
                     .hasRole("ADMIN")

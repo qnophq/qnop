@@ -20,62 +20,48 @@
  */
 package io.qnop.web;
 
+import io.qnop.service.tracking.TrackingCollectService;
 import io.qnop.service.tracking.TrackingProxyService;
 import io.qnop.web.security.ratelimit.HttpClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
-import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * The two endpoints that keep analytics inside the origin (issue #666).
+ * The endpoint that keeps analytics inside the origin (issue #666).
  *
- * <p>Short, opaque paths on purpose. {@code /t/s.js} and {@code /t/c/…} carry no word an ad blocker
- * matches on — not to defeat a user's choice (Do-Not-Track is honoured, consent is asked for, and
- * the profile switch wins over everything) but because a blocked measurement from a consenting user
- * is just a hole in the numbers.
+ * <p>There is deliberately no script endpoint (issue #910). An analytics vendor's JavaScript served
+ * from this origin would run with the application's full privileges — it could read the signed-in
+ * user's access token — so qnop's own client builds each measurement and this endpoint only
+ * forwards it.
+ *
+ * <p>A short, opaque path on purpose. {@code /t/c/…} carries no word an ad blocker matches on — not
+ * to defeat a user's choice (Do-Not-Track is honoured, consent is asked for, and the profile switch
+ * wins over everything) but because a blocked measurement from a consenting user is just a hole in
+ * the numbers.
  *
  * <p>Deliberately outside {@code /api/v1}: this is not part of the published REST contract
  * (ADR-0015). It speaks whatever shape the configured analytics backend speaks, and that is the
  * backend's contract, not qnop's.
  */
 // @Controller, not @RestController: ApiPathConfig mounts every @RestController under
-// /api/v1, and these two are infrastructure rather than part of the published
-// contract (ADR-0015) — the client's script tag and beacon URLs must stay where the
+// /api/v1, and this endpoint is infrastructure rather than part of the published
+// contract (ADR-0015) — the client's beacon URLs must stay where the
 // security rules and the CSP expect them.
 @Controller
 public class TrackingProxyController {
 
-  private final TrackingProxyService proxy;
+  private final TrackingCollectService collector;
   private final HttpClientIpResolver clientIp;
 
-  public TrackingProxyController(TrackingProxyService proxy, HttpClientIpResolver clientIp) {
-    this.proxy = proxy;
+  public TrackingProxyController(TrackingCollectService collector, HttpClientIpResolver clientIp) {
+    this.collector = collector;
     this.clientIp = clientIp;
-  }
-
-  /** The vendor script, served from this origin so the CSP need not name a second one. */
-  @GetMapping("/t/s.js")
-  @ResponseBody
-  public ResponseEntity<byte[]> script() {
-    return proxy
-        .script()
-        .map(
-            script ->
-                ResponseEntity.ok()
-                    // Short enough that switching backends takes effect within the hour,
-                    // long enough that a reload is not a round-trip to the vendor.
-                    .cacheControl(
-                        CacheControl.maxAge(java.time.Duration.ofMinutes(10)).cachePublic())
-                    .header("Content-Type", script.contentType())
-                    .body(script.body()))
-        .orElseGet(() -> ResponseEntity.notFound().build());
   }
 
   /**
@@ -84,6 +70,11 @@ public class TrackingProxyController {
    * <p>Both methods, because the backends disagree: Matomo and Pirsch measure over a query string
    * with GET, Umami, Plausible and PostHog post a JSON body. A proxy that took only one of them
    * would work for half the providers — which is exactly how this was found.
+   *
+   * <p>Only a measurement in the exact shape qnop's own client builds is forwarded, rebuilt from
+   * the validated values (issue #910) — and never one a browser marks as sent from another site:
+   * the endpoint is unauthenticated, and a cross-site page must not be able to write into this
+   * deployment's analytics through it.
    *
    * <p>Answers 204 whatever the backend said. The browser can do nothing useful with an analytics
    * error, and a page that reports its own measurement failures to the user is a page that has its
@@ -94,6 +85,11 @@ public class TrackingProxyController {
       method = {RequestMethod.GET, RequestMethod.POST})
   @ResponseBody
   public ResponseEntity<Void> collect(HttpServletRequest request) throws IOException {
+    if ("cross-site".equalsIgnoreCase(request.getHeader("Sec-Fetch-Site"))) {
+      // qnop's client always sends same-origin. A browser saying otherwise is
+      // another site's page posting here; it gets the same silent 204.
+      return ResponseEntity.noContent().build();
+    }
     // Everything up to the first '?': a servlet container keeps the query out of
     // getRequestURI(), but not every caller of this method is a servlet
     // container, and a path carrying a query would never match the provider's
@@ -110,12 +106,11 @@ public class TrackingProxyController {
     // Resolved through the same trusted-proxy rules the rate limiters use
     // (ADR-0027): behind a load balancer getRemoteAddr() is the balancer, and
     // truncating that address would tell the backend nothing at all.
-    proxy.forward(
+    collector.collect(
         request.getMethod(),
         path,
         request.getQueryString(),
         body,
-        request.getContentType(),
         clientIp.resolve(request),
         request.getHeader("User-Agent"));
     return ResponseEntity.noContent().build();

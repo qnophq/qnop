@@ -71,6 +71,14 @@ public class User {
   @Column(name = "enabled", nullable = false)
   private boolean enabled = true;
 
+  /**
+   * A self-registered account that has not confirmed its e-mail address yet (issue #900). Distinct
+   * from an administrator-disabled account: only a pending account can be activated by a
+   * verification link. Always {@code false} while {@link #enabled} is {@code true} (DB check).
+   */
+  @Column(name = "email_verification_pending", nullable = false)
+  private boolean emailVerificationPending = false;
+
   @Column(name = "password_change_required", nullable = false)
   private boolean passwordChangeRequired = false;
 
@@ -197,8 +205,24 @@ public class User {
     return enabled;
   }
 
+  /**
+   * Sets the enabled state as an explicit decision (an administrator's, typically), which also
+   * settles a pending e-mail verification (issue #900): once someone has decided about the account,
+   * a verification link can no longer override that decision.
+   */
   public void setEnabled(boolean enabled) {
     this.enabled = enabled;
+    this.emailVerificationPending = false;
+  }
+
+  public boolean isEmailVerificationPending() {
+    return emailVerificationPending;
+  }
+
+  /** Marks a fresh self-registration as disabled until its address is verified (issue #900). */
+  public void markPendingEmailVerification() {
+    this.enabled = false;
+    this.emailVerificationPending = true;
   }
 
   public boolean isPasswordChangeRequired() {

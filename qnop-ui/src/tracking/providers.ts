@@ -19,159 +19,189 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/** Where the proxied script and the proxied measurements live on this origin. */
-export const SCRIPT_URL = '/t/s.js';
+import type { TrackedEvent } from './trackEvent';
+
+/** Where the proxied measurements go on this origin. */
 export const COLLECT_BASE = '/t/c';
 
-type Paq = unknown[][];
-
-interface PlausibleFn {
-  (event: string, options?: { u?: string; callback?: () => void }): void;
+/** One measurement, ready to send to {@link COLLECT_BASE}: the path carries any query string. */
+export interface Beacon {
+  method: 'GET' | 'POST';
+  path: string;
+  body?: string;
+  contentType?: string;
 }
 
-interface UmamiApi {
-  track: (payload: unknown, data?: unknown) => void;
-}
-
-interface PosthogApi {
-  init: (key: string, options: Record<string, unknown>) => void;
-  capture: (event: string, properties?: Record<string, unknown>) => void;
-}
-
-declare global {
-  interface Window {
-    _paq?: Paq;
-    plausible?: PlausibleFn;
-    umami?: UmamiApi;
-    posthog?: PosthogApi;
-  }
+/** What every measurement may say about the visit — and nothing more. */
+export interface BeaconContext {
+  siteId: string;
+  /** Public knowledge: the backends that want a full URL get this origin plus a route pattern. */
+  origin: string;
+  hostname: string;
+  language: string;
+  screenWidth: number;
+  screenHeight: number;
+  /** A random id per page load, for the one backend that insists on one (PostHog). */
+  visitId: string;
 }
 
 /**
- * What each backend needs, reduced to three questions: what goes on the script tag, what to do once
- * it has loaded, and how to report a page view or an event.
+ * Builds measurements in a backend's own collect format (issue #910).
  *
- * Every adapter has the same job beyond wiring: **stop the script from measuring on its own**.
- * Left alone, each of these reports `window.location` on load — which in qnop is a URL with a
- * document id in it. So auto-tracking is switched off wherever the vendor allows it, and qnop sends
- * route patterns instead.
+ * qnop does not load any analytics vendor's script. A script served from this origin runs with the
+ * application's full privileges — it could read the signed-in user's access token and call the API
+ * as them — so a compromised or misconfigured analytics host would have been code execution in
+ * every consenting reviewer's session. Each backend's collect endpoint is a small, documented
+ * HTTP API, and building the request here is less code than configuring the vendor script was.
+ *
+ * Every `url` passed in is already a route pattern (`/reviews/:documentId`), never a real path;
+ * no title and no referrer is ever sent. Pure functions, so the exact shape is asserted in tests.
  */
 export interface TrackerAdapter {
-  /** Attributes for the injected `<script>`; most backends are configured entirely this way. */
-  attributes(siteId: string): Record<string, string>;
-  /** Runs before the script is inserted (Matomo's queue has to exist first). */
-  beforeLoad?(siteId: string): void;
-  /** Runs once the script has loaded (PostHog is configured through its API). */
-  afterLoad?(siteId: string): void;
-  pageview(url: string): void;
-  event(name: string): void;
+  pageview(ctx: BeaconContext, url: string): Beacon;
+  event(ctx: BeaconContext, name: TrackedEvent, url: string): Beacon;
 }
 
+const JSON_TYPE = 'application/json';
+/** What the vendors' own scripts send JSON as, so the backend sees nothing unusual. */
+const TEXT_TYPE = 'text/plain;charset=UTF-8';
+
+function absolute(ctx: BeaconContext, url: string): string {
+  return `${ctx.origin}${url}`;
+}
+
+function query(params: Record<string, string>): string {
+  return new URLSearchParams(params).toString();
+}
+
+function post(path: string, body: unknown, contentType: string): Beacon {
+  return { method: 'POST', path, body: JSON.stringify(body), contentType };
+}
+
+/** Matomo's HTTP Tracking API: a GET to `matomo.php`; no cookies, no visitor id, no title. */
 const matomo: TrackerAdapter = {
-  attributes: () => ({}),
-  beforeLoad(siteId) {
-    const paq: Paq = (window._paq = window._paq ?? []);
-    paq.push(['setTrackerUrl', `${COLLECT_BASE}/matomo.php`]);
-    paq.push(['setSiteId', siteId]);
-    // Matomo tracks nothing until asked, which is exactly what qnop wants.
-    paq.push(['disableCookies']);
-  },
-  pageview(url) {
-    window._paq?.push(['setCustomUrl', url]);
-    // Matomo would otherwise send document.title as the action name.
-    window._paq?.push(['setDocumentTitle', url]);
-    window._paq?.push(['trackPageView']);
-  },
-  event(name) {
-    window._paq?.push(['trackEvent', 'qnop', name]);
-  },
+  pageview: (ctx, url) => ({ method: 'GET', path: `/matomo.php?${matomoQuery(ctx, url)}` }),
+  event: (ctx, name, url) => ({
+    method: 'GET',
+    path: `/matomo.php?${matomoQuery(ctx, url, { e_c: 'qnop', e_a: name })}`,
+  }),
 };
 
+function matomoQuery(ctx: BeaconContext, url: string, extra: Record<string, string> = {}): string {
+  return query({
+    idsite: ctx.siteId,
+    rec: '1',
+    apiv: '1',
+    // 204 instead of a tracking pixel.
+    send_image: '0',
+    url: absolute(ctx, url),
+    res: `${ctx.screenWidth}x${ctx.screenHeight}`,
+    ...extra,
+    rand: String(Date.now()),
+  });
+}
+
+/** Plausible's Events API, in the body shape its own script sends. */
 const plausible: TrackerAdapter = {
-  attributes: (siteId) => ({ 'data-domain': siteId, 'data-api': `${COLLECT_BASE}/api/event` }),
-  pageview(url) {
-    window.plausible?.('pageview', { u: absolute(url) });
-  },
-  event(name) {
-    window.plausible?.(name, { u: absolute(window.location.pathname) });
-  },
+  pageview: (ctx, url) => plausibleEvent(ctx, 'pageview', url),
+  event: (ctx, name, url) => plausibleEvent(ctx, name, url),
 };
 
+function plausibleEvent(ctx: BeaconContext, name: string, url: string): Beacon {
+  return post(
+    '/api/event',
+    { name, url: absolute(ctx, url), domain: ctx.siteId, referrer: null },
+    TEXT_TYPE,
+  );
+}
+
+/** Umami's collect endpoint: a page view is an event without a name. */
 const umami: TrackerAdapter = {
-  attributes: (siteId) => ({
-    'data-website-id': siteId,
-    'data-host-url': COLLECT_BASE,
-    // Without this it reports the real URL on load and on every history change.
-    'data-auto-track': 'false',
-  }),
-  pageview(url) {
-    // `title` is document.title, which qnop must not export (see the server's
-    // sanitiser); it is blanked here so it never leaves the tab either.
-    window.umami?.track((props: unknown) => ({ ...(props as object), url, title: '' }));
-  },
-  event(name) {
-    window.umami?.track(name);
-  },
+  pageview: (ctx, url) => umamiEvent(ctx, url),
+  event: (ctx, name, url) => umamiEvent(ctx, url, name),
 };
 
+function umamiEvent(ctx: BeaconContext, url: string, name?: string): Beacon {
+  return post(
+    '/api/send',
+    {
+      type: 'event',
+      payload: {
+        website: ctx.siteId,
+        hostname: ctx.hostname,
+        language: ctx.language,
+        screen: `${ctx.screenWidth}x${ctx.screenHeight}`,
+        url,
+        referrer: '',
+        ...(name ? { name } : {}),
+      },
+    },
+    JSON_TYPE,
+  );
+}
+
+/** PostHog's capture endpoint; anonymous events, no person profile. */
 const posthog: TrackerAdapter = {
-  attributes: () => ({}),
-  afterLoad(siteId) {
-    window.posthog?.init(siteId, {
-      api_host: COLLECT_BASE,
-      // Everything that would collect on its own, off. Autocapture records the
-      // text of what was clicked, and in qnop that text is a document title;
-      // session recording would copy the document itself.
-      autocapture: false,
-      capture_pageview: false,
-      capture_pageleave: false,
-      disable_session_recording: true,
-      disable_surveys: true,
-      // Plain JSON, so the proxy can read — and sanitise — what travels.
-      disable_compression: true,
-      persistence: 'memory',
-      // No remote config, no feature flags, no lazily-loaded modules. qnop uses
-      // PostHog to count page views and nothing else, and each of those would
-      // fetch a path (/array/<token>/config.js, /flags/, /static/<module>.js)
-      // that the proxy's allowlist does not carry — by design, since an
-      // allowlist that grew to cover them would stop being a boundary.
-      advanced_disable_decide: true,
-      advanced_disable_flags: true,
-      disable_external_dependency_loading: true,
-    });
-  },
-  pageview(url) {
-    window.posthog?.capture('$pageview', { $current_url: absolute(url), $title: '' });
-  },
-  event(name) {
-    window.posthog?.capture(name);
-  },
+  pageview: (ctx, url) => posthogEvent(ctx, '$pageview', url),
+  event: (ctx, name, url) => posthogEvent(ctx, name, url),
 };
 
+function posthogEvent(ctx: BeaconContext, event: string, url: string): Beacon {
+  return post(
+    '/i/v0/e/',
+    {
+      api_key: ctx.siteId,
+      event,
+      distinct_id: ctx.visitId,
+      properties: {
+        $current_url: absolute(ctx, url),
+        $process_person_profile: false,
+        $lib: 'qnop',
+      },
+    },
+    JSON_TYPE,
+  );
+}
+
+/**
+ * Pirsch, in the format its `pa.js` uses: page views as a GET to `/hit`, events as a POST to
+ * `/event`. Unlike the vendor script — which could only report the real URL — this sends the route
+ * pattern, so the server-side rewrite is now a second line rather than the only one.
+ */
 const pirsch: TrackerAdapter = {
-  attributes: (siteId) => ({
-    id: 'pianjs',
-    'data-code': siteId,
-    // The names pa.js defaults to; the proxy forwards them under the same names.
-    'data-hit-endpoint': `${COLLECT_BASE}/hit`,
-    'data-event-endpoint': `${COLLECT_BASE}/event`,
-    'data-session-endpoint': `${COLLECT_BASE}/session`,
-    // Pirsch has no documented way to send a page view with a URL of our
-    // choosing, so its automatic one stays on and the server rewrites the id
-    // out of it (TrackedUrlSanitizer). Query strings never leave at all.
-    'data-disable-query': 'true',
-    'data-disable-referrer': 'true',
+  pageview: (ctx, url) => ({
+    method: 'GET',
+    path: `/hit?${query({
+      nc: String(Date.now()),
+      code: ctx.siteId,
+      url: absolute(ctx, url),
+      t: '',
+      ref: '',
+      w: String(ctx.screenWidth),
+      h: String(ctx.screenHeight),
+    })}`,
   }),
-  pageview() {
-    // Deliberately empty: see above.
-  },
-  event(name) {
-    const fn = (window as unknown as { pirsch?: (name: string) => void }).pirsch;
-    fn?.(name);
-  },
+  event: (ctx, name, url) =>
+    post(
+      '/event',
+      {
+        identification_code: ctx.siteId,
+        url: absolute(ctx, url),
+        title: '',
+        referrer: '',
+        screen_width: ctx.screenWidth,
+        screen_height: ctx.screenHeight,
+        tags: {},
+        event_name: name,
+        event_duration: 0,
+        event_meta: {},
+        non_interactive: false,
+      },
+      TEXT_TYPE,
+    ),
 };
 
-export const ADAPTERS: Record<string, TrackerAdapter> = {
+export const ADAPTERS: Readonly<Record<string, TrackerAdapter>> = {
   matomo,
   plausible,
   umami,
@@ -179,7 +209,76 @@ export const ADAPTERS: Record<string, TrackerAdapter> = {
   pirsch,
 };
 
-/** Backends that want a full URL rather than a path; the origin is public knowledge. */
-function absolute(path: string): string {
-  return `${window.location.origin}${path}`;
+/** A tracker bound to one backend and one page load. */
+export interface ActiveTracker {
+  pageview(url: string): void;
+  event(name: TrackedEvent): void;
+}
+
+/** Sends one measurement to this origin's proxy; failures are dropped without a trace. */
+export function sendBeacon(beacon: Beacon): void {
+  void fetch(`${COLLECT_BASE}${beacon.path}`, {
+    method: beacon.method,
+    headers: beacon.contentType ? { 'Content-Type': beacon.contentType } : undefined,
+    body: beacon.body,
+    keepalive: true,
+    // The proxy is unauthenticated; nothing about the session travels with a measurement —
+    // not a cookie, and not the real address of the page in a Referer header.
+    credentials: 'omit',
+    referrerPolicy: 'no-referrer',
+    cache: 'no-store',
+  }).catch(() => {
+    // A measurement is the one thing allowed to fail in total silence.
+  });
+}
+
+/**
+ * Binds an adapter to this page load; null for a provider this client does not know.
+ *
+ * Events report the route pattern of the most recent page view, so an event never needs the real
+ * location either.
+ */
+export function createTracker(
+  provider: string,
+  siteId: string,
+  send: (beacon: Beacon) => void = sendBeacon,
+): ActiveTracker | null {
+  const adapter = Object.prototype.hasOwnProperty.call(ADAPTERS, provider)
+    ? ADAPTERS[provider]
+    : undefined;
+  if (!adapter) {
+    return null;
+  }
+  const ctx = browserContext(siteId);
+  let currentUrl = '/';
+  return {
+    pageview(url) {
+      currentUrl = url;
+      send(adapter.pageview(ctx, url));
+    },
+    event(name) {
+      send(adapter.event(ctx, name, currentUrl));
+    },
+  };
+}
+
+function browserContext(siteId: string): BeaconContext {
+  return {
+    siteId,
+    origin: window.location.origin,
+    hostname: window.location.hostname,
+    language: navigator.language ?? '',
+    screenWidth: window.screen?.width ?? 0,
+    screenHeight: window.screen?.height ?? 0,
+    visitId: randomId(),
+  };
+}
+
+function randomId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }

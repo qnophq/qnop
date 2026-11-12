@@ -84,7 +84,9 @@ tags:
       demote leads — without being a global ADMIN, gated per-team in the handler
       (a MEMBER or non-lead gets 403; an ADMIN passes for any team). Creating,
       renaming and deleting teams stays ADMIN-only under `/admin/teams`. A team can
-      never lose its last lead through this surface.
+      never lose its last lead through this surface. Since issue #936 (ADR-0064) a
+      lead who is not an ADMIN only invites — the user joins once they accept
+      (`/teams/invitations/**`) — and granting `LEAD` is an ADMIN decision.
   - name: AdminOidcProviders
     description: |
       Superadmin-only management of DB-configured OIDC/OAuth2 login providers,
@@ -1060,7 +1062,10 @@ paths:
       description: |
         Partial update of display name, global role and enabled state. The
         self-lockout guard rejects (409) an attempt to disable or demote your own
-        account or the last remaining admin.
+        account or the last remaining admin. Enabling an account that is still
+        pending its e-mail verification is refused (409 `USER_PENDING_VERIFICATION`);
+        send it a password-reset link instead, which activates it without any
+        registrant-chosen password.
       operationId: updateUser
       security:
         - bearerAuth: []
@@ -1092,7 +1097,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: Self-lockout or last-admin guard violated
+          description: Self-lockout or last-admin guard violated, or the account is pending verification
           content:
             application/json:
               schema:
@@ -1492,6 +1497,34 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /admin/teams/{teamId}/invitations/{userId}:
+    delete:
+      tags:
+        - AdminTeams
+      summary: Revoke a pending team invitation
+      description: |
+        Withdraws a team lead's pending invitation of the user (issue #936,
+        ADR-0064). The invitation never granted anything, so revoking it only
+        removes it from the invited user's list.
+      operationId: revokeTeamInvitation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '204':
+          description: Invitation revoked
+        '404':
+          description: The team has no pending invitation of this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /admin/storage-consistency:
     get:
       tags:
@@ -1555,6 +1588,120 @@ paths:
                 $ref: '#/components/schemas/OrphanDeleteResponse'
         '400':
           description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /teams/invitations:
+    get:
+      tags:
+        - Teams
+      summary: List the caller's pending team invitations
+      description: |
+        The invitations a team lead has sent the caller and the caller has not
+        answered yet (issue #936, ADR-0064), newest first. A pending invitation
+        grants nothing — no team access, no review visibility — until accepted.
+        Invitations into disabled teams are not listed.
+      operationId: listMyTeamInvitations
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The caller's pending invitations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyTeamInvitationListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /teams/invitations/{teamId}/accept:
+    post:
+      tags:
+        - Teams
+      summary: Accept a team invitation
+      description: |
+        The invited caller joins the team as a `MEMBER` (issue #936). Only the
+        invited user can accept; anybody else's invitation answers 404. Subject
+        to the per-team member quota (409 when the team is full).
+      operationId: acceptMyTeamInvitation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+      responses:
+        '200':
+          description: The team the caller now belongs to.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyTeam'
+        '404':
+          description: The caller has no pending invitation to this team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The team has reached its member limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /teams/invitations/{teamId}/decline:
+    post:
+      tags:
+        - Teams
+      summary: Decline a team invitation
+      description: |
+        The invited caller turns the invitation down; it is deleted (issue
+        #936). The team lead may invite again later.
+      operationId: declineMyTeamInvitation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+      responses:
+        '204':
+          description: Invitation declined
+        '404':
+          description: The caller has no pending invitation to this team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /teams/{teamId}/invitations/{userId}:
+    delete:
+      tags:
+        - Teams
+      summary: Revoke a pending invitation of a led team
+      description: |
+        A LEAD of the team (or an ADMIN) withdraws a pending invitation (issue
+        #936). Any other caller gets 403.
+      operationId: revokeMyTeamInvitation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '204':
+          description: Invitation revoked
+        '404':
+          description: The team has no pending invitation of this user
           content:
             application/json:
               schema:
@@ -1743,10 +1890,20 @@ paths:
     post:
       tags:
         - Teams
-      summary: Add a member to a led team
+      summary: Add (or invite) a member to a led team
       description: |
         A LEAD of the team (or an ADMIN) adds a member with a team role (issue
         #470). Any other caller gets 403.
+
+        Consent (issue #936, ADR-0064): an ADMIN's add takes effect at once and
+        the response has `status: ACTIVE`. A lead who is not an admin only
+        **invites** the user — the response has `status: INVITED` and grants no
+        team access until the user accepts (`POST /teams/invitations/{teamId}/accept`).
+        A lead may only offer `MEMBER`; asking for `LEAD` answers 403
+        `LEAD_GRANT_REQUIRES_ADMIN`. 409 `ALREADY_MEMBER` / `ALREADY_INVITED`
+        when the user is already in the team or already invited, and 409
+        `TOO_MANY_PENDING_INVITATIONS` when the team already holds 50 unanswered
+        invitations.
       operationId: addMyTeamMember
       security:
         - bearerAuth: []
@@ -1760,7 +1917,7 @@ paths:
               $ref: '#/components/schemas/AdminTeamMemberRequest'
       responses:
         '201':
-          description: The added member
+          description: The added member (`ACTIVE`) or the sent invitation (`INVITED`)
           content:
             application/json:
               schema:
@@ -1778,7 +1935,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: The user is already a member of the team
+          description: >-
+            The user is already a member of, or already invited to, the team, or
+            the team holds too many unanswered invitations
           content:
             application/json:
               schema:
@@ -1799,7 +1958,9 @@ paths:
         themselves out. Nobody changes their OWN role through this surface (409
         `SELF_ROLE_CHANGE`, mirroring `SELF_REMOVAL`) — demoting a lead is
         another lead's or an admin's call, and the admin console is the path
-        for one's own role. Any non-lead caller gets 403.
+        for one's own role. Any non-lead caller gets 403. Promoting to `LEAD`
+        is an ADMIN decision (issue #936): a lead who is not an admin gets 403
+        `LEAD_GRANT_REQUIRES_ADMIN`; demoting stays a lead's call.
       operationId: setMyTeamMemberRole
       security:
         - bearerAuth: []
@@ -1881,10 +2042,13 @@ paths:
       summary: Register a local account
       description: |
         Self-registration of a local user. Public; gated by the
-        `auth.self_registration_enabled` setting. Anti-enumeration: the response is
-        **uniform** whether or not the username/email already exists (no account is
-        created or re-mailed for a duplicate); when registration is disabled the
-        endpoint reports a **disguised 404** so its availability is not revealed.
+        `auth.self_registration_enabled` setting. The account stays pending until the
+        address is verified (see `/auth/verify-email`). Anti-enumeration: the response
+        is **uniform** whether or not the username/email already exists — a duplicate
+        creates no account and instead sends a neutral notice to the entered address,
+        and every mail is sent after the response, off the request thread; when
+        registration is disabled the endpoint reports a **disguised 404** so its
+        availability is not revealed.
       operationId: register
       security: []
       requestBody:
@@ -1915,20 +2079,37 @@ paths:
         '429':
           $ref: '#/components/responses/TooManyRequests'
   /auth/verify-email:
-    get:
+    post:
       tags:
         - AuthRegistration
       summary: Verify a registered email address
-      description: Consumes a single-use verification token and activates the account. Public.
+      description: |
+        Confirms a self-registration and activates the account (issue #900). Public.
+        The link proves control of the mailbox, and for an account nobody has verified
+        yet mailbox control is account control. With `setNew` false (default) the
+        request confirms the registration the link belongs to: `password` must be its
+        password and the account gets exactly its credentials; a mismatch is
+        `VERIFICATION_PASSWORD_MISMATCH` and leaves the link usable. Confirming works
+        for the whole link lifetime (24 hours). With `setNew` true the holder sets new
+        credentials instead — the trust of a password-reset link, so only while the
+        link is younger than the configured password-reset link lifetime
+        (`VERIFICATION_SET_NEW_EXPIRED` after that: register again for a fresh link).
+        `username` is then required and becomes the username and display name;
+        `password` follows the password policy (8–200 characters, at most 72 UTF-8
+        bytes; otherwise `VALIDATION_ERROR`). Either way every other link of the
+        address is spent. A username of another account is
+        `VERIFICATION_USERNAME_TAKEN` (the link stays usable); an unknown, expired or
+        used link, or an account no longer pending, is `INVALID_VERIFICATION_TOKEN`.
+        Only an account still pending verification can be activated — never one an
+        administrator has disabled. Rate-limited per client network.
       operationId: verifyEmail
       security: []
-      parameters:
-        - name: token
-          in: query
-          required: true
-          description: The raw verification token from the emailed link.
-          schema:
-            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEmailRequest'
       responses:
         '200':
           description: Verification result
@@ -1937,11 +2118,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/VerifyEmailResponse'
         '400':
-          description: Unknown, expired, or already-used token
+          description: Invalid link, password mismatch, taken username, invalid new credentials or a link too old to set new ones
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /auth/forgot-password:
     post:
       tags:
@@ -5066,22 +5249,24 @@ components:
       type: object
       description: |
         What the client needs to measure usage (issue #666). It never learns the
-        analytics host: the script comes from `/t/s.js` and measurements go to
-        `/t/c/…` on this origin, which is what keeps the CSP pinned to 'self'.
+        analytics host: the client builds each measurement in the backend's
+        collect format and sends it to `/t/c/…` on this origin, which is what
+        keeps the CSP pinned to 'self'. No analytics vendor script is loaded
+        (issue #910).
       properties:
         provider:
           type: string
           enum: [matomo, plausible, umami, posthog, pirsch]
-          description: Which backend's script and call shape to use.
+          description: Which backend's collect format to use.
         siteId:
           type: string
           description: |
-            The backend's identifier for this site, as the script needs it
+            The backend's identifier for this site, as its collect format needs it
             (Matomo idSite, Plausible domain, Umami website id, PostHog project
             API key, Pirsch identification code).
         consentRequired:
           type: boolean
-          description: Ask before loading anything at all.
+          description: Ask before measuring anything at all.
         respectDnt:
           type: boolean
           description: Leave browsers that send Do-Not-Track or GPC entirely alone.
@@ -5341,7 +5526,7 @@ components:
           format: password
           minLength: 8
           maxLength: 200
-          description: The replacement password. Must meet the minimum-length policy.
+          description: "The replacement password. Password policy — 8–200 characters and at most 72 UTF-8 bytes (VALIDATION_ERROR otherwise)."
       required:
         - currentPassword
         - newPassword
@@ -6272,6 +6457,52 @@ components:
       enum:
         - LEAD
         - MEMBER
+    TeamMembershipStatus:
+      type: string
+      description: |
+        Whether a roster entry is a member (`ACTIVE`) or a pending invitation a
+        team lead sent and the user has not accepted yet (`INVITED`, issue #936,
+        ADR-0064). An invited user has no team access at all.
+      enum:
+        - ACTIVE
+        - INVITED
+    MyTeamInvitation:
+      type: object
+      description: A pending invitation of the caller into a team (issue #936).
+      properties:
+        teamId:
+          type: string
+          format: uuid
+        teamName:
+          type: string
+        teamSlug:
+          type: string
+          nullable: true
+        teamAvatarUrl:
+          type: string
+          nullable: true
+          description: The team's avatar URL with a cache-buster, or null when none is set.
+        invitedByName:
+          type: string
+          nullable: true
+          description: Display name of the lead who sent the invitation; null once that account is gone.
+        invitedAt:
+          type: string
+          format: date-time
+      required:
+        - teamId
+        - teamName
+        - invitedAt
+    MyTeamInvitationListResponse:
+      type: object
+      description: The caller's pending team invitations (issue #936).
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MyTeamInvitation'
+      required:
+        - items
     AdminTeamMember:
       type: object
       description: A team member joined with their user identity.
@@ -6296,6 +6527,9 @@ components:
         joinedAt:
           type: string
           format: date-time
+          description: When the user joined — for an `INVITED` entry, when the invitation was sent.
+        status:
+          $ref: '#/components/schemas/TeamMembershipStatus'
       required:
         - userId
         - displayName
@@ -6387,6 +6621,11 @@ components:
           format: date-time
         members:
           type: array
+          items:
+            $ref: '#/components/schemas/AdminTeamMember'
+        pendingInvitations:
+          type: array
+          description: Pending invitations sent by a team lead (issue #936), each with `status` INVITED.
           items:
             $ref: '#/components/schemas/AdminTeamMember'
       required:
@@ -6595,6 +6834,9 @@ components:
         joinedAt:
           type: string
           format: date-time
+          description: When the user joined — for an `INVITED` entry, when the invitation was sent.
+        status:
+          $ref: '#/components/schemas/TeamMembershipStatus'
       required:
         - userId
         - displayName
@@ -6642,6 +6884,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TeamMember'
+        pendingInvitations:
+          type: array
+          description: |
+            Pending invitations (issue #936), each with `status` INVITED — only
+            for a caller who may manage the team (`viewerCanManage`); empty for
+            everyone else.
+          items:
+            $ref: '#/components/schemas/TeamMember'
       required:
         - id
         - name
@@ -6665,6 +6915,7 @@ components:
           type: string
           minLength: 8
           maxLength: 200
+          description: "Password policy — 8–200 characters and at most 72 UTF-8 bytes (VALIDATION_ERROR otherwise)."
         displayName:
           type: string
           maxLength: 255
@@ -6684,6 +6935,33 @@ components:
       required:
         - verificationRequired
         - message
+    VerifyEmailRequest:
+      type: object
+      description: |
+        The emailed verification token plus either the password of the registration it
+        belongs to (`setNew` false) or new credentials (`setNew` true).
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 512
+        password:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 200
+        setNew:
+          type: boolean
+          default: false
+          description: Set `password` (and `username`) as new credentials instead of confirming.
+        username:
+          type: string
+          minLength: 3
+          maxLength: 64
+          description: With `setNew`, the username to use (required then).
+      required:
+        - token
+        - password
     VerifyEmailResponse:
       type: object
       properties:
@@ -6712,6 +6990,7 @@ components:
           type: string
           minLength: 8
           maxLength: 200
+          description: "Password policy — 8–200 characters and at most 72 UTF-8 bytes (VALIDATION_ERROR otherwise)."
       required:
         - token
         - newPassword
@@ -6949,8 +7228,8 @@ components:
             the failure in the user's language: `REQUIRED`, `NOT_AN_INTEGER`,
             `NOT_A_BOOLEAN`, `NOT_AN_OPTION`, `TOO_LONG`, `TOO_SHORT`,
             `LENGTH_OUT_OF_RANGE`, `TOO_SMALL`, `TOO_LARGE`, `INVALID_EMAIL`,
-            `INVALID_URL`, `INVALID_TIMEZONE`, `INVALID_LANGUAGE`,
-            `INVALID_FORMAT`, `UNKNOWN_SETTING`. Null when the failure has no
+            `INVALID_URL`, `REQUIRES_HTTPS`, `INVALID_TIMEZONE`,
+            `INVALID_LANGUAGE`, `INVALID_FORMAT`, `UNKNOWN_SETTING`. Null when the failure has no
             stable reason (e.g. a custom constraint message, or a size limit on
             a list); new codes may be added, so a client falls back to `message`
             for one it does not know.

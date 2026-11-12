@@ -17,8 +17,7 @@ And the second constraint is the product itself: a qnop URL contains the id of a
 ### Measurement goes through this server, never past it
 
 ```
-Browser ──GET /t/s.js──►  qnop ──►  https://matomo.internal/matomo.js   (cached 1h)
-        ──POST /t/c/…─►  qnop ──►  https://matomo.internal/matomo.php   (forwarded)
+Browser ──GET/POST /t/c/…─►  qnop ──►  https://matomo.internal/matomo.php   (forwarded)
 ```
 
 The alternative — extending the CSP with the configured analytics host per deployment — was rejected. It weakens the one policy that is identical on every other page, it hands each reviewer's IP address to a third party, and it puts the measurement squarely in the path of ad blockers. Proxying costs two endpoints and turns all three around: the CSP stays untouched, the backend sees only what qnop chooses to send, and there is no third-party host to block.
@@ -65,7 +64,7 @@ One thing this amendment does **not** provide, and an operator relying on it sho
 
 **At connection time (`GuardedDnsResolver`, `OutboundHttpClients`).** The decision is enforced by the client that makes the request, on the address it actually connects to. We chose **Apache HttpClient 5** (Apache-2.0, already managed by the Spring Boot BOM) because it is the Spring-supported, BOM-managed client whose DNS hook feeds the connect directly (Jetty's and OkHttp's equivalents would add a dependency Spring does not manage here): the connection operator asks the `DnsResolver` for the host's addresses and opens the socket to exactly those, so there is no second lookup between check and connect — a name that answers with a public address first and a private one later cannot get through. Every resolved address must pass the policy; one blocked address refuses the host. SNI, certificate verification and the `Host` header keep using the name. The alternatives were worse: the JDK `HttpClient` and `HttpURLConnection` have no resolution hook; rewriting the URL to the IP literal breaks TLS host verification; a JVM-wide `InetAddressResolverProvider` would affect every connection the process makes (database, object storage) and is bypassed by the JDK address cache. The guarded clients follow **no redirects**, do not inflate compressed bodies, read at most 1 MiB of any response, and carry the `qnop.http-client.outbound-*` timeouts. Their pools are sized explicitly (20 per route, 50 in total) and a pooled connection is waited for no longer than the connect timeout (the tracking proxy: no longer than its 3-second request bound), so a slow backend cannot queue request threads behind a full pool.
 
-**Upgrade note — outbound proxies.** The guarded clients ignore the JVM proxy system properties (`https.proxyHost`, `http.proxyHost`, …): through a proxy the name would be resolved by the proxy, outside the guard. Spring Security's previous defaults honoured them, so a deployment that reaches its IdP or analytics backend *only* through an egress proxy loses OIDC login and usage tracking with this change. An explicit, documented-as-weaker proxy opt-in is tracked as a follow-up (issue #940).
+**Upgrade note — outbound proxies.** The guarded clients ignore the JVM proxy system properties (`https.proxyHost`, `http.proxyHost`, …): through a proxy the name would be resolved by the proxy, outside the guard. Spring Security's previous defaults honoured them, so a deployment that reaches its IdP or analytics backend *only* through an egress proxy loses OIDC login and usage tracking with this change. An explicit, documented-as-weaker proxy opt-in followed in issue #940 (see the amendment below).
 
 Where it is wired:
 
@@ -75,9 +74,19 @@ Where it is wired:
 
 The deployment opt-ins are unchanged in meaning: `qnop.auth.oidc.allow-private-discovery-uris` and `qnop.tracking.allow-private-host` relax the range checks at both halves (local Keycloak on `localhost` keeps working); the numeric-form check stays on.
 
+### Amendment (2026-11, #940): an explicit outbound proxy, as a weaker mode
+
+Deployments that reach their IdP or analytics backend only through a mandatory egress proxy lost OIDC login and usage tracking with #904. The guarded clients (`OutboundHttpClients`) now accept an explicit proxy: `qnop.http-client.proxy.host`, `.port` and `.non-proxy-hosts`, bound and validated as part of `HttpClientProperties` (a malformed or partial configuration fails startup).
+
+- **Opt-in only, deployment-only.** Unset means direct connections, exactly as before. The JVM proxy system properties stay ignored — honouring them would be an implicit opt-in nobody chose. The proxy is a deployment property and never an application setting: whoever can choose the proxy can steer every guarded request, so it must not be reachable from the admin UI.
+- **The weaker trust model is explicit in code** (`OutboundProxyRoutePlanner`). For a proxied destination the proxy resolves the name, so the connection-time address check cannot apply. The lexical guard (`OutboundUriGuard`) is therefore re-run on every proxied request, inside the client, with the same private-destination opt-in as the feature that owns the client — reserved names, private/loopback/metadata IP literals and non-canonical numeric hosts never reach the proxy. A public name that resolves to an internal address is not caught by qnop in this mode: **the proxy's egress ACL becomes the remaining control**, and the operator documentation says so.
+- **The proxy host is the one exemption.** The client's DNS resolver lets exactly the configured proxy name past `OutboundAddressPolicy` — it is operator configuration and normally sits on a private network. It is resolved like any connection target: once per new pooled connection (not per request), with every address it answers tried in turn, so a multi-address proxy fails over. The exemption is by name but reaches only the proxy hop: proxied destinations are never resolved locally, and a non-proxy entry that covers the proxy host is refused at startup, so no direct route can lead to it.
+- **Non-proxy hosts keep the full guard.** Exact names, `*.suffix` entries or IPv6 literals are routed directly and go through `GuardedDnsResolver` (resolve, check every address, pin) as in direct mode. Entries and targets are compared after the same normalisation (case, trailing root dot, IPv6 brackets); an entry that could never match (a port, an empty label) fails startup instead of silently proxying the destination it was meant to keep direct. Operators should list internal IdPs there rather than proxy them.
+- **Scope.** Plain-HTTP proxies (`CONNECT` for https destinations, so TLS stays end-to-end); no proxy authentication — supporting it would add a stored credential for little gain, and can follow if a deployment needs it. Redirects, size and time limits are unchanged in both modes. One `WARN` line at startup names the proxy's `host:port` when proxy mode is active.
+
 ### Four gates, any of which says no
 
-Operator configuration, Do-Not-Track/GPC, the account-level opt-out, and consent. All four must agree before a script tag is even created. The consent answer lives in the browser (the sign-in screen is measured, and nobody has an account yet at that point); the opt-out lives on the account, so it follows a person across devices and outlives a cleared browser store. Administrators and auditors are excluded unless an operator explicitly includes them — a handful of privileged people is barely a statistic and very much personal data.
+Operator configuration, Do-Not-Track/GPC, the account-level opt-out, and consent. All four must agree before a single measurement is sent. The consent answer lives in the browser (the sign-in screen is measured, and nobody has an account yet at that point); the opt-out lives on the account, so it follows a person across devices and outlives a cleared browser store. Administrators and auditors are excluded unless an operator explicitly includes them — a handful of privileged people is barely a statistic and very much personal data.
 
 ### Events are a closed union
 
@@ -87,13 +96,47 @@ Four names, no properties: `review_created`, `annotation_created`, `review_final
 
 Matomo, Plausible, Umami, PostHog (self-hostable) and Pirsch (cloud, proxy-native). **Fathom was dropped during implementation**: its custom-domain feature was withdrawn in 2023 with no replacement, and its documented model expects beacons to reach it directly from the browser so its bot detection sees the real client. Proxying it would either not work or quietly poison its data — and adding a CSP exception for one vendor would give up the property this whole design exists to keep.
 
+### Amendment (2026-11, issue #910): no vendor script — qnop builds the measurements itself
+
+The original design proxied the vendor's **script** as well as its measurements: `/t/s.js` was fetched from the configured analytics host and served from qnop's origin. That kept the CSP at `'self'`, but it also meant the script ran with the application's full privileges — it could read the signed-in user's in-memory access token and call the API as them. Its content was not pinned and the fetch was unbounded, so a compromised analytics host, or a wrong host in the settings, was code execution in every consenting reviewer's session, administrators included.
+
+**Decision.** The script is gone. The SPA builds every measurement itself, in the backend's own documented collect format, and posts it to the existing `/t/c/…` proxy; the server neither fetches nor serves any analytics JavaScript (`/t/s.js` no longer exists). Per backend:
+
+| Backend | Page view | Event |
+|---|---|---|
+| Matomo | `GET /matomo.php` (HTTP Tracking API, `send_image=0`) | same, with `e_c=qnop&e_a=<name>` |
+| Plausible | `POST /api/event` `{name:"pageview", url, domain}` | same, with the event name |
+| Umami | `POST /api/send` `{type:"event", payload:{website, hostname, language, screen, url}}` | same, with `name` |
+| PostHog | `POST /i/v0/e/` `{api_key, event:"$pageview", distinct_id, properties}` (anonymous: `$process_person_profile:false`) | same, with the event name |
+| Pirsch | `GET /hit?code=…&url=…` (the format `pa.js` uses) | `POST /event` |
+
+Each request carries the route pattern (as an absolute URL on qnop's origin where the backend wants one), the event name for events, and — only where the backend's format has a field for it — the screen size (Matomo, Umami, Pirsch) and the browser language (Umami). Never a title or a referrer. Requests are sent with `credentials: 'omit'` and `referrerPolicy: 'no-referrer'`. PostHog's `distinct_id` is a random id per page load, which is what the previous `persistence: 'memory'` configuration amounted to — so PostHog's "unique users" count page loads, not people, and should not be read as visitor numbers; that is the privacy design, not a defect.
+
+**The allowlist shrank to match.** `TrackingProvider` now admits exactly the paths above: Umami's `/api/batch`, PostHog's `/e`, `/batch`, `/decide/`, `/flags` and Pirsch's `/session` are refused. Nothing but qnop's own code sends to the proxy any more, so nothing else needs to pass.
+
+**The server accepts only that shape.** The collect endpoint is unauthenticated, so `TrackingMeasurementValidator` admits a request only if it is exactly what the client builds: the right method and path, only the known keys and query parameters, this deployment's site id (no relaying into another site on the same analytics instance), an event from the closed list of four, empty `tags`/`event_meta` for Pirsch, and for PostHog no person or identity properties, with `$process_person_profile` forced to `false`. What is forwarded is rebuilt from the validated values with a pinned content type — never the caller's bytes or header — and the URL sanitiser still runs after it. A request a browser marks `Sec-Fetch-Site: cross-site` is dropped as well. The golden requests in `qnop-ui/src/tracking/__fixtures__/beacons.json` are written by the client's tests from the real builders and read by the server's tests, which assert that every one is accepted and that the paths per backend equal the allowlist — client and server cannot drift without a test failing.
+
+**Transport.** A non-private tracking host must use `https`; plain `http` remains possible only for a host the lexical SSRF policy classes as private (an IP literal in a private range, `localhost`, `*.local`, `*.internal`), which in turn requires the `qnop.tracking.allow-private-host` deployment opt-in. A public name that merely resolves to a private address must use https. The rule (`TrackingHostPolicy`) is purely lexical, so it is enforced when the setting is saved — the field reports `REQUIRES_HTTPS` — and again in `TrackingConfigService` for a value saved before the rule existed, which then switches measurement off with a warning. **Upgrade note:** a deployment whose public analytics host is configured as `http://` stops measuring after this change until the host is switched to `https://`.
+
+**Visitor addresses through the proxy.** Every measurement reaches the backend from qnop's server, so the backend must take the visitor's address from `X-Forwarded-For`. Matomo does so only when its `config.ini.php` lists `HTTP_X_FORWARDED_FOR` in `proxy_client_headers[]`; the setting help and `docs/DEPLOYMENT.md` say so. Pirsch's identification-code endpoints are designed for browser calls, and its own proxy integrations use server-side API clients, so through qnop it may attribute every visitor to qnop's address — a known limitation, with a server-side access-token mode and a real-instance smoke test across all five backends tracked in issue #944. Neither could be verified against live instances in this change; the request formats were checked against the vendors' current scripts and API documentation.
+
+**The admin screen says what is trusted.** The tracking settings group carries a standing note (in every UI locale): qnop runs no provider code in the browser, the configured backend still receives each forwarded measurement with the visitor's user agent and — as configured — IP address, so it must be a server the operator trusts, and a public host must use https.
+
+**Alternatives considered.**
+
+- *Vendor script in a sandboxed iframe* (`sandbox="allow-scripts"`, opaque origin, postMessage bridge). Rejected. Requests from an opaque origin arrive with `Origin: null`; the JSON POSTs of Plausible, Umami and PostHog are non-simple, so the unauthenticated proxy would have had to answer CORS preflights for `null` — accepting cross-origin writes from any sandboxed document anywhere. Pirsch's script can only report its own `location`, which inside the frame is the frame's URL, not the page's. Pirsch also reads `localStorage` unguarded, which throws in an opaque origin. And the iframe would still run third-party code whose behaviour qnop cannot review — only in a smaller box.
+- *Pin the script by hash, with an admin-confirmed digest.* Rejected as the primary control: it keeps third-party code in the application origin and turns every vendor release into a silent outage until an administrator re-confirms a hash they cannot meaningfully review. It was the fallback had the first-party beacons not been feasible; they were.
+- *Response-size cap on the script fetch.* Moot — there is no script fetch. Forwarded measurements already have a 64 KiB request cap, and the backend's response is discarded.
+
+**Consequences.** No third-party JavaScript executes in qnop's origin under any configuration, and the unauthenticated collect endpoint passes on nothing qnop's own client would not have sent. The vendors' scripts are no longer a moving part, so a vendor release cannot change what qnop sends; the price is that qnop now owns five small request builders (`qnop-ui/src/tracking/providers.ts`), each pinned by a test against the server's allowlist — a change to a vendor's collect API is a code change here rather than an automatic pickup. Features that only the scripts provided — Plausible's engagement/scroll-depth events, Umami's performance and error reports, PostHog's remote config — are gone, all of them things qnop did not want to collect anyway.
+
 ## Consequences
 
 **Positive.** The CSP is unchanged. No reviewer's browser contacts an analytics host. Ad blockers have nothing to act on, so the numbers describe everyone who consented rather than everyone who consented and did not block. Switching backends is a settings change, not a deployment change.
 
 **Negative.** Five vendor integrations to keep working, each of which can change its script or endpoints without telling us; a broken one fails silently by design. The proxy adds a request path to keep an eye on. Payloads that are compressed or otherwise unreadable pass the server-side sanitiser untouched, so the clients are configured to send plain JSON — a coupling worth knowing about.
 
-**Neutral.** Pirsch reports its own page view because it offers no documented way to send one with a chosen URL; the server rewrites the id out of it, which is exactly why the second line exists.
+**Neutral.** ~~Pirsch reports its own page view because it offers no documented way to send one with a chosen URL; the server rewrites the id out of it, which is exactly why the second line exists.~~ Superseded by the #910 amendment: qnop now sends Pirsch's page view itself, with the route pattern; the server-side rewrite remains the second line for every backend.
 
 ## Related
 
@@ -102,3 +145,4 @@ Matomo, Plausible, Umami, PostHog (self-hostable) and Pirsch (cloud, proxy-nativ
 - **ADR-0027** — the rate-limiting the unauthenticated collect endpoint reuses
 - **Issue #21** — the OIDC SSRF guard, extracted here into `OutboundUriGuard` and shared
 - **Issue #904** — the guard resolves host names and pins the connection to the validated addresses (amendment above)
+- **Issue #910** — no vendor script; first-party collect requests and HTTPS for public hosts (amendment above)

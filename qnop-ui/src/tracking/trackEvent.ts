@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { TrackerAdapter } from './providers';
+import type { ActiveTracker } from './providers';
 
 /**
  * Everything qnop measures beyond page views (issue #666).
@@ -32,11 +32,11 @@ import type { TrackerAdapter } from './providers';
 export type TrackedEvent =
   'review_created' | 'annotation_created' | 'review_finalized' | 'export_generated';
 
-let active: TrackerAdapter | null = null;
+let active: ActiveTracker | null = null;
 
-/** Set by {@code TrackingBoot} once — and only if — a tracker actually loaded. */
-export function setActiveTracker(adapter: TrackerAdapter | null): void {
-  active = adapter;
+/** Set by {@code TrackingBoot} while — and only while — every gate says measure. */
+export function setActiveTracker(tracker: ActiveTracker | null): void {
+  active = tracker;
 }
 
 /**

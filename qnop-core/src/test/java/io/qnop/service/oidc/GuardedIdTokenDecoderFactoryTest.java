@@ -53,7 +53,7 @@ import org.springframework.security.oauth2.jwt.JwtException;
 class GuardedIdTokenDecoderFactoryTest {
 
   private static final HttpClientProperties DEFAULTS =
-      new HttpClientProperties(null, null, null, null, null);
+      new HttpClientProperties(null, null, null, null, null, null);
   private static final HostResolver TO_LOOPBACK =
       host -> new InetAddress[] {InetAddress.getLoopbackAddress()};
 

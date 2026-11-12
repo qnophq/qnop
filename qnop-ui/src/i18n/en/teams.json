@@ -129,7 +129,7 @@
         "share": "Share the workload",
         "rise": "Rise through the ranks"
       },
-      "hint": "A team lead or an administrator can add you — your teams appear here the moment they do.",
+      "hint": "A team lead or an administrator can invite you — accept the invitation here and the team appears.",
       "illustration": "An open seat waiting in a team"
     }
   },
@@ -138,6 +138,7 @@
     "publicProfile": "Public profile",
     "editTeam": "Edit team",
     "addMember": "Add member",
+    "inviteMember": "Invite member",
     "columns": {
       "member": "Member",
       "role": "Role",
@@ -192,6 +193,32 @@
     "cancel": "Cancel",
     "submit": "Add",
     "submitCount": "Add {{number}}",
-    "failed": "Could not add: {{names}}."
+    "failed": "Could not add: {{names}}.",
+    "inviteTitle": "Invite members",
+    "inviteHint": "Each person gets an invitation and joins the team as a member once they accept it. Only an administrator can make someone a lead.",
+    "invite": "Send invitation",
+    "inviteCount": "Send {{number}} invitations"
+  },
+  "invitations": {
+    "title_one": "Team invitation",
+    "title_other": "{{count}} team invitations",
+    "hint": "You only join a team — and see its reviews — once you accept.",
+    "invitedBy": "Invited by {{name}} · {{date}}",
+    "invited": "Invited {{date}}",
+    "accept": "Accept",
+    "decline": "Decline",
+    "acceptAria": "Accept the invitation to {{team}}",
+    "declineAria": "Decline the invitation to {{team}}",
+    "failed": "The invitation could not be answered."
+  },
+  "pendingInvitations": {
+    "title_one": "Pending invitation",
+    "title_other": "{{count}} pending invitations",
+    "hint": "Invited people have no access to the team until they accept.",
+    "status": "Invited",
+    "invitedAt": "Invited {{date}}",
+    "revoke": "Revoke",
+    "revokeAria": "Revoke the invitation for {{name}}",
+    "revokeFailed": "Could not revoke the invitation."
   }
 }

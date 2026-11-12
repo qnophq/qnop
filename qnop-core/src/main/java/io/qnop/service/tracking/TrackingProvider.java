@@ -27,74 +27,52 @@ import java.util.Optional;
 /**
  * The analytics backends qnop can forward measurements to (issue #666).
  *
- * <p>Each entry is three facts: which script the browser loads, which paths the browser is allowed
- * to send to, and — for the hosted ones — where that goes by default. Everything else about the
- * backend is the backend's business.
+ * <p>Each entry is two facts: which paths the browser is allowed to send to, and — for the hosted
+ * ones — where that goes by default. Everything else about the backend is the backend's business.
+ *
+ * <p><strong>No vendor script is involved (issue #910).</strong> qnop's own client builds every
+ * measurement in the backend's documented collect format and sends it here; the backend's
+ * JavaScript is never fetched, served or executed. A script served from this origin would run with
+ * the application's full privileges, so a compromised or misconfigured analytics host would have
+ * been code execution in every consenting reviewer's session.
  *
  * <p><strong>The collect list is a boundary, not a convenience.</strong> The proxy forwards a path
- * only if it appears here, which is what makes a promise like "no session recording" enforceable:
- * PostHog's {@code /s/} is absent, so a client that somehow asked for session replay would be
- * refused by this server rather than trusted not to ask. The same list keeps the endpoint from
- * being a general-purpose relay to the analytics host.
- *
- * <p>The script variants are chosen for one reason: none of them may report page views on their
- * own. qnop sends its own, built from route patterns, because the real URL of a review contains its
- * id (see {@link TrackedUrlSanitizer}).
+ * only if it appears here, and the list holds exactly the paths qnop's client sends — one for page
+ * views, one for events (they coincide for most backends). PostHog's {@code /s/} (session
+ * recording), its {@code /decide/} and {@code /flags/} configuration endpoints and every batch
+ * endpoint are absent, so they are refused by this server rather than trusted not to be asked for.
+ * The same list keeps the endpoint from being a general-purpose relay to the analytics host.
  */
 public enum TrackingProvider {
 
-  /** Self-hosted only. {@code matomo.js} tracks nothing until {@code trackPageView} is called. */
-  MATOMO("matomo", "/matomo.js", List.of("/matomo.php"), null, null),
+  /** Self-hosted only; the HTTP Tracking API. */
+  MATOMO("matomo", List.of("/matomo.php"), null),
+
+  /** The Events API, cloud by default. */
+  PLAUSIBLE("plausible", List.of("/api/event"), "https://plausible.io"),
+
+  /** Self-hosted only; the {@code /api/send} collect endpoint. */
+  UMAMI("umami", List.of("/api/send"), null),
 
   /**
-   * {@code script.manual.js} is the variant that does <em>not</em> track automatically — the
-   * default {@code script.js} would report the real URL on load, id and all.
-   */
-  PLAUSIBLE(
-      "plausible", "/js/script.manual.js", List.of("/api/event"), "https://plausible.io", null),
-
-  /** Self-hosted only; auto-tracking is switched off through a data attribute on the tag. */
-  UMAMI("umami", "/script.js", List.of("/api/send", "/api/batch"), null, null),
-
-  /**
-   * Cloud PostHog splits assets and ingestion across two hosts; a self-hosted one serves both.
+   * The capture endpoint, cloud ingestion by default; a self-hosted PostHog serves it too.
    *
-   * <p>{@code /s/} (session recording) and {@code /static/recorder.js} are deliberately absent:
-   * qnop renders customers' documents, and a recording of that screen is a copy of the document.
+   * <p>{@code /s/} (session recording) is deliberately absent: qnop renders customers' documents,
+   * and a recording of that screen is a copy of the document.
    */
-  POSTHOG(
-      "posthog",
-      "/static/array.js",
-      List.of("/e", "/e/", "/i/v0/e/", "/batch", "/batch/", "/decide/", "/flags", "/flags/"),
-      "https://us.i.posthog.com",
-      "https://us-assets.i.posthog.com"),
+  POSTHOG("posthog", List.of("/i/v0/e/"), "https://us.i.posthog.com"),
 
-  /**
-   * Built for proxying: the script takes its endpoints as data attributes.
-   *
-   * <p>The paths are the ones {@code pa.js} actually defaults to — {@code /hit} (sent as a GET),
-   * {@code /event} and {@code /session}. An earlier guess at {@code /pv}, {@code /e}, {@code /s}
-   * answers 404 on the real host, which is what checking rather than assuming is for.
-   */
-  PIRSCH("pirsch", "/pa.js", List.of("/hit", "/event", "/session"), "https://api.pirsch.io", null);
+  /** Page views as a GET to {@code /hit}, events as a POST to {@code /event}. */
+  PIRSCH("pirsch", List.of("/hit", "/event"), "https://api.pirsch.io");
 
   private final String id;
-  private final String scriptPath;
   private final List<String> collectPaths;
   private final String defaultHost;
-  private final String defaultScriptHost;
 
-  TrackingProvider(
-      String id,
-      String scriptPath,
-      List<String> collectPaths,
-      String defaultHost,
-      String defaultScriptHost) {
+  TrackingProvider(String id, List<String> collectPaths, String defaultHost) {
     this.id = id;
-    this.scriptPath = scriptPath;
     this.collectPaths = List.copyOf(collectPaths);
     this.defaultHost = defaultHost;
-    this.defaultScriptHost = defaultScriptHost;
   }
 
   public static Optional<TrackingProvider> fromId(String id) {
@@ -114,10 +92,6 @@ public enum TrackingProvider {
     return id;
   }
 
-  public String scriptPath() {
-    return scriptPath;
-  }
-
   public List<String> collectPaths() {
     return collectPaths;
   }
@@ -125,14 +99,6 @@ public enum TrackingProvider {
   /** Where measurements go when the operator configured no host; null where there is no cloud. */
   public String defaultHost() {
     return defaultHost;
-  }
-
-  /**
-   * Where the script comes from when no host is configured; null means "same as {@link
-   * #defaultHost()}".
-   */
-  public String defaultScriptHost() {
-    return defaultScriptHost != null ? defaultScriptHost : defaultHost;
   }
 
   /** True where the backend exists only self-hosted, so a host must be configured. */

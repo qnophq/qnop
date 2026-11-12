@@ -38,6 +38,10 @@ const { myTeamsState } = vi.hoisted(() => ({
 
 vi.mock('../../api/hooks/useMyTeams', () => ({
   useMyTeams: () => myTeamsState,
+  // No pending invitations here; MyTeamInvitations.test.tsx covers them (#936).
+  useMyTeamInvitations: () => ({ data: { items: [] } }),
+  useAcceptTeamInvitation: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeclineTeamInvitation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 function renderPage() {

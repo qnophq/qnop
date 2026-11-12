@@ -67,6 +67,27 @@ auth.admin_password_reset:
   ctaLabel: "Definir uma nova senha"
   preheader: "Um administrador redefiniu sua senha do {{siteName}}."
 
+auth.registration_attempt:
+  subject: "Sobre seu cadastro no {{siteName}}"
+  bodyPlain: |
+    Olá,
+
+    Alguém pediu para criar uma conta no {{siteName}} com este endereço de e-mail. Nenhuma conta nova foi criada, porque este endereço de e-mail ou o nome de usuário escolhido já está em uso.
+
+    Se você já tem uma conta, entre aqui — a página de login também permite redefinir uma senha esquecida:
+
+    {{actionUrl}}
+
+    Se não foi você, pode ignorar esta mensagem; nada foi alterado.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Sobre seu cadastro</h1>
+    <p style="margin:0 0 14px;">Olá,</p>
+    <p style="margin:0 0 14px;">Alguém pediu para criar uma conta no <strong style="color:#18191f;">{{siteName}}</strong> com este endereço de e-mail. Nenhuma conta nova foi criada, porque este endereço de e-mail ou o nome de usuário escolhido já está em uso.</p>
+    <p style="margin:0 0 14px;">Se você já tem uma conta, entre — a página de login também permite redefinir uma senha esquecida.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Se não foi você, pode ignorar este e-mail — nada foi alterado.</p>
+  ctaLabel: "Ir para o login"
+  preheader: "Nenhuma conta nova no {{siteName}} foi criada para este endereço."
+
 review.participant_added:
   subject: "Você agora participa da revisão de “{{documentTitle}}”"
   bodyPlain: |

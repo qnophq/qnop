@@ -96,7 +96,7 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.members").isArray());
 
-    // Add carol.
+    // Invite carol — a lead's add needs her consent (issue #936).
     mockMvc
         .perform(
             post("/api/v1/teams/{id}/members", teamId)
@@ -105,14 +105,29 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
                 .content("{\"userId\":\"%s\",\"teamRole\":\"MEMBER\"}".formatted(carol.getId())))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.teamRole").value("MEMBER"))
+        .andExpect(jsonPath("$.status").value("INVITED"))
         // Names only on the member surface — never an e-mail address (issue #917).
         .andExpect(jsonPath("$.email").doesNotExist());
+    mockMvc
+        .perform(
+            post("/api/v1/teams/invitations/{id}/accept", teamId)
+                .header("Authorization", bearer(token("carol"))))
+        .andExpect(status().isOk());
 
-    // Promote carol to LEAD, then demote again (a co-lead remains, so allowed).
+    // Granting LEAD is an admin decision (issue #936): the admin promotes carol, and
+    // the lead may demote her again (a co-lead remains, so allowed).
     mockMvc
         .perform(
             patch("/api/v1/teams/{id}/members/{uid}", teamId, carol.getId())
                 .header("Authorization", bearer(leadToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"teamRole\":\"LEAD\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("LEAD_GRANT_REQUIRES_ADMIN"));
+    mockMvc
+        .perform(
+            patch("/api/v1/teams/{id}/members/{uid}", teamId, carol.getId())
+                .header("Authorization", bearer(admin))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"teamRole\":\"LEAD\"}"))
         .andExpect(status().isOk())

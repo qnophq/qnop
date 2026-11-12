@@ -66,14 +66,21 @@ class TrackingProviderTest {
   }
 
   @Test
-  @DisplayName("PostHog's cloud serves its script from a different host than its ingestion")
-  void separatesAssetsFromIngestion() {
-    assertThat(TrackingProvider.POSTHOG.defaultScriptHost())
-        .isEqualTo("https://us-assets.i.posthog.com");
-    assertThat(TrackingProvider.POSTHOG.defaultHost()).isEqualTo("https://us.i.posthog.com");
-    // Everyone else serves both from the same place.
-    assertThat(TrackingProvider.PIRSCH.defaultScriptHost())
-        .isEqualTo(TrackingProvider.PIRSCH.defaultHost());
+  @DisplayName("each backend admits only the requests qnop's own client builds (#910)")
+  void admitsOnlyWhatTheClientSends() {
+    // No vendor script runs in the browser any more, so nothing but qnop's own
+    // beacon builder sends here — and it sends exactly one page-view path and one
+    // event path per backend. The batch, decide, flags and session endpoints the
+    // vendor scripts used are no longer reachable.
+    assertThat(TrackingProvider.MATOMO.collectPaths()).containsExactly("/matomo.php");
+    assertThat(TrackingProvider.PLAUSIBLE.collectPaths()).containsExactly("/api/event");
+    assertThat(TrackingProvider.UMAMI.collectPaths()).containsExactly("/api/send");
+    assertThat(TrackingProvider.POSTHOG.collectPaths()).containsExactly("/i/v0/e/");
+    assertThat(TrackingProvider.PIRSCH.collectPaths()).containsExactly("/hit", "/event");
+    assertThat(TrackingProvider.POSTHOG.allowsCollectPath("/decide/")).isFalse();
+    assertThat(TrackingProvider.POSTHOG.allowsCollectPath("/batch/")).isFalse();
+    assertThat(TrackingProvider.UMAMI.allowsCollectPath("/api/batch")).isFalse();
+    assertThat(TrackingProvider.PIRSCH.allowsCollectPath("/session")).isFalse();
   }
 
   @Test

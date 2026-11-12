@@ -21,15 +21,24 @@
 package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.AuthRegistrationApi;
+import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.RegisterRequest;
 import io.qnop.api.v1.model.RegisterResponse;
+import io.qnop.api.v1.model.VerifyEmailRequest;
 import io.qnop.api.v1.model.VerifyEmailResponse;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
 import io.qnop.service.auth.RegistrationService;
+import io.qnop.service.auth.RegistrationService.VerificationPasswordMismatchException;
+import io.qnop.service.auth.RegistrationService.VerificationSetNewExpiredException;
+import io.qnop.service.auth.RegistrationService.VerificationUsernameTakenException;
 import io.qnop.web.security.ratelimit.AuthIdentifierRateLimiter;
+import java.time.OffsetDateTime;
+import org.springframework.core.NestedExceptionUtils;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -77,13 +86,58 @@ public class AuthRegistrationController implements AuthRegistrationApi {
   }
 
   @Override
-  public ResponseEntity<VerifyEmailResponse> verifyEmail(String token) {
+  public ResponseEntity<VerifyEmailResponse> verifyEmail(VerifyEmailRequest request) {
     try {
-      registrationService.verify(token);
-    } catch (InvalidVerificationTokenException e) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+      registrationService.verify(
+          request.getToken(),
+          request.getPassword(),
+          Boolean.TRUE.equals(request.getSetNew()),
+          request.getUsername());
+    } catch (DataIntegrityViolationException e) {
+      // Another account claimed the username between the check and the update (issue #900): the
+      // same answer as the checked case. Any other conflict (e.g. a slug race) is a plain retry.
+      if (violates(e, USERNAME_INDEX)) {
+        throw new VerificationUsernameTakenException();
+      }
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT, "The account changed concurrently; please try again.");
     }
     return ResponseEntity.ok(
         new VerifyEmailResponse().verified(true).message("Email verified. You can now sign in."));
+  }
+
+  @ExceptionHandler(InvalidVerificationTokenException.class)
+  ResponseEntity<ErrorResponse> invalidToken(InvalidVerificationTokenException e) {
+    return verificationError("INVALID_VERIFICATION_TOKEN", e.getMessage());
+  }
+
+  /** Its own code, so the SPA can tell a mistyped password from a dead link (issue #900). */
+  @ExceptionHandler(VerificationPasswordMismatchException.class)
+  ResponseEntity<ErrorResponse> passwordMismatch(VerificationPasswordMismatchException e) {
+    return verificationError("VERIFICATION_PASSWORD_MISMATCH", e.getMessage());
+  }
+
+  /** Only confirming is left for an older link; the page explains how to get a fresh one. */
+  @ExceptionHandler(VerificationSetNewExpiredException.class)
+  ResponseEntity<ErrorResponse> setNewExpired(VerificationSetNewExpiredException e) {
+    return verificationError("VERIFICATION_SET_NEW_EXPIRED", e.getMessage());
+  }
+
+  @ExceptionHandler(VerificationUsernameTakenException.class)
+  ResponseEntity<ErrorResponse> usernameTaken(VerificationUsernameTakenException e) {
+    return verificationError("VERIFICATION_USERNAME_TAKEN", e.getMessage());
+  }
+
+  private static final String USERNAME_INDEX = "ux_qnop_user_username_internal";
+
+  /** Whether the violated constraint (named in the driver's message) is {@code constraint}. */
+  private static boolean violates(DataIntegrityViolationException e, String constraint) {
+    Throwable cause = NestedExceptionUtils.getMostSpecificCause(e);
+    return cause.getMessage() != null && cause.getMessage().contains(constraint);
+  }
+
+  private static ResponseEntity<ErrorResponse> verificationError(String code, String message) {
+    return ResponseEntity.badRequest()
+        .body(new ErrorResponse().code(code).message(message).timestamp(OffsetDateTime.now()));
   }
 }

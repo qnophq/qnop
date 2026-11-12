@@ -80,6 +80,10 @@ export default defineConfig({
         // stays on its own component test.
         'src/pages/my-teams/MyTeamsPage.tsx',
         'src/pages/my-teams/MyTeamDetailPage.tsx',
+        // Consent for lead-initiated enrolment (issue #936): the invitee's
+        // accept/decline panel and the lead's invite dialog.
+        'src/components/my-teams/MyTeamInvitations.tsx',
+        'src/components/my-teams/AddMyTeamMemberDialog.tsx',
         // The organisation-wide audit trail page (issue #466). The page owns the
         // filter/pagination orchestration; its presentational table stays on its
         // own component test.

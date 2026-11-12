@@ -26,10 +26,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { MyTeamListResponse, TeamDetail } from '../generated';
 import {
   myTeamKeys,
+  useAcceptTeamInvitation,
   useAddMyTeamMember,
+  useDeclineTeamInvitation,
   useMyTeam,
+  useMyTeamInvitations,
   useMyTeams,
   useRemoveMyTeamMember,
+  useRevokeMyTeamInvitation,
   useSetMyTeamMemberRole,
 } from './useMyTeams';
 import { teamsApi } from '../config';
@@ -41,6 +45,10 @@ vi.mock('../config', () => ({
     addMyTeamMember: vi.fn(),
     setMyTeamMemberRole: vi.fn(),
     removeMyTeamMember: vi.fn(),
+    listMyTeamInvitations: vi.fn(),
+    acceptMyTeamInvitation: vi.fn(),
+    declineMyTeamInvitation: vi.fn(),
+    revokeMyTeamInvitation: vi.fn(),
   },
 }));
 
@@ -128,5 +136,39 @@ describe('my-team mutations', () => {
     const remove = renderHook(() => useRemoveMyTeamMember(), { wrapper });
     await remove.result.current.mutateAsync({ teamId: 't1', userId: 'u1' });
     expect(teamsApi.removeMyTeamMember).toHaveBeenCalledWith({ teamId: 't1', userId: 'u1' });
+  });
+});
+
+describe('team invitations (#936)', () => {
+  it('lists, accepts, declines and revokes through the non-admin client', async () => {
+    vi.mocked(teamsApi.listMyTeamInvitations).mockResolvedValue({
+      data: { items: [{ teamId: 't1', teamName: 'Core', invitedAt: '2026-11-01T10:00:00Z' }] },
+    } as Awaited<ReturnType<typeof teamsApi.listMyTeamInvitations>>);
+    vi.mocked(teamsApi.acceptMyTeamInvitation).mockResolvedValue({ data: {} } as Awaited<
+      ReturnType<typeof teamsApi.acceptMyTeamInvitation>
+    >);
+    vi.mocked(teamsApi.declineMyTeamInvitation).mockResolvedValue({ data: undefined } as Awaited<
+      ReturnType<typeof teamsApi.declineMyTeamInvitation>
+    >);
+    vi.mocked(teamsApi.revokeMyTeamInvitation).mockResolvedValue({ data: undefined } as Awaited<
+      ReturnType<typeof teamsApi.revokeMyTeamInvitation>
+    >);
+
+    const list = renderHook(() => useMyTeamInvitations(), { wrapper });
+    await waitFor(() => expect(list.result.current.isSuccess).toBe(true));
+    expect(list.result.current.data?.items[0].teamName).toBe('Core');
+    expect(myTeamKeys.invitations()).toEqual(['my', 'teams', 'invitations']);
+
+    const accept = renderHook(() => useAcceptTeamInvitation(), { wrapper });
+    await accept.result.current.mutateAsync('t1');
+    expect(teamsApi.acceptMyTeamInvitation).toHaveBeenCalledWith({ teamId: 't1' });
+
+    const decline = renderHook(() => useDeclineTeamInvitation(), { wrapper });
+    await decline.result.current.mutateAsync('t2');
+    expect(teamsApi.declineMyTeamInvitation).toHaveBeenCalledWith({ teamId: 't2' });
+
+    const revoke = renderHook(() => useRevokeMyTeamInvitation(), { wrapper });
+    await revoke.result.current.mutateAsync({ teamId: 't1', userId: 'u9' });
+    expect(teamsApi.revokeMyTeamInvitation).toHaveBeenCalledWith({ teamId: 't1', userId: 'u9' });
   });
 });

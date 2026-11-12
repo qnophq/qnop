@@ -28,7 +28,7 @@ import type { AdminTeamDetail, AdminTeamMember } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
 import { TeamDetailPage } from './TeamDetailPage';
 
-const { teamState, setRoleMutate, removeMemberMutate } = vi.hoisted(() => ({
+const { teamState, setRoleMutate, removeMemberMutate, revokeMutate } = vi.hoisted(() => ({
   teamState: { data: undefined, isLoading: false, isError: false } as {
     data: AdminTeamDetail | undefined;
     isLoading: boolean;
@@ -36,12 +36,14 @@ const { teamState, setRoleMutate, removeMemberMutate } = vi.hoisted(() => ({
   },
   setRoleMutate: vi.fn(),
   removeMemberMutate: vi.fn(),
+  revokeMutate: vi.fn(),
 }));
 
 vi.mock('../../api/hooks/useTeams', () => ({
   useTeam: () => teamState,
   useSetTeamMemberRole: () => ({ mutate: setRoleMutate }),
   useRemoveTeamMember: () => ({ mutate: removeMemberMutate }),
+  useRevokeTeamInvitation: () => ({ mutate: revokeMutate, isPending: false }),
 }));
 
 // The heavy member/team dialogs pull in their own api hooks and search UI;

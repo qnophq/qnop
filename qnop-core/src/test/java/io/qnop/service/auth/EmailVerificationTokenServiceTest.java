@@ -23,6 +23,8 @@ package io.qnop.service.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -30,14 +32,18 @@ import io.qnop.entity.EmailVerificationToken;
 import io.qnop.entity.User;
 import io.qnop.repository.EmailVerificationTokenRepository;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
+import io.qnop.service.auth.EmailVerificationTokenService.PendingVerification;
 import io.qnop.service.scheduler.SchedulerService;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -47,92 +53,141 @@ class EmailVerificationTokenServiceTest {
   @Mock private EmailVerificationTokenRepository tokens;
   @Mock private SchedulerService scheduler;
   private EmailVerificationTokenService service;
-  private final User user = User.internal("Jane", "jane@example.com", "jane", "hash");
+  private final User user = User.internal("Jane", "jane@example.com", "jane", "row-hash");
 
   @BeforeEach
   void setUp() {
     service = new EmailVerificationTokenService(tokens, scheduler);
   }
 
-  @Test
-  @DisplayName("issue stores a token with a 24h expiry and returns the raw value")
-  void issueStoresToken() {
-    when(tokens.findUnconsumedTokensForUser(any())).thenReturn(List.of());
+  private static EmailVerificationToken live() {
+    return new EmailVerificationToken(null, "h", Instant.now().plusSeconds(60));
+  }
 
-    EmailVerificationTokenService.IssuedToken issued = service.issue(user);
+  @Test
+  @DisplayName("issueForRegistration stores a 24h token carrying the registration's credentials")
+  void issueStoresCandidate() {
+    when(tokens.findUnconsumedIdsForUserOldestFirst(any())).thenReturn(List.of());
+
+    var issued = service.issueForRegistration(user, "jane2", "Jane Two", "cand-hash");
 
     assertThat(issued.rawToken()).isNotBlank();
     assertThat(issued.expiresAt()).isAfter(Instant.now().plusSeconds(23 * 3600));
-    verify(tokens).save(any(EmailVerificationToken.class));
+    ArgumentCaptor<EmailVerificationToken> saved =
+        ArgumentCaptor.forClass(EmailVerificationToken.class);
+    verify(tokens).save(saved.capture());
+    assertThat(saved.getValue().getCandidateUsername()).isEqualTo("jane2");
+    assertThat(saved.getValue().getCandidateDisplayName()).isEqualTo("Jane Two");
+    assertThat(saved.getValue().getCandidatePasswordHash()).isEqualTo("cand-hash");
   }
 
   @Test
-  @DisplayName("issue supersedes any earlier unconsumed token for the user")
-  void issueSupersedesPrior() {
-    EmailVerificationToken prior =
-        new EmailVerificationToken(user, "oldhash", Instant.now().plusSeconds(60));
-    when(tokens.findUnconsumedTokensForUser(any())).thenReturn(List.of(prior));
+  @DisplayName("other outstanding links stay valid while fewer than the cap are outstanding")
+  void issueKeepsOtherLinks() {
+    when(tokens.findUnconsumedIdsForUserOldestFirst(any()))
+        .thenReturn(List.of(UUID.randomUUID(), UUID.randomUUID()));
 
-    service.issue(user);
+    service.issueForRegistration(user, "jane", "Jane", "h");
 
-    assertThat(prior.getConsumedAt()).isNotNull();
+    verify(tokens, never()).consumeAllById(any(), any());
   }
 
   @Test
-  @DisplayName("consume returns the owner and marks the token used")
-  void consumeValid() {
+  @DisplayName("at the cap the oldest outstanding links are spent")
+  void issueEvictsTheOldest() {
+    List<UUID> outstanding = new ArrayList<>();
+    for (int i = 0; i < 4; i++) {
+      outstanding.add(UUID.randomUUID());
+    }
+    when(tokens.findUnconsumedIdsForUserOldestFirst(any())).thenReturn(outstanding);
+
+    service.issueForRegistration(user, "jane", "Jane", "h");
+
+    // 4 outstanding + 1 new, cap 3: the two oldest go, in one targeted update.
+    verify(tokens).consumeAllById(eq(outstanding.subList(0, 2)), any());
+  }
+
+  @Test
+  @DisplayName("issuedWithin compares the newest link's age with the window")
+  void issuedWithinUsesTheNewestLink() {
+    UUID userId = UUID.randomUUID();
+    when(tokens.findLatestIssuedAt(userId)).thenReturn(Optional.of(Instant.now().minusSeconds(60)));
+    assertThat(service.issuedWithin(userId, java.time.Duration.ofMinutes(5))).isTrue();
+    assertThat(service.issuedWithin(userId, java.time.Duration.ofSeconds(30))).isFalse();
+
+    when(tokens.findLatestIssuedAt(userId)).thenReturn(Optional.empty());
+    assertThat(service.issuedWithin(userId, java.time.Duration.ofMinutes(5))).isFalse();
+  }
+
+  @Test
+  @DisplayName("peek returns the token's candidate credentials without consuming it")
+  void peekReturnsCandidate() {
+    User pending = User.internal("Row", "jane@example.com", "row", "row-hash");
+    pending.markPendingEmailVerification();
+    EmailVerificationToken token =
+        new EmailVerificationToken(
+            pending, "h", Instant.now().plusSeconds(60), "jane", "Jane", "cand-hash");
+    when(tokens.findByTokenHash(any())).thenReturn(Optional.of(token));
+
+    PendingVerification peeked = service.peek("raw-token");
+
+    assertThat(peeked.accountPending()).isTrue();
+    assertThat(peeked.username()).isEqualTo("jane");
+    assertThat(peeked.displayName()).isEqualTo("Jane");
+    assertThat(peeked.passwordHash()).isEqualTo("cand-hash");
+  }
+
+  @Test
+  @DisplayName("a token issued before candidates existed falls back to the account row")
+  void peekFallsBackForLegacyTokens() {
     EmailVerificationToken token =
         new EmailVerificationToken(user, "h", Instant.now().plusSeconds(60));
     when(tokens.findByTokenHash(any())).thenReturn(Optional.of(token));
-    when(tokens.markConsumed(any(), any())).thenReturn(1);
 
-    User result = service.consume("raw-token");
+    PendingVerification peeked = service.peek("raw-token");
 
-    assertThat(result).isSameAs(user);
-    verify(tokens).markConsumed(any(), any(Instant.class));
+    assertThat(peeked.username()).isEqualTo("jane");
+    assertThat(peeked.passwordHash()).isEqualTo("row-hash");
+  }
+
+  @Test
+  @DisplayName("peek rejects an expired, used or unknown token")
+  void peekRejectsUnusable() {
+    EmailVerificationToken expired =
+        new EmailVerificationToken(user, "h", Instant.now().minusSeconds(60));
+    when(tokens.findByTokenHash(any())).thenReturn(Optional.of(expired));
+    assertThatThrownBy(() -> service.peek("raw-token"))
+        .isInstanceOf(InvalidVerificationTokenException.class);
+
+    EmailVerificationToken used =
+        new EmailVerificationToken(user, "h", Instant.now().plusSeconds(60));
+    used.setConsumedAt(Instant.now());
+    when(tokens.findByTokenHash(any())).thenReturn(Optional.of(used));
+    assertThatThrownBy(() -> service.peek("raw-token"))
+        .isInstanceOf(InvalidVerificationTokenException.class);
+
+    when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
+    assertThatThrownBy(() -> service.peek("raw-token"))
+        .isInstanceOf(InvalidVerificationTokenException.class);
   }
 
   @Test
   @DisplayName("consume rejects a token consumed concurrently (atomic guard, issue #61)")
   void consumeLosesRace() {
-    EmailVerificationToken token =
-        new EmailVerificationToken(user, "h", Instant.now().plusSeconds(60));
-    when(tokens.findByTokenHash(any())).thenReturn(Optional.of(token));
-    when(tokens.markConsumed(any(), any())).thenReturn(0); // another request already won
+    UUID id = UUID.randomUUID();
+    when(tokens.markConsumed(eq(id), any())).thenReturn(0);
 
-    assertThatThrownBy(() -> service.consume("raw-token"))
+    assertThatThrownBy(() -> service.consume(id))
         .isInstanceOf(InvalidVerificationTokenException.class);
   }
 
   @Test
-  @DisplayName("consume rejects an expired token")
-  void consumeExpired() {
-    EmailVerificationToken token =
-        new EmailVerificationToken(user, "h", Instant.now().minusSeconds(60));
-    when(tokens.findByTokenHash(any())).thenReturn(Optional.of(token));
+  @DisplayName("consumeAllForUser spends every outstanding link of the account")
+  void consumeAllForUser() {
+    UUID userId = UUID.randomUUID();
 
-    assertThatThrownBy(() -> service.consume("raw-token"))
-        .isInstanceOf(InvalidVerificationTokenException.class);
-  }
+    service.consumeAllForUser(userId);
 
-  @Test
-  @DisplayName("consume rejects an already-used token")
-  void consumeAlreadyUsed() {
-    EmailVerificationToken token =
-        new EmailVerificationToken(user, "h", Instant.now().plusSeconds(60));
-    token.setConsumedAt(Instant.now());
-    when(tokens.findByTokenHash(any())).thenReturn(Optional.of(token));
-
-    assertThatThrownBy(() -> service.consume("raw-token"))
-        .isInstanceOf(InvalidVerificationTokenException.class);
-  }
-
-  @Test
-  @DisplayName("consume rejects an unknown token")
-  void consumeUnknown() {
-    when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
-
-    assertThatThrownBy(() -> service.consume("raw-token"))
-        .isInstanceOf(InvalidVerificationTokenException.class);
+    verify(tokens).consumeAllForUser(eq(userId), any());
   }
 }

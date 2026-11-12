@@ -105,41 +105,103 @@ class UserServiceTest {
   }
 
   @Test
-  @DisplayName("createSelfRegistered falls back to the username when the display name is blank")
-  void createSelfRegisteredFallsBackToUsername() {
-    when(passwordEncoder.encode("secret")).thenReturn("hashed");
+  @DisplayName(
+      "createPendingRegistration stores no registrant password, falls back to the username and"
+          + " leaves the account disabled and pending verification")
+  void createPendingRegistrationFallsBackToUsername() {
     when(users.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
     User created =
-        service.createSelfRegistered("jdoe", "jdoe@example.com", "secret", "  ", UserRole.MEMBER);
+        service.createPendingRegistration("jdoe", "JDoe@Example.com", "  ", UserRole.MEMBER);
 
     assertThat(created.getDisplayName()).isEqualTo("jdoe");
     assertThat(created.getRole()).isEqualTo(UserRole.MEMBER);
     assertThat(created.isEnabled()).isFalse();
+    assertThat(created.isEmailVerificationPending()).isTrue();
+    assertThat(created.getPasswordHash()).isEqualTo(UserService.PENDING_PASSWORD_PLACEHOLDER);
     assertThat(created.getEmail()).isEqualTo("jdoe@example.com");
   }
 
   @Test
-  @DisplayName("createSelfRegistered tolerates a null email (normalizeEmail short-circuits)")
-  void createSelfRegisteredWithNullEmail() {
-    when(passwordEncoder.encode("secret")).thenReturn("hashed");
+  @DisplayName("createPendingRegistration tolerates a null email (normalizeEmail short-circuits)")
+  void createPendingRegistrationWithNullEmail() {
     when(users.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-    User created =
-        service.createSelfRegistered("jdoe", null, "secret", "Jane Doe", UserRole.MEMBER);
+    User created = service.createPendingRegistration("jdoe", null, "Jane Doe", UserRole.MEMBER);
 
     assertThat(created.getEmail()).isNull();
     assertThat(created.getDisplayName()).isEqualTo("Jane Doe");
   }
 
   @Test
-  @DisplayName("internalUserExists returns true on an email match alone, normalizing case")
-  void internalUserExistsOnEmailOnly() {
-    when(users.existsByEmailIgnoreCaseAndSource("bob@example.com", UserSource.INTERNAL))
-        .thenReturn(true);
+  @DisplayName(
+      "activateVerifiedRegistration applies the verified credentials and moves the slug to the"
+          + " verified display name")
+  void activateVerifiedRegistrationAppliesCredentials() {
+    UUID id = UUID.randomUUID();
+    User pending = User.internal("Squatter Name", "jane@example.com", "old", "old-hash");
+    pending.setSlug("squatter-name");
+    when(users.activateVerifiedRegistration(id, "jane", "Jane Doe", "new-hash")).thenReturn(1);
+    when(users.findById(id)).thenReturn(Optional.of(pending));
 
-    // The email branch short-circuits the OR, so the username lookup is never consulted.
-    assertThat(service.internalUserExists("bob", "Bob@Example.com")).isTrue();
+    assertThat(service.activateVerifiedRegistration(id, "jane", "Jane Doe", "new-hash"))
+        .isEqualTo(UserService.ActivationOutcome.ACTIVATED);
+
+    // The earlier registrant's name does not survive in the profile URL (issue #900).
+    verify(users).updateSlug(id, "jane-doe");
+  }
+
+  @Test
+  @DisplayName("activateVerifiedRegistration keeps a slug that already fits the name")
+  void activateVerifiedRegistrationKeepsAFittingSlug() {
+    UUID id = UUID.randomUUID();
+    User pending = User.internal("Jane Doe", "jane@example.com", "jane", "old-hash");
+    pending.setSlug("jane-doe");
+    when(users.activateVerifiedRegistration(id, "jane", "Jane Doe", "h")).thenReturn(1);
+    when(users.findById(id)).thenReturn(Optional.of(pending));
+
+    service.activateVerifiedRegistration(id, "jane", "Jane Doe", "h");
+
+    verify(users, never()).updateSlug(any(), any());
+  }
+
+  @Test
+  @DisplayName(
+      "activateVerifiedRegistration changes nothing for an account that is no longer pending")
+  void activateVerifiedRegistrationIsConditional() {
+    UUID id = UUID.randomUUID();
+    when(users.activateVerifiedRegistration(id, "jane", "jane", "h")).thenReturn(0);
+
+    assertThat(service.activateVerifiedRegistration(id, "jane", null, "h"))
+        .isEqualTo(UserService.ActivationOutcome.NOT_PENDING);
+    verify(users, never()).updateSlug(any(), any());
+  }
+
+  @Test
+  @DisplayName("activateVerifiedRegistration refuses a username another account took meanwhile")
+  void activateVerifiedRegistrationRefusesTakenUsername() {
+    UUID id = UUID.randomUUID();
+    User other = User.internal("Jane", "other@example.com", "jane", "h");
+    when(users.findByUsernameAndSource("jane", UserSource.INTERNAL))
+        .thenReturn(Optional.of(other)); // a different (id-less) account
+
+    assertThat(service.activateVerifiedRegistration(id, "jane", "Jane", "h"))
+        .isEqualTo(UserService.ActivationOutcome.USERNAME_TAKEN);
+    verify(users, never()).activateVerifiedRegistration(any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("internalPasswordChangeStillRequired is false once changed or when the user is gone")
+  void passwordChangeStillRequired() {
+    User admin = User.internal("Administrator", "admin@qnop.local", "admin", "h");
+    admin.setPasswordChangeRequired(true);
+    when(users.findByUsernameAndSource("admin", UserSource.INTERNAL))
+        .thenReturn(Optional.of(admin));
+    assertThat(service.internalPasswordChangeStillRequired("admin")).isTrue();
+
+    admin.setPasswordChangeRequired(false);
+    assertThat(service.internalPasswordChangeStillRequired("admin")).isFalse();
+    assertThat(service.internalPasswordChangeStillRequired("ghost")).isFalse();
   }
 
   @Test

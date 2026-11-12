@@ -29,7 +29,7 @@ import { buildTheme } from '../../theme/theme';
 import { useAuthStore } from '../../stores/authStore';
 import { MyTeamDetailPage } from './MyTeamDetailPage';
 
-const { teamState, setRoleMutate, removeMemberMutate } = vi.hoisted(() => ({
+const { teamState, setRoleMutate, removeMemberMutate, revokeMutate } = vi.hoisted(() => ({
   teamState: { data: undefined, isLoading: false, isError: false } as {
     data: TeamDetail | undefined;
     isLoading: boolean;
@@ -37,12 +37,14 @@ const { teamState, setRoleMutate, removeMemberMutate } = vi.hoisted(() => ({
   },
   setRoleMutate: vi.fn(),
   removeMemberMutate: vi.fn(),
+  revokeMutate: vi.fn(),
 }));
 
 vi.mock('../../api/hooks/useMyTeams', () => ({
   useMyTeam: () => teamState,
   useSetMyTeamMemberRole: () => ({ mutate: setRoleMutate }),
   useRemoveMyTeamMember: () => ({ mutate: removeMemberMutate }),
+  useRevokeMyTeamInvitation: () => ({ mutate: revokeMutate, isPending: false }),
 }));
 
 vi.mock('../../components/my-teams/EditMyTeamDialog', () => ({
@@ -62,12 +64,14 @@ vi.mock('../../components/my-teams/AddMyTeamMemberDialog', () => ({
     open: boolean;
     teamId: string;
     existingMemberIds: string[];
+    canGrantLead: boolean;
     onClose: () => void;
   }) =>
     props.open ? (
       <div data-testid="add-member-dialog">
         <span data-testid="add-team-id">{props.teamId}</span>
         <span data-testid="add-existing">{props.existingMemberIds.join(',')}</span>
+        <span data-testid="add-can-grant-lead">{String(props.canGrantLead)}</span>
         <button type="button" onClick={props.onClose}>
           close-add
         </button>
@@ -93,6 +97,16 @@ const MEMBER: TeamMember = {
   joinedAt: '2026-02-01T10:00:00Z',
 };
 
+const INVITED: TeamMember = {
+  userId: 'u3',
+  displayName: 'Grace Hopper',
+  slug: 'grace-hopper',
+  avatarUrl: undefined,
+  teamRole: 'MEMBER',
+  joinedAt: '2026-03-01T10:00:00Z',
+  status: 'INVITED',
+};
+
 function makeTeam(overrides: Partial<TeamDetail> = {}): TeamDetail {
   return {
     id: 't1',
@@ -111,6 +125,7 @@ function makeTeam(overrides: Partial<TeamDetail> = {}): TeamDetail {
 beforeEach(() => {
   setRoleMutate.mockReset();
   removeMemberMutate.mockReset();
+  revokeMutate.mockReset();
   teamState.data = makeTeam();
   teamState.isLoading = false;
   teamState.isError = false;
@@ -157,7 +172,8 @@ describe('MyTeamDetailPage', () => {
     ).toBe('/users/alan-turing');
   });
 
-  it('promotes a member to lead through the non-admin client', async () => {
+  it('lets an admin promote a member to lead through the team client', async () => {
+    useAuthStore.setState({ role: 'ADMIN' });
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Alan Turing' }));
@@ -168,6 +184,47 @@ describe('MyTeamDetailPage', () => {
       userId: 'u2',
       teamRole: 'LEAD',
     });
+  });
+
+  it('offers a lead no way to grant LEAD, but still lets them demote (#936)', async () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Alan Turing' }));
+    expect(await screen.findByText('Remove from team')).toBeTruthy();
+    expect(screen.queryByText('Make lead')).toBeNull();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Ada Lovelace' }));
+    fireEvent.click(await screen.findByText('Make member'));
+    expect(setRoleMutate.mock.calls[0][0]).toEqual({
+      teamId: 't1',
+      userId: 'u1',
+      teamRole: 'MEMBER',
+    });
+  });
+
+  it('lists pending invitations apart from the roster, with a revoke action (#936)', () => {
+    teamState.data = makeTeam({ pendingInvitations: [INVITED] });
+    renderPage();
+
+    expect(screen.getByRole('heading', { name: 'Pending invitation' })).toBeTruthy();
+    expect(screen.getByText('Invited')).toBeTruthy();
+    // Not in the member table: no row menu for the invited user.
+    expect(screen.queryByRole('button', { name: 'Actions for Grace Hopper' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke the invitation for Grace Hopper' }));
+    expect(revokeMutate.mock.calls[0][0]).toEqual({ teamId: 't1', userId: 'u3' });
+  });
+
+  it('shows no pending invitations to a plain member', () => {
+    teamState.data = makeTeam({
+      viewerRole: 'MEMBER',
+      viewerCanManage: false,
+      pendingInvitations: [INVITED],
+    });
+    renderPage();
+
+    expect(screen.queryByRole('heading', { name: 'Pending invitation' })).toBeNull();
   });
 
   it('removes a member after confirming, through the non-admin client', async () => {
@@ -214,14 +271,16 @@ describe('MyTeamDetailPage', () => {
     expect(await screen.findByText('Could not remove the member.')).toBeTruthy();
   });
 
-  it('opens the add-member dialog wired with the team id and existing members', async () => {
+  it('opens the invite dialog for a lead, excluding members and pending invitees', async () => {
+    teamState.data = makeTeam({ pendingInvitations: [INVITED] });
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add member' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Invite member' }));
 
     expect(await screen.findByTestId('add-member-dialog')).toBeTruthy();
     expect(screen.getByTestId('add-team-id').textContent).toBe('t1');
-    expect(screen.getByTestId('add-existing').textContent).toBe('u1,u2');
+    expect(screen.getByTestId('add-existing').textContent).toBe('u1,u2,u3');
+    expect(screen.getByTestId('add-can-grant-lead').textContent).toBe('false');
 
     fireEvent.click(screen.getByRole('button', { name: 'close-add' }));
     await waitFor(() => expect(screen.queryByTestId('add-member-dialog')).toBeNull());
@@ -247,6 +306,7 @@ describe('MyTeamDetailPage', () => {
     expect(screen.getByRole('link', { name: "View Ada Lovelace's profile" })).toBeTruthy();
     // ...but nothing can be managed.
     expect(screen.queryByRole('button', { name: 'Add member' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Invite member' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit team' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Actions for Ada Lovelace' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Actions' })).toBeNull();

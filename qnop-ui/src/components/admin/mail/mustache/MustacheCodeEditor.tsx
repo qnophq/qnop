@@ -25,6 +25,7 @@ import { useTheme } from '@mui/material/styles';
 import { html } from '@codemirror/lang-html';
 import { EditorView, dropCursor } from '@codemirror/view';
 import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
+import { readCspNonce } from '../../../../utils/cspNonce';
 import { mustacheExtension } from './mustacheExtension';
 
 /** Imperative handle the editor exposes so chip clicks can insert text at the caret. */
@@ -78,6 +79,9 @@ export const MustacheCodeEditor = forwardRef<MustacheEditorHandle, MustacheCodeE
 
     const extensions = useMemo(
       () => [
+        // CodeMirror mounts its theme as a <style> element in the document;
+        // the SPA's policy only applies it with the page nonce (issue #913).
+        ...cspNonceExtension(),
         EditorView.lineWrapping,
         // Chips can be dragged in (issue #316 polish); the drop cursor shows
         // where the placeholder will land while hovering.
@@ -128,3 +132,8 @@ export const MustacheCodeEditor = forwardRef<MustacheEditorHandle, MustacheCodeE
     );
   },
 );
+
+function cspNonceExtension() {
+  const nonce = readCspNonce();
+  return nonce ? [EditorView.cspNonce.of(nonce)] : [];
+}

@@ -65,6 +65,27 @@ auth.admin_password_reset:
   ctaLabel: "Neues Passwort festlegen"
   preheader: "Ein Administrator hat dein {{siteName}}-Passwort zurückgesetzt."
 
+auth.registration_attempt:
+  subject: "Zu deiner Registrierung bei {{siteName}}"
+  bodyPlain: |
+    Hallo,
+
+    jemand wollte mit dieser E-Mail-Adresse ein {{siteName}}-Konto anlegen. Es wurde kein neues Konto erstellt, weil diese E-Mail-Adresse oder der gewählte Benutzername bereits verwendet wird.
+
+    Falls du schon ein Konto hast, melde dich hier an — auf der Anmeldeseite kannst du auch ein vergessenes Passwort zurücksetzen:
+
+    {{actionUrl}}
+
+    Falls du das nicht warst, kannst du diese Nachricht einfach ignorieren; es hat sich nichts geändert.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Zu deiner Registrierung</h1>
+    <p style="margin:0 0 14px;">Hallo,</p>
+    <p style="margin:0 0 14px;">jemand wollte mit dieser E-Mail-Adresse ein <strong style="color:#18191f;">{{siteName}}</strong>-Konto anlegen. Es wurde kein neues Konto erstellt, weil diese E-Mail-Adresse oder der gewählte Benutzername bereits verwendet wird.</p>
+    <p style="margin:0 0 14px;">Falls du schon ein Konto hast, melde dich an — auf der Anmeldeseite kannst du auch ein vergessenes Passwort zurücksetzen.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Falls du das nicht warst, kannst du diese E-Mail ignorieren — es hat sich nichts geändert.</p>
+  ctaLabel: "Zur Anmeldung"
+  preheader: "Für diese Adresse wurde kein neues {{siteName}}-Konto angelegt."
+
 review.participant_added:
   subject: "Du wurdest als Reviewer zu „{{documentTitle}}“ hinzugefügt"
   bodyPlain: |

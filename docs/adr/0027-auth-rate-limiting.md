@@ -117,6 +117,7 @@ using many source addresses was not limited at all. They now exist next to the p
 | `register-email` | e-mail | 5 / 3600s | every request | `429` |
 | `reset-password-token` | reset token | 10 / 3600s | every attempt | `429` |
 | `reset-password` (per IP, filter) | client IP | 5 / 900s | every attempt | `429` |
+| `verify-email` (per IP, filter, #900) | client IP (IPv6 /56) | 20 / 900s | every verify-email request | `429` |
 
 `login-device-cookie-lifetime` (default 30 days) bounds the recognised-device cookie. The per-IP
 `reset-password` filter is the IP half of the password-reset limit the decision above already

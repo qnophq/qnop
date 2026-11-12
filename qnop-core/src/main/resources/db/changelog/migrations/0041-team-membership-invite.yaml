@@ -1,0 +1,66 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Consent for lead-initiated team enrolment (issue #936, ADR-0064). A team lead
+# no longer adds a user to the team directly: the add becomes a pending
+# invitation that grants nothing until the invited user accepts it. Invitations
+# live in their OWN table rather than as a status column on team_membership, so
+# every query that derives access from team_membership keeps meaning "active
+# member" without a filter that could be forgotten. Existing memberships are
+# untouched and stay active. A NEW changeset: shipped changesets are immutable.
+databaseChangeLog:
+  - changeSet:
+      id: 0041-team-invitation
+      author: qnop
+      comment: Pending team invitations created by a team lead (issue #936).
+      changes:
+        - createTable:
+            tableName: team_invitation
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: team_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column: { name: invited_by, type: UUID }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            constraintName: fk_team_invitation_team
+            baseTableName: team_invitation
+            baseColumnNames: team_id
+            referencedTableName: team
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_team_invitation_user
+            baseTableName: team_invitation
+            baseColumnNames: user_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_team_invitation_invited_by
+            baseTableName: team_invitation
+            baseColumnNames: invited_by
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - addUniqueConstraint:
+            constraintName: ux_team_invitation_team_user
+            tableName: team_invitation
+            columnNames: team_id, user_id
+        - createIndex:
+            indexName: ix_team_invitation_user
+            tableName: team_invitation
+            columns:
+              - column: { name: user_id }

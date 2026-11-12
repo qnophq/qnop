@@ -26,7 +26,6 @@ import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
@@ -34,7 +33,6 @@ import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.util.Timeout;
@@ -44,8 +42,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * Fetches the vendor script and forwards measurements, so the browser never talks to the analytics
- * backend itself (issue #666).
+ * Forwards measurements, so the browser never talks to the analytics backend itself (issue #666).
+ *
+ * <p>It forwards and nothing else: no vendor script is fetched or served (issue #910) — qnop's own
+ * client builds each measurement in the backend's collect format.
  *
  * <p>The SPA's Content-Security-Policy pins scripts and connections to {@code 'self'} (ADR-0040).
  * Rather than weakening that per deployment, this server stands in the middle — which turns a
@@ -61,22 +61,15 @@ public class TrackingProxyService {
 
   private static final Logger log = LoggerFactory.getLogger(TrackingProxyService.class);
 
-  /** The vendor script changes on their release schedule, not ours. */
-  private static final Duration SCRIPT_TTL = Duration.ofHours(1);
-
   /** A measurement is small; anything larger is not one. */
   public static final int MAX_BODY_BYTES = 64 * 1024;
 
   /** Bounds a hung backend: a measurement is never worth holding a request thread for. */
   private static final Duration FORWARD_TIMEOUT = Duration.ofSeconds(3);
 
-  private static final Duration SCRIPT_TIMEOUT = Duration.ofSeconds(10);
-
   private final TrackingConfigService config;
   private final CloseableHttpClient http;
   private final RequestConfig requestDefaults;
-
-  private volatile CachedScript cachedScript;
 
   /**
    * Whether the last forward failed, so a broken backend is reported once instead of once per
@@ -108,51 +101,6 @@ public class TrackingProxyService {
   @PreDestroy
   void close() throws IOException {
     http.close();
-  }
-
-  /** The vendor script, cached; empty when tracking is off or the backend would not answer. */
-  public Optional<Script> script() {
-    Optional<TrackingRuntimeConfig> active = config.current();
-    if (active.isEmpty()) {
-      return Optional.empty();
-    }
-    String url = active.get().scriptUrl();
-    CachedScript cached = cachedScript;
-    if (cached != null && cached.matches(url)) {
-      return Optional.of(cached.script());
-    }
-    HttpGet get = new HttpGet(URI.create(url));
-    get.setConfig(timeout(SCRIPT_TIMEOUT));
-    get.setHeader("Accept", "application/javascript, text/javascript, */*");
-    try {
-      FetchedScript fetched =
-          http.execute(
-              get,
-              response -> {
-                Header type = response.getFirstHeader("Content-Type");
-                return new FetchedScript(
-                    response.getCode(),
-                    response.getEntity() == null
-                        ? new byte[0]
-                        : EntityUtils.toByteArray(response.getEntity()),
-                    type == null ? null : type.getValue());
-              });
-      if (fetched.status() != 200) {
-        log.warn("The analytics script at {} answered {}", url, fetched.status());
-        return Optional.empty();
-      }
-      Script script =
-          new Script(
-              fetched.body(),
-              fetched.contentType() == null
-                  ? "application/javascript; charset=utf-8"
-                  : fetched.contentType());
-      cachedScript = new CachedScript(url, script, Instant.now());
-      return Optional.of(script);
-    } catch (IOException e) {
-      log.warn("Could not fetch the analytics script from {}: {}", url, e.getMessage());
-      return Optional.empty();
-    }
   }
 
   /**
@@ -264,17 +212,6 @@ public class TrackingProxyService {
   private void recovered() {
     if (forwardingBroken.compareAndSet(true, false)) {
       log.info("Usage tracking is being recorded again");
-    }
-  }
-
-  private record FetchedScript(int status, byte[] body, String contentType) {}
-
-  /** The vendor script as fetched. */
-  public record Script(byte[] body, String contentType) {}
-
-  private record CachedScript(String url, Script script, Instant fetchedAt) {
-    boolean matches(String candidate) {
-      return url.equals(candidate) && fetchedAt.plus(SCRIPT_TTL).isAfter(Instant.now());
     }
   }
 }

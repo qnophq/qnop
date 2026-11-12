@@ -50,7 +50,7 @@ class GuardedOutboundClientTest {
 
   private static final String HOST = "idp.example.test";
   private static final HttpClientProperties DEFAULTS =
-      new HttpClientProperties(null, null, null, null, null);
+      new HttpClientProperties(null, null, null, null, null, null);
 
   private HttpServer internal;
   private final List<String> received = new CopyOnWriteArrayList<>();

@@ -97,7 +97,7 @@ class ConfigurationTreeBuilderTest {
             Boolean.TRUE,
             Duration.ofHours(24),
             100);
-    HttpClientProperties http = new HttpClientProperties(null, null, null, null, null);
+    HttpClientProperties http = new HttpClientProperties(null, null, null, null, null, null);
     ReanchoringProperties reanchoring = ReanchoringProperties.defaults();
     RateLimitProperties rateLimit =
         RateLimitPropertiesFixture.withTrustedProxies(List.of("10.0.0.0/8"));
@@ -191,6 +191,17 @@ class ConfigurationTreeBuilderTest {
     ConfigurationEntry origins = entry(response, "qnop.cors.allowed-origins");
     assertThat(origins.getValueType()).isEqualTo(ConfigurationValueType.LIST);
     assertThat(origins.getValue()).isEqualTo("https://a.example.com, https://b.example.com");
+  }
+
+  @Test
+  void surfacesTheOutboundProxyOptInUnsetByDefault() {
+    // issue #940: the deployment-only proxy opt-in shows on the effective-configuration page.
+    ConfigurationResponse response = build(null);
+    ConfigurationEntry host = entry(response, "qnop.http-client.proxy.host");
+    assertThat(host.getValueType()).isEqualTo(ConfigurationValueType.UNSET);
+    assertThat(host.getEnvVar()).isEqualTo("QNOP_HTTP_CLIENT_PROXY_HOST");
+    assertThat(entry(response, "qnop.http-client.proxy.port").getValueType())
+        .isEqualTo(ConfigurationValueType.UNSET);
   }
 
   @Test
