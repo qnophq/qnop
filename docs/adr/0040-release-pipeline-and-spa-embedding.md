@@ -39,3 +39,27 @@ The release artifact is **one container image** containing the Spring Boot jar w
 - One image serves API + UI; deployments that want a separate frontend can still build `qnop-ui` themselves (the embedding is additive, not exclusive).
 - `RELEASE_TOKEN` must exist as a repository secret before the first release; `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` are optional and activate the Docker Hub publication when added.
 - Maven publication of `qnop-spi`/`qnop-api` (needed by qnop-enterprise) is deliberately out of scope here — tracked in #497; a rolling snapshot workflow may follow later.
+
+## Amendment (2026-11, #913): nonce-based styles, no `'unsafe-inline'`
+
+The SPA policy above allowed inline styles (`style-src 'self' 'unsafe-inline'`) because MUI's Emotion injects `<style>` elements at runtime. That allowance applied to every `<style>` element and every `style="…"` attribute an attacker could get into the document, so it is replaced by a per-request nonce.
+
+**Policy.** SPA responses now carry `style-src 'self' 'nonce-<n>'` and no `'unsafe-inline'` anywhere — no `style-src-elem`/`style-src-attr` split either. A `style` attribute in markup is therefore not applied; style writes through the CSSOM (React's `style` prop, `element.style.x = …`, Emotion's `insertRule`, constructable stylesheets) are not governed by CSP and are unaffected. `script-src` stays `'self'` (the bundle has no inline script). API/actuator responses keep the deny-all policy.
+
+**Nonce.** 128 bits from `SecureRandom`, standard Base64, minted once per request (`CspNonce.forRequest`) and shared by the two consumers that need it: `PathAwareCspHeaderWriter` (header) and `SpaIndexNonceTransformer` (body). Whichever runs first mints it.
+
+**Per-request `index.html`.** The build leaves a `__CSP_NONCE__` placeholder (Vite `html.cspNonce`) on a `<meta property="csp-nonce" nonce="…">` and on the document's own `<script>`/`<link>` tags. The SPA resource handler substitutes the request's nonce through a resource transformer that only touches the bundle's root `index.html` (matched by location, not file name), with the resource chain's caching switched off (a cached transform would freeze one nonce; a cached resolution would also grow with every distinct client-side route). `/` forwards to `index.html` explicitly. Caching follows the kind of file: `index.html` and every client route are `no-store` without `Last-Modified`; Vite's content-hashed `/assets/**` are `public, max-age=31536000, immutable`; the un-hashed root files from `public/` (favicons, og-image) get `public, max-age=3600`. A missing chunk under `/assets/` and anything under `/t/` stay 404s instead of falling back to `index.html`. `qnop.ui.static-location` (default `classpath:/static/`) moves the bundle — a test seam, so only the one integration test that needs a stand-in bundle gets one.
+
+**Client.** `main.tsx` wraps the app in an Emotion `CacheProvider` whose cache (`key: 'css'`) carries the nonce read from the meta tag (the `nonce` IDL property — browsers hide the attribute once a policy is in force). The audit of runtime `<style>` injection in the bundle found:
+
+- **CodeMirror** (mail template editor) mounts its theme as a `<style>` in the document → `EditorView.cspNonce`.
+- **react-easy-crop** (avatar crop) injects its stylesheet → its `nonce` prop.
+- **emoji-mart 5** puts a fixed stylesheet into the picker's shadow root with no nonce support. It is built while the custom element is still detached, and CSP checks a `<style>` when it is connected, so the picker host stamps the page nonce on that element before attaching it. Chosen over a hash allowance (breaks silently on every emoji-mart upgrade and would be a second, static allowance next to the nonce) and over replacing the picker (disproportionate).
+- **pdf.js** loads fonts through the Font Loading API and constructable stylesheets in every supported browser; its `<style>` fallback is only reached without them. qnop renders canvas only (no text/annotation layer).
+- MUI's own `<style>` paths outside Emotion (`enableCssLayer`, `disableTransitionOnChange`) are not used.
+
+**No implicit opt-out.** The header writer used to skip responses that already had a CSP header. It now always sets its policy and replaces whatever a handler set; no handler sets one today. A surface that genuinely needs a different policy gets its own branch in the writer, not an opt-out.
+
+**Parity.** `vite dev` enforces `style-src 'self' 'nonce-…'` with a per-start nonce; `vite preview` — what the Playwright suite drives — serves `index.html` per request with the full SPA policy and a fresh nonce, mirroring the backend. Both serve the same policy string: the preview's copy (`src/utils/spaCspPolicy.ts`) is checked against the Java constant by a unit test. The Playwright page fixture records `securitypolicyviolation` events (directive and blocked source) plus CSP console errors, and fails the test that caused them.
+
+**Rendered content.** Comment and annotation Markdown is rendered by react-markdown as React elements (no raw HTML, no `rehype-raw`) and sanitised with rehype-sanitize's default schema, which allows no `style` attribute; highlighting uses classes. Branding logos are `<img>` elements, so an SVG's own styles live in its image document and are not subject to the page's policy.

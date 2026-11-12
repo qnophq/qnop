@@ -27,6 +27,7 @@ import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { useTranslation } from 'react-i18next';
 import { toSupportedLocale, type AppLocale } from '../../../i18n/locales';
+import { readCspNonce, stampCspNonce } from '../../../utils/cspNonce';
 
 /** The picker's footprint, reserved so the popover doesn't jump when it loads. */
 const PICKER_WIDTH = 352;
@@ -127,6 +128,12 @@ function PickerHost({ onClose, onSelect }: Omit<EmojiPickerPopoverProps, 'anchor
             requestAnimationFrame(() => onSelectRef.current(native));
           },
         });
+        // emoji-mart puts its stylesheet into the picker's shadow root as a
+        // <style> without a nonce, so the SPA's policy would drop it (issue
+        // #913). The element is still detached here; stamping the page nonce
+        // before it is connected is what the policy checks.
+        const { shadowRoot } = picker as unknown as HTMLElement;
+        if (shadowRoot) stampCspNonce(shadowRoot, readCspNonce());
         // The host div is manual-DOM only — React renders the spinner/error as
         // siblings, so the reconciler never trips over the injected element.
         hostRef.current.replaceChildren(picker as unknown as HTMLElement);

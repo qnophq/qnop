@@ -1,6 +1,11 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { randomBytes } from 'node:crypto';
+import { statSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { spaCspPolicy } from './src/utils/spaCspPolicy';
 
 // https://vite.dev/config/
 //
@@ -28,8 +33,85 @@ const proxy = {
   '/login/oauth2': { target: apiUrl, changeOrigin: false },
 };
 
+/**
+ * Nonce-based styles (issue #913, ADR-0040 amendment). The production build
+ * leaves `__CSP_NONCE__` in index.html — on the `<meta property="csp-nonce">`
+ * the app reads and on the document's own tags — and the backend swaps in a
+ * fresh nonce per request, the same one its `style-src` allows.
+ *
+ * Dev and preview enforce the same rule so a style that only works with
+ * `'unsafe-inline'` breaks here first, not after a release:
+ * - dev: one random nonce per server start, `style-src` only (HMR needs the
+ *   rest of the dev server's freedom);
+ * - preview (the Playwright suite): the full SPA policy, with a fresh nonce per
+ *   index.html response, exactly as the backend serves it.
+ */
+const CSP_NONCE_PLACEHOLDER = '__CSP_NONCE__';
+
+function freshNonce(): string {
+  return randomBytes(16).toString('base64');
+}
+
+/** Whether `pathname` names a file of the build other than index.html. */
+function isBuildFile(outDir: string, pathname: string): boolean {
+  try {
+    const file = path.resolve(outDir, `.${decodeURIComponent(pathname)}`);
+    const inBuild = file.startsWith(outDir + path.sep) && file !== path.join(outDir, 'index.html');
+    return inBuild && statSync(file).isFile();
+  } catch {
+    // Malformed escapes or a missing file: not a build file.
+    return false;
+  }
+}
+
+function cspNonce(): Plugin {
+  const devNonce = freshNonce();
+  let outDir = '';
+  return {
+    name: 'qnop-csp-nonce',
+    config(_, { command }) {
+      return { html: { cspNonce: command === 'build' ? CSP_NONCE_PLACEHOLDER : devNonce } };
+    },
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    configureServer(server) {
+      server.middlewares.use((_req, res, next) => {
+        res.setHeader('Content-Security-Policy', `style-src 'self' 'nonce-${devNonce}'`);
+        next();
+      });
+    },
+    configurePreviewServer(server) {
+      // Runs before the preview proxy and static files. A browser navigation —
+      // decided by `Accept: text/html`, not by the path's shape, so a slug with
+      // a dot (`/reviews/v1.2`) is still a route — outside the proxied backend
+      // paths and not naming a file of the build gets index.html, rendered per
+      // request.
+      server.middlewares.use((req, res, next) => {
+        const { pathname } = new URL(req.url ?? '/', 'http://preview');
+        const isNavigation =
+          req.method === 'GET' &&
+          (req.headers.accept ?? '').includes('text/html') &&
+          !Object.keys(proxy).some((prefix) => pathname.startsWith(prefix)) &&
+          !isBuildFile(outDir, pathname);
+        if (!isNavigation) return next();
+        readFile(path.join(outDir, 'index.html'), 'utf8').then(
+          (template) => {
+            const nonce = freshNonce();
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-store');
+            res.setHeader('Content-Security-Policy', spaCspPolicy(nonce));
+            res.end(template.replaceAll(CSP_NONCE_PLACEHOLDER, nonce));
+          },
+          (error: unknown) => next(error),
+        );
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), cspNonce()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

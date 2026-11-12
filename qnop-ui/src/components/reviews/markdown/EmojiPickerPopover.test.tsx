@@ -34,6 +34,11 @@ vi.mock('emoji-mart', () => ({
       pickerProps.push(props);
       const element = document.createElement('div');
       element.setAttribute('data-testid', 'emoji-picker');
+      // Like emoji-mart: a shadow root holding a nonce-less <style>, built
+      // while the element is still detached.
+      const style = document.createElement('style');
+      style.textContent = ':host { display: block; }';
+      element.attachShadow({ mode: 'open' }).append(style);
       return element;
     }
   },
@@ -100,5 +105,42 @@ describe('EmojiPickerPopover language', () => {
       ).not.toBeInTheDocument(),
     );
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+/** emoji-mart's shadow-root stylesheet gets the page nonce (issue #913). */
+describe('EmojiPickerPopover CSP nonce', () => {
+  afterEach(() => {
+    cleanup();
+    document.head.querySelectorAll('meta[property="csp-nonce"]').forEach((m) => m.remove());
+  });
+
+  it('stamps the page nonce on the picker stylesheet before it is connected', async () => {
+    const meta = document.createElement('meta');
+    meta.setAttribute('property', 'csp-nonce');
+    meta.setAttribute('nonce', 'picker-nonce');
+    document.head.append(meta);
+    const connectedWhenStamped: boolean[] = [];
+    const setAttribute = vi
+      .spyOn(HTMLStyleElement.prototype, 'setAttribute')
+      .mockImplementation(function (this: HTMLStyleElement, name: string, value: string) {
+        if (name === 'nonce') connectedWhenStamped.push(this.isConnected);
+        Element.prototype.setAttribute.call(this, name, value);
+      });
+
+    renderPicker();
+
+    const picker = await screen.findByTestId('emoji-picker');
+    const style = picker.shadowRoot?.querySelector('style');
+    expect(style?.getAttribute('nonce')).toBe('picker-nonce');
+    expect(connectedWhenStamped).toEqual([false]);
+    setAttribute.mockRestore();
+  });
+
+  it('leaves the stylesheet alone when the page has no nonce', async () => {
+    renderPicker();
+
+    const picker = await screen.findByTestId('emoji-picker');
+    expect(picker.shadowRoot?.querySelector('style')?.hasAttribute('nonce')).toBe(false);
   });
 });
