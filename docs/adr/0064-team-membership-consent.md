@@ -148,7 +148,7 @@ answers `409 USER_HAS_AUDIT_HISTORY` ("disable it instead"), and it maps a forei
 races the check to the same 409, never a 500. The residual: such an account can be disabled but
 not erased, and its name stays in the snapshotted audit detail. An erasure path (anonymising the
 actor and the snapshotted names) interacts with the hash chain (#928) and needs its own design; it
-is tracked as a follow-up.
+is tracked in #952.
 
 **Mail switches.** The invitation mail is exempt from `notifications.review_emails_enabled`, whose
 admin description now says so. It is not exempt from the mail layer's master switch: with
