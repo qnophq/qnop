@@ -37,6 +37,7 @@ type NotificationFields = Pick<
   | 'toState'
   | 'versionNumber'
   | 'actionTarget'
+  | 'teamName'
 > &
   Partial<Pick<NotificationDetail, 'body' | 'actionLabel'>>;
 
@@ -91,6 +92,10 @@ export function useNotificationText() {
 
     const title = (n: NotificationFields): string => {
       if (n.type === NotificationType.ReviewDeleted) return t('text.title.reviewDeleted');
+      // Not about a review (issue #948): no tombstone, and the actor is the inviting lead.
+      if (n.type === NotificationType.TeamInvitation) {
+        return n.actorName ? t('text.title.teamInvitation', values(n)) : n.title;
+      }
       if (!n.accessible) return t('text.title.tombstone');
       if (missingActor(n, ACTOR_TITLES)) return n.title;
       const v = values(n);
@@ -122,6 +127,11 @@ export function useNotificationText() {
       const fallback = n.body ?? '';
       const v = values(n);
       if (n.type === NotificationType.ReviewDeleted) return t('text.body.reviewDeleted', v);
+      if (n.type === NotificationType.TeamInvitation) {
+        return n.actorName && n.teamName
+          ? t('text.body.teamInvitation', { actor: n.actorName, team: n.teamName })
+          : fallback;
+      }
       if (!n.accessible) return t('text.body.tombstone');
       if (missingActor(n, ACTOR_BODIES)) return fallback;
       switch (n.type) {
@@ -157,6 +167,7 @@ export function useNotificationText() {
     const actionLabel = (n: NotificationFields): string => {
       if (n.actionTarget === 'ANNOTATION') return t('text.action.openAnnotation');
       if (n.actionTarget === 'REVIEW') return t('text.action.openReview');
+      if (n.actionTarget === 'TEAMS') return t('text.action.openMyTeams');
       return n.actionLabel ?? t('text.action.openReview');
     };
 

@@ -80,6 +80,10 @@
     "description": "Emails about reviews you are part of — being added as a reviewer, new annotations, replies in your discussions, decisions, and status changes.",
     "cadenceLabel": "Email me about review activity",
     "mentionsNote": "Mentions reach you straight away either way — being named personally is the one case where waiting costs something.",
+    "teamInvitations": {
+      "label": "Email me when I'm invited to a team",
+      "help": "An invitation waits for your answer, so it is sent straight away. It shows up in your inbox either way."
+    },
     "cadence": {
       "IMMEDIATE": {
         "label": "As it happens",

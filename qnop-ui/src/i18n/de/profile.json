@@ -80,6 +80,10 @@
     "description": "E-Mails zu Reviews, an denen du beteiligt bist — wenn du als Reviewer hinzugefügt wirst, bei neuen Anmerkungen, Antworten in deinen Diskussionen, Entscheidungen und Statusänderungen.",
     "cadenceLabel": "Per E-Mail über Review-Aktivität informieren",
     "mentionsNote": "Erwähnungen erreichen dich so oder so sofort — wer dich persönlich nennt, soll nicht bis morgen warten müssen.",
+    "teamInvitations": {
+      "label": "Per E-Mail informieren, wenn mich jemand in ein Team einlädt",
+      "help": "Eine Einladung wartet auf deine Antwort, deshalb kommt sie sofort. In deinem Posteingang erscheint sie in jedem Fall."
+    },
     "cadence": {
       "IMMEDIATE": {
         "label": "Sofort",

@@ -80,6 +80,10 @@
     "description": "E-mails sobre as revisões de que você participa — quando alguém adiciona você como revisor, novas anotações, respostas nas suas discussões, decisões e mudanças de status.",
     "cadenceLabel": "Receber e-mails sobre a atividade das revisões",
     "mentionsNote": "As menções chegam imediatamente de qualquer forma — quando alguém cita você pessoalmente, esperar tem um custo.",
+    "teamInvitations": {
+      "label": "Receber um e-mail quando me convidarem para uma equipe",
+      "help": "Um convite espera a sua resposta, por isso é enviado na hora. Ele aparece na sua caixa de entrada de qualquer forma."
+    },
     "cadence": {
       "IMMEDIATE": {
         "label": "Na hora",

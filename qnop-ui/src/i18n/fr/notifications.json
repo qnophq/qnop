@@ -8,6 +8,7 @@
     "versionUploaded": "Nouvelle version",
     "workflowChanged": "Workflow",
     "reviewDeleted": "Révision supprimée",
+    "teamInvitation": "Invitation d’équipe",
     "fallback": "Notification"
   },
   "quoted": "« {{text}} »",
@@ -70,6 +71,7 @@
     "context": "Contexte",
     "from": "De",
     "review": "Révision",
+    "team": "Équipe",
     "received": "Reçu",
     "openReview": "Ouvrir la révision"
   },
@@ -89,6 +91,7 @@
       "versionUploaded": "Nouvelle version téléversée",
       "workflowChanged": "La révision est passée à l’état « {{state}} »",
       "reviewDeleted": "Une révision a été supprimée",
+      "teamInvitation": "{{actor}} vous invite dans une équipe",
       "tombstone": "Une révision à laquelle vous n’avez plus accès"
     },
     "body": {
@@ -105,11 +108,13 @@
       "versionUploaded": "{{actor}} a téléversé la version {{version}} de « {{review}} ».",
       "workflowChanged": "« {{review}} » est passée de « {{from}} » à « {{to}} ».",
       "reviewDeleted": "« {{review}} » a été définitivement supprimée par un administrateur.",
+      "teamInvitation": "{{actor}} vous invite à rejoindre « {{team}} ». Acceptez ou refusez l’invitation dans Mes équipes.",
       "tombstone": "Cette notification concerne une révision qui ne vous est plus accessible."
     },
     "action": {
       "openAnnotation": "Ouvrir l’annotation",
-      "openReview": "Ouvrir la révision"
+      "openReview": "Ouvrir la révision",
+      "openMyTeams": "Ouvrir Mes équipes"
     }
   }
 }

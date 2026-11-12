@@ -715,7 +715,8 @@
       "review__workflow_changed": "Review status change",
       "review__deleted": "Review deleted",
       "review__version_uploaded": "New document version",
-      "review__mention": "You were mentioned"
+      "review__mention": "You were mentioned",
+      "team__invitation": "Team invitation"
     },
     "localeStatus": {
       "custom": "Customised",

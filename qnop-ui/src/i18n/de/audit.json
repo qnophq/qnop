@@ -142,6 +142,34 @@
       "label": "Neuverschlüsselung fehlgeschlagen",
       "description": "Die Neuverschlüsselung gespeicherter Geheimnisse beim Start ist fehlgeschlagen (Issue #927). Die Instanz ist trotzdem gestartet und versucht es beim nächsten Start erneut; die Details nennen den Fehlertyp, das Server-Log den Rest."
     },
+    "teamInvitationCreated": {
+      "label": "Team-Einladung verschickt",
+      "description": "Ein Team-Lead hat jemanden ins Team eingeladen. Die Einladung gewährt nichts, bis die Person sie annimmt."
+    },
+    "teamInvitationAccepted": {
+      "label": "Team-Einladung angenommen",
+      "description": "Die eingeladene Person hat angenommen und ist jetzt Mitglied des Teams."
+    },
+    "teamInvitationDeclined": {
+      "label": "Team-Einladung abgelehnt",
+      "description": "Die eingeladene Person hat abgelehnt; die Einladung wurde gelöscht."
+    },
+    "teamInvitationRevoked": {
+      "label": "Team-Einladung zurückgezogen",
+      "description": "Eine offene Einladung wurde entfernt — von einem Lead oder Administrator zurückgezogen, beim Deaktivieren des Teams verworfen oder durch direktes Hinzufügen überholt."
+    },
+    "teamMemberAdded": {
+      "label": "Team-Mitglied hinzugefügt",
+      "description": "Ein Administrator hat jemanden direkt mit der angezeigten Rolle ins Team aufgenommen — auch den ersten Lead eines neuen Teams."
+    },
+    "teamMemberRemoved": {
+      "label": "Team-Mitglied entfernt",
+      "description": "Ein Lead oder Administrator hat ein Mitglied aus dem Team entfernt; angezeigt ist die Rolle, die es hatte."
+    },
+    "teamMemberRoleChanged": {
+      "label": "Team-Rolle geändert",
+      "description": "Die Team-Rolle eines Mitglieds hat sich geändert — Lead vergeben oder entzogen, also das Recht, das Team zu verwalten."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "Ein aufgezeichnetes Review-Ereignis."
@@ -174,6 +202,23 @@
       "storageObjects_one": "{{count}} Speicherobjekt",
       "storageObjects_other": "{{count}} Speicherobjekte",
       "more": "{{titles}} +{{remaining}} weitere"
+    },
+    "team": {
+      "subject": "{{user}} · {{team}}",
+      "asRole": "{{subject}} · als {{role}}",
+      "roleChange": "{{subject}} · {{from}} → {{to}}",
+      "withReason": "{{subject}} · {{reason}}",
+      "unknownUser": "ein ehemaliger Nutzer",
+      "unknownTeam": "ein ehemaliges Team",
+      "roles": {
+        "LEAD": "Lead",
+        "MEMBER": "Mitglied"
+      },
+      "reasons": {
+        "REVOKED": "zurückgezogen",
+        "TEAM_DISABLED": "Team deaktiviert",
+        "SUPERSEDED": "direkt hinzugefügt"
+      }
     }
   }
 }

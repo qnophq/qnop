@@ -187,4 +187,31 @@ describe('formatAuditDetail', () => {
     expect(formatAuditDetail('some.future.event', '{"meta":{"k":1}}')).toBe('meta: {"k":1}');
     expect(formatAuditDetail('some.future.event', '42')).toBe('42');
   });
+
+  it('renders team-membership events from the snapshotted names, never ids (#948)', () => {
+    const base = '"teamId":"t1","teamName":"Legal","userId":"u1","userName":"Ivy"';
+    expect(formatAuditDetail('team.invitation.created', `{${base},"role":"MEMBER"}`)).toBe(
+      'Ivy · Legal · as Member',
+    );
+    expect(formatAuditDetail('team.invitation.accepted', `{${base}}`)).toBe('Ivy · Legal');
+    expect(formatAuditDetail('team.invitation.revoked', `{${base},"reason":"TEAM_DISABLED"}`)).toBe(
+      'Ivy · Legal · team disabled',
+    );
+    expect(
+      formatAuditDetail(
+        'team.member.role_changed',
+        `{${base},"previousRole":"MEMBER","role":"LEAD"}`,
+      ),
+    ).toBe('Ivy · Legal · Member → Lead');
+    expect(formatAuditDetail('team.member.removed', `{${base},"role":"LEAD"}`)).toBe(
+      'Ivy · Legal · as Lead',
+    );
+    // A user whose name was not known when recorded, and a role a newer server added.
+    expect(
+      formatAuditDetail(
+        'team.member.added',
+        '{"teamId":"t1","teamName":"Legal","userId":"u1","userName":null,"role":"OWNER"}',
+      ),
+    ).toBe('a former user · Legal · as Owner');
+  });
 });
