@@ -27,8 +27,9 @@ import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * The one SSRF-guarded transport every OIDC request goes through — discovery, token, user-info and
- * JWK set (issue #904). Honours the deployment's private-IdP opt-in ({@link OidcSsrfPolicy}).
+ * The one SSRF-guarded transport every OIDC request goes through — discovery, token, user-info, JWK
+ * set (issue #904) and the GitHub e-mail lookup (issue #946). Honours the deployment's private-IdP
+ * opt-in ({@link OidcSsrfPolicy}).
  *
  * <p>Deliberately not exposed as a {@code ClientHttpRequestFactory} bean, so nothing else picks it
  * up by type; a holder that owns the pooled client and closes it with the context.

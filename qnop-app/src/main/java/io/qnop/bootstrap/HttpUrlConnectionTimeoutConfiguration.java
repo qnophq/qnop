@@ -32,7 +32,7 @@ import org.springframework.context.annotation.Configuration;
  * timeouts themselves, so this remains a backstop for anything else that builds a default {@code
  * RestTemplate}. Runs at context initialization. An operator-supplied {@code
  * -Dsun.net.client.default*Timeout} always wins. Clients qnop constructs itself (S3, SMTP, the
- * GitHub {@code RestClient}, the guarded clients) carry their own timeouts and are unaffected.
+ * guarded clients) carry their own timeouts and are unaffected.
  *
  * <p>Note: with Apache HttpClient 5 on the classpath (issue #904), a {@code RestClient} built
  * without an explicit request factory defaults to an <em>unguarded</em> HttpComponents client that

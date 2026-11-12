@@ -35,7 +35,7 @@ import org.springframework.stereotype.Component;
  * qnop.auth.oidc.allow-private-discovery-uris=true} (scheme validation still applies).
  *
  * <p>This is the save-time, DNS-free half. Every request to an OIDC provider — discovery, token,
- * user-info, JWK set — also goes through the guarded client of {@link
+ * user-info, JWK set, the GitHub e-mail lookup — also goes through the guarded client of {@link
  * OidcOutboundHttpConfiguration} (issue #904), which validates each resolved address at connection
  * time and follows no redirects.
  */
