@@ -20,7 +20,12 @@
 -- Rollback of 0043-audit-prune-context (issue #959): restores the 0040 cascade
 -- marker, sanction check and tombstone writer, and the 0042 insert guard —
 -- i.e. the session-setting authorisation this changeset replaced — and drops
--- the owner-only state.
+-- the owner-only state. The 0042 seal and user-erasure trigger functions
+-- return to their 0042 bodies, without the trigger-binding check.
+--
+-- The EXECUTE revokes on the SECURITY DEFINER trigger functions stay in
+-- place: they break nothing (triggers fire regardless of EXECUTE), and
+-- restoring PUBLIC's EXECUTE would only reopen a hole.
 
 CREATE OR REPLACE FUNCTION audit_event_cascade_sanctioned(p_scope TEXT, p_document_id UUID)
 RETURNS BOOLEAN
@@ -134,6 +139,69 @@ BEGIN
 END;
 $fn$;
 
+CREATE OR REPLACE FUNCTION audit_event_seal()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $fn$
+DECLARE
+  r RECORD;
+  v_seq BIGINT;
+  v_prev VARCHAR(64);
+  v_hash VARCHAR(64);
+BEGIN
+  IF current_setting('transaction_isolation') <> 'read committed' THEN
+    RAISE EXCEPTION 'audit events must be written in READ COMMITTED transactions (found %)',
+      current_setting('transaction_isolation')
+      USING ERRCODE = 'invalid_transaction_state';
+  END IF;
+
+  -- The row may already be gone again (inserted and cascade-deleted in the
+  -- same transaction); then there is nothing to seal.
+  SELECT id, scope, document_id, event_type, actor_id, detail, created_at INTO r
+  FROM audit_event WHERE id = NEW.id AND chain_seq IS NULL;
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT last_seq, last_hash INTO v_seq, v_prev
+  FROM audit_chain_head WHERE id = 1 FOR UPDATE;
+
+  v_hash := encode(
+    sha256(convert_to(v_prev || audit_event_canonical(
+      r.id, r.scope, r.document_id, r.event_type, r.actor_id, r.detail, r.created_at), 'UTF8')),
+    'hex');
+
+  UPDATE audit_event
+     SET chain_seq = v_seq + 1, prev_hash = v_prev, row_hash = v_hash
+   WHERE id = NEW.id;
+  UPDATE audit_chain_head SET last_seq = v_seq + 1, last_hash = v_hash WHERE id = 1;
+  RETURN NULL;
+END;
+$fn$;
+
+CREATE OR REPLACE FUNCTION qnop_user_redact_audit()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $fn$
+DECLARE
+  v_actor UUID;
+BEGIN
+  BEGIN
+    v_actor := nullif(current_setting('qnop.erasing_actor', true), '')::uuid;
+  EXCEPTION WHEN invalid_text_representation THEN
+    v_actor := NULL;
+  END;
+  PERFORM set_config('qnop.erasing_actor', '', true);
+  IF v_actor = OLD.id OR NOT EXISTS (SELECT 1 FROM qnop_user u WHERE u.id = v_actor) THEN
+    v_actor := NULL;
+  END IF;
+  PERFORM audit_event_redact_user(OLD.id, v_actor);
+  RETURN OLD;
+END;
+$fn$;
+
 DROP FUNCTION IF EXISTS audit_prune_context_current();
 DROP FUNCTION IF EXISTS audit_cascade_marked(uuid);
 DROP TABLE IF EXISTS audit_prune_context;
@@ -147,7 +215,9 @@ BEGIN
     'audit_event_cascade_sanctioned(text, uuid)',
     'document_mark_audit_cascade()',
     'audit_event_record_prune()',
-    'audit_event_guard_insert()']
+    'audit_event_guard_insert()',
+    'audit_event_seal()',
+    'qnop_user_redact_audit()']
   LOOP
     EXECUTE format('ALTER FUNCTION %s SET search_path = %I, pg_temp', f, current_schema());
   END LOOP;

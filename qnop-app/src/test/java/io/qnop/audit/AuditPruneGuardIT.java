@@ -32,6 +32,7 @@ import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.audit.AuditChainVerificationService;
+import io.qnop.service.audit.AuditChainVerifier.ProblemKind;
 import io.qnop.service.audit.AuditChainVerifier.Report;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -149,9 +150,17 @@ class AuditPruneGuardIT extends AbstractIntegrationTest {
     return jdbc.queryForObject(sql, Long.class, args);
   }
 
-  private long contextRows() {
-    return count("SELECT (SELECT count(*) FROM audit_cascade_context)")
-        + count("SELECT (SELECT count(*) FROM audit_prune_context)");
+  /**
+   * Owner-only state left behind: any announced tombstone, and the cascade markers of the given
+   * documents. (Markers of documents whose cascade removed no audit row are swept by a later
+   * deletion, so other tests' leftovers are deliberately not counted.)
+   */
+  private long contextRows(UUID... documentIds) {
+    long markers = 0;
+    for (UUID id : documentIds) {
+      markers += count("SELECT count(*) FROM audit_cascade_context WHERE document_id = ?", id);
+    }
+    return markers + count("SELECT (SELECT count(*) FROM audit_prune_context)");
   }
 
   private static void assertRejected(Runnable statement, String message) {
@@ -291,6 +300,31 @@ class AuditPruneGuardIT extends AbstractIntegrationTest {
                     }),
             "permission denied");
       }
+      // Nor can it bind the owner's trigger functions to a table of its own (TEMP is granted to
+      // PUBLIC by default): EXECUTE on them is revoked, which is checked at CREATE TRIGGER.
+      for (String attach :
+          List.of(
+              "BEFORE DELETE ON audit_prune_it_mine FOR EACH ROW"
+                  + " EXECUTE FUNCTION document_mark_audit_cascade()",
+              "AFTER DELETE ON audit_prune_it_mine REFERENCING OLD TABLE AS removed"
+                  + " FOR EACH STATEMENT EXECUTE FUNCTION audit_event_record_prune()",
+              "AFTER INSERT ON audit_prune_it_mine FOR EACH ROW"
+                  + " EXECUTE FUNCTION audit_event_seal()",
+              "BEFORE DELETE ON audit_prune_it_mine FOR EACH ROW"
+                  + " EXECUTE FUNCTION qnop_user_redact_audit()")) {
+        assertRejected(
+            () ->
+                tx.executeWithoutResult(
+                    status -> {
+                      jdbc.execute("SET LOCAL ROLE " + RESTRICTED_ROLE);
+                      jdbc.execute(
+                          "CREATE TEMP TABLE audit_prune_it_mine (id UUID, scope TEXT,"
+                              + " document_id UUID, chain_seq BIGINT, prev_hash TEXT,"
+                              + " row_hash TEXT) ON COMMIT DROP");
+                      jdbc.execute("CREATE TRIGGER audit_prune_it_attach " + attach);
+                    }),
+            "permission denied for function");
+      }
     } finally {
       jdbc.execute("DROP OWNED BY " + RESTRICTED_ROLE);
       jdbc.execute("DROP ROLE " + RESTRICTED_ROLE);
@@ -299,7 +333,7 @@ class AuditPruneGuardIT extends AbstractIntegrationTest {
     assertThat(count("SELECT count(*) FROM audit_event WHERE document_id = ?", doc.getId()))
         .isZero();
     assertThat(tombstones()).singleElement().asString().contains(doc.getId().toString());
-    assertThat(contextRows()).isZero();
+    assertThat(contextRows(doc.getId())).isZero();
     assertVerifiesClean();
   }
 
@@ -317,10 +351,8 @@ class AuditPruneGuardIT extends AbstractIntegrationTest {
     tx.executeWithoutResult(
         status -> {
           jdbc.update("DELETE FROM document WHERE id IN (?, ?)", first.getId(), second.getId());
-          // Cleared at the end of the deleting statement, not only at commit.
-          assertThat(
-                  count("SELECT count(*) FROM audit_cascade_context WHERE txid = txid_current()"))
-              .isZero();
+          // Spent by the end of the deleting statement, not only at commit.
+          assertThat(contextRows(first.getId(), second.getId())).isZero();
           explainDeletion(first.getId());
           explainDeletion(second.getId());
         });
@@ -330,7 +362,7 @@ class AuditPruneGuardIT extends AbstractIntegrationTest {
         .asString()
         .contains(first.getId().toString())
         .contains(second.getId().toString());
-    assertThat(contextRows()).isZero();
+    assertThat(contextRows(first.getId(), second.getId())).isZero();
     assertVerifiesClean();
   }
 
@@ -368,7 +400,7 @@ class AuditPruneGuardIT extends AbstractIntegrationTest {
 
     assertThat(tombstones()).hasSize(2);
     assertThat(count("SELECT count(*) FROM audit_event WHERE document_id IS NOT NULL")).isZero();
-    assertThat(contextRows()).isZero();
+    assertThat(contextRows(doc.getId(), other.getId())).isZero();
     assertVerifiesClean();
   }
 
@@ -383,7 +415,7 @@ class AuditPruneGuardIT extends AbstractIntegrationTest {
           jdbc.execute("SAVEPOINT before_delete");
           jdbc.update("DELETE FROM document WHERE id = ?", doc.getId());
           jdbc.execute("ROLLBACK TO SAVEPOINT before_delete");
-          assertThat(contextRows()).isZero();
+          assertThat(contextRows(doc.getId())).isZero();
         });
     assertRejected(
         () -> runFromTrigger("DELETE FROM audit_event WHERE id = '" + onDocument.getId() + "'"),
@@ -434,5 +466,176 @@ class AuditPruneGuardIT extends AbstractIntegrationTest {
     assertThat(count("SELECT count(*) FROM document WHERE id = ?", doc.getId())).isEqualTo(1L);
     assertThat(tombstones()).isEmpty();
     assertVerifiesClean();
+  }
+
+  @Test
+  @DisplayName("the owner's trigger functions refuse to run as a trigger on any other table")
+  void definerTriggerFunctionsAreBoundToTheirTables() {
+    Document doc = newDocument();
+    jdbc.execute(
+        "CREATE TABLE audit_prune_it_own (id UUID, scope TEXT, document_id UUID,"
+            + " chain_seq BIGINT, prev_hash TEXT, row_hash TEXT)");
+    try {
+      List<String> triggers =
+          List.of(
+              "BEFORE DELETE ON audit_prune_it_own FOR EACH ROW"
+                  + " EXECUTE FUNCTION document_mark_audit_cascade()",
+              "AFTER DELETE ON audit_prune_it_own REFERENCING OLD TABLE AS removed"
+                  + " FOR EACH STATEMENT EXECUTE FUNCTION audit_event_record_prune()",
+              "AFTER INSERT ON audit_prune_it_own FOR EACH ROW"
+                  + " EXECUTE FUNCTION audit_event_seal()",
+              "BEFORE DELETE ON audit_prune_it_own FOR EACH ROW"
+                  + " EXECUTE FUNCTION qnop_user_redact_audit()");
+      for (String trigger : triggers) {
+        // Even the owner, who may attach them, cannot make them act for another table.
+        assertRejected(
+            () ->
+                tx.executeWithoutResult(
+                    status -> {
+                      jdbc.execute("CREATE TRIGGER audit_prune_it_bound " + trigger);
+                      jdbc.update(
+                          "INSERT INTO audit_prune_it_own (id, scope, document_id, chain_seq)"
+                              + " VALUES (?, 'DOCUMENT', ?, 1)",
+                          doc.getId(),
+                          doc.getId());
+                      jdbc.update("DELETE FROM audit_prune_it_own");
+                    }),
+            "runs only as the");
+      }
+    } finally {
+      jdbc.execute("DROP TABLE audit_prune_it_own");
+    }
+
+    assertThat(contextRows(doc.getId())).isZero();
+    assertThat(tombstones()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a cascade from a parent table reaching documents on several paths prunes them all")
+  void cascadeFromAParentOverSeveralPaths() {
+    Document direct = newDocument();
+    Document viaFirst = newDocument();
+    Document viaSecond = newDocument();
+    Document withoutTrail = newDocument();
+    saveSystem("test.before");
+    saveForDocument(direct.getId(), "test.direct");
+    saveForDocument(viaFirst.getId(), "test.via.first");
+    saveForDocument(viaSecond.getId(), "test.via.second");
+    saveForDocument(direct.getId(), "test.direct.again");
+    saveSystem("test.after");
+
+    // The schema has no parent of document today; build one for this transaction only and roll
+    // it back: documents reached directly from the parent, and one level deeper through two rows
+    // of an intermediate table.
+    assertThatThrownBy(
+            () ->
+                tx.executeWithoutResult(
+                    status -> {
+                      jdbc.execute("CREATE TABLE audit_prune_it_parent (id INT PRIMARY KEY)");
+                      jdbc.execute(
+                          "CREATE TABLE audit_prune_it_mid (id INT PRIMARY KEY, parent INT"
+                              + " REFERENCES audit_prune_it_parent (id) ON DELETE CASCADE)");
+                      jdbc.execute(
+                          "ALTER TABLE document"
+                              + " ADD COLUMN it_parent INT REFERENCES audit_prune_it_parent (id)"
+                              + " ON DELETE CASCADE,"
+                              + " ADD COLUMN it_mid INT REFERENCES audit_prune_it_mid (id)"
+                              + " ON DELETE CASCADE");
+                      jdbc.execute("INSERT INTO audit_prune_it_parent VALUES (1)");
+                      jdbc.execute("INSERT INTO audit_prune_it_mid VALUES (10, 1), (11, 1)");
+                      jdbc.update(
+                          "UPDATE document SET it_parent = 1 WHERE id IN (?, ?)",
+                          direct.getId(),
+                          withoutTrail.getId());
+                      jdbc.update("UPDATE document SET it_mid = 10 WHERE id = ?", viaFirst.getId());
+                      jdbc.update(
+                          "UPDATE document SET it_mid = 11 WHERE id = ?", viaSecond.getId());
+
+                      jdbc.update("DELETE FROM audit_prune_it_parent");
+
+                      List<UUID> trailed =
+                          List.of(direct.getId(), viaFirst.getId(), viaSecond.getId());
+                      assertThat(
+                              count(
+                                  "SELECT count(*) FROM document WHERE id IN (?, ?, ?, ?)",
+                                  direct.getId(),
+                                  viaFirst.getId(),
+                                  viaSecond.getId(),
+                                  withoutTrail.getId()))
+                          .isZero();
+                      assertThat(
+                              count(
+                                  "SELECT count(*) FROM audit_event WHERE document_id IS NOT NULL"))
+                          .isZero();
+                      assertThat(tombstones())
+                          .singleElement()
+                          .asString()
+                          .contains(trailed.stream().map(UUID::toString).toList());
+                      assertThat(contextRows(trailed.toArray(UUID[]::new))).isZero();
+                      throw new IllegalStateException("rollback-sentinel");
+                    }))
+        .hasMessage("rollback-sentinel");
+
+    assertThat(count("SELECT count(*) FROM document WHERE id = ?", direct.getId())).isEqualTo(1L);
+    assertVerifiesClean();
+  }
+
+  @Test
+  @DisplayName("malformed tombstones are reported without stopping the verification")
+  void malformedTombstonesAreReportedNotFatal() {
+    Document doc = newDocument();
+    saveSystem("test.before");
+    saveForDocument(doc.getId(), "test.doc");
+    saveSystem("test.after");
+    tx.executeWithoutResult(
+        status -> {
+          jdbc.update("DELETE FROM document WHERE id = ?", doc.getId());
+          explainDeletion(doc.getId());
+        });
+    List<String> malformed =
+        List.of(
+            "[]",
+            "{\"documentIds\": \"x\", \"ranges\": [1]}",
+            "{\"documentIds\": [\"a\"], \"ranges\": [null]}",
+            "{\"documentIds\": [\"a\"], \"ranges\": [{\"fromSeq\": \"1\", \"toSeq\": {}}]}");
+    jdbc.execute("ALTER TABLE audit_event DISABLE TRIGGER trg_audit_event_guard_insert");
+    try {
+      for (String detail : malformed) {
+        jdbc.update(
+            "INSERT INTO audit_event (id, scope, event_type, detail, created_at)"
+                + " VALUES (gen_random_uuid(), 'SYSTEM', ?, ?::jsonb, now())",
+            AuditChainRepository.PRUNED_EVENT_TYPE,
+            detail);
+      }
+    } finally {
+      jdbc.execute("ALTER TABLE audit_event ENABLE TRIGGER trg_audit_event_guard_insert");
+    }
+
+    Report report = verification.verify();
+
+    // Each malformed one is a finding and vouches for nothing; the real one still bridges its gap.
+    assertThat(report.problems())
+        .hasSize(malformed.size())
+        .allSatisfy(p -> assertThat(p.kind()).isEqualTo(ProblemKind.BAD_PRUNE_RANGE));
+    assertThat(report.intact()).isFalse();
+  }
+
+  @Test
+  @DisplayName("a marker no tombstone spent is swept by a later deletion")
+  void unspentMarkersAreSwept() {
+    Document withoutTrail = newDocument();
+    tx.executeWithoutResult(
+        status -> jdbc.update("DELETE FROM document WHERE id = ?", withoutTrail.getId()));
+    // No audit row went, so no tombstone names it; the marker outlives its transaction.
+    assertThat(contextRows(withoutTrail.getId())).isEqualTo(1L);
+
+    // Swept by the next deletion once no transaction older than it is running. Retried, because
+    // a concurrent transaction elsewhere can briefly hold the horizon back.
+    for (int attempt = 0; attempt < 5 && contextRows(withoutTrail.getId()) > 0; attempt++) {
+      Document next = newDocument();
+      tx.executeWithoutResult(
+          status -> jdbc.update("DELETE FROM document WHERE id = ?", next.getId()));
+    }
+    assertThat(contextRows(withoutTrail.getId())).isZero();
   }
 }
