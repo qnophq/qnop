@@ -22,6 +22,7 @@ package io.qnop.service.notification;
 
 import io.qnop.entity.Notification;
 import io.qnop.entity.NotificationDigest;
+import io.qnop.entity.NotificationType;
 import io.qnop.entity.User;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.NotificationDigestRepository;
@@ -246,6 +247,9 @@ public class NotificationDigestService {
   private List<Notification> stillVisible(UUID recipientId, List<Notification> unread) {
     Map<String, Boolean> memo = new HashMap<>();
     return unread.stream()
+        // The review digest is about reviews. A team invitation is mailed as it happens,
+        // under its own opt-out, and an opted-out user must not get it here instead (#948).
+        .filter(notification -> notification.getType() != NotificationType.TEAM_INVITATION)
         .filter(
             notification ->
                 notification.getDocumentId() == null

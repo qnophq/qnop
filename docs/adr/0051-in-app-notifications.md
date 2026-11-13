@@ -70,6 +70,27 @@ Two decisions are worth recording.
 
 The sweep needed its own index. The inbox index leads with `recipient_id`, so a delete predicated on `created_at` alone could not use it and would scan the whole table once per batch; `ix_notification_created_at` (changeset 0030) serves the sweep.
 
+## Amendment (2026-11, #948): a first non-review notification
+
+`TEAM_INVITATION` is the first notification type that is not about a review: a team lead invited the
+recipient into a team (ADR-0064 amendment). It deliberately reuses this ADR's machinery rather than
+growing a second one:
+
+- **Same intent, same sinks.** The recipient rule is trivial (exactly the invited user), so
+  `TeamInvitationNotifier` builds the `ReviewNotificationIntent` directly instead of going through
+  `ReviewNotificationService`, and offers it to every `ReviewNotificationSink`. The names keep the
+  `Review` prefix; the shape was never review-specific.
+- **Row shape unchanged.** Like `REVIEW_DELETED` it carries no `document_id`; the inviting lead is
+  the `actor_id` and the team's name is the snapshotted `excerpt`. No `team_id` column was added: the
+  notification links to "My Teams", which shows whether the invitation is still pending, so nothing
+  on the row needs re-checking on read.
+- **Identity on read.** There is no per-review anonymity to apply; the lead's public display name and
+  slug are read from the user row. The API exposes the team name as `teamName` and the action target
+  as `TEAMS`.
+- **Mail gate.** The mail sink applies the type's own opt-out (`email_team_invitations`) and neither
+  the review-mail switch nor the review cadence; the digest skips these rows, so a user who opted
+  out of the invitation mail does not receive it in the morning summary instead.
+
 ## Related
 
 - **ADR-0038** — per-review privacy; the identity resolution this ADR defers to read time

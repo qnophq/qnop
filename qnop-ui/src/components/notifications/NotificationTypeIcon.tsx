@@ -28,6 +28,7 @@ import {
   MessageSquarePlus,
   Trash2,
   UserPlus,
+  UsersRound,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { NotificationType } from '../../api/generated';
@@ -45,6 +46,7 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   [NotificationType.VersionUploaded]: FileUp,
   [NotificationType.WorkflowChanged]: GitBranch,
   [NotificationType.ReviewDeleted]: Trash2,
+  [NotificationType.TeamInvitation]: UsersRound,
 };
 
 export function NotificationTypeIcon({

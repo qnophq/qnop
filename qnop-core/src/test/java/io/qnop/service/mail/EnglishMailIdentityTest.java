@@ -73,6 +73,7 @@ class EnglishMailIdentityTest {
           Map.entry("versionNumber", "3"),
           Map.entry("oldState", "In review"),
           Map.entry("newState", "Changes requested"),
+          Map.entry("teamName", "Legal review"),
           Map.entry("totalCount", 11),
           Map.entry("totalPhrase", "11 updates"),
           Map.entry("digestBody", "* Q3 contract draft — 3 new annotations, 7 comments"),

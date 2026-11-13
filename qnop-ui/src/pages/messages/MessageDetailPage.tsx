@@ -280,6 +280,7 @@ export function MessageDetailPage() {
                 {data.documentTitle && (
                   <RailFact label={t('detail.review')} value={data.documentTitle} />
                 )}
+                {data.teamName && <RailFact label={t('detail.team')} value={data.teamName} />}
                 <RailFact label={t('detail.received')} value={formatDateTime(data.createdAt)} />
               </Stack>
 

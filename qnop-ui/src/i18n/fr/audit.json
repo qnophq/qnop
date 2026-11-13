@@ -142,6 +142,34 @@
       "label": "Échec du rechiffrement",
       "description": "Le rechiffrement des secrets stockés au démarrage a échoué (issue #927). L’instance a démarré malgré tout et réessaiera au prochain démarrage ; les détails indiquent le type d’erreur, le journal du serveur le reste."
     },
+    "teamInvitationCreated": {
+      "label": "Invitation d’équipe envoyée",
+      "description": "Un responsable d’équipe a invité une personne dans l’équipe. L’invitation n’accorde rien tant qu’elle n’est pas acceptée."
+    },
+    "teamInvitationAccepted": {
+      "label": "Invitation d’équipe acceptée",
+      "description": "La personne invitée a accepté et est désormais membre de l’équipe."
+    },
+    "teamInvitationDeclined": {
+      "label": "Invitation d’équipe refusée",
+      "description": "La personne invitée a refusé ; l’invitation a été supprimée."
+    },
+    "teamInvitationRevoked": {
+      "label": "Invitation d’équipe retirée",
+      "description": "Une invitation en attente a été supprimée — retirée par un responsable ou un administrateur, abandonnée lors de la désactivation de l’équipe ou rendue caduque par un ajout direct."
+    },
+    "teamMemberAdded": {
+      "label": "Membre ajouté à l’équipe",
+      "description": "Un administrateur a ajouté directement une personne à l’équipe avec le rôle indiqué — y compris le premier responsable d’une nouvelle équipe."
+    },
+    "teamMemberRemoved": {
+      "label": "Membre retiré de l’équipe",
+      "description": "Un responsable ou un administrateur a retiré un membre de l’équipe ; le rôle indiqué est celui qu’il avait."
+    },
+    "teamMemberRoleChanged": {
+      "label": "Rôle d’équipe modifié",
+      "description": "Le rôle d’un membre dans l’équipe a changé — attribution ou retrait du rôle de responsable, qui permet de gérer l’équipe."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "Un événement de révision enregistré."
@@ -176,6 +204,23 @@
       "storageObjects_many": "{{count}} objets de stockage",
       "storageObjects_other": "{{count}} objets de stockage",
       "more": "{{titles}} et {{remaining}} de plus"
+    },
+    "team": {
+      "subject": "{{user}} · {{team}}",
+      "asRole": "{{subject}} · en tant que {{role}}",
+      "roleChange": "{{subject}} · {{from}} → {{to}}",
+      "withReason": "{{subject}} · {{reason}}",
+      "unknownUser": "un ancien utilisateur",
+      "unknownTeam": "une ancienne équipe",
+      "roles": {
+        "LEAD": "Responsable",
+        "MEMBER": "Membre"
+      },
+      "reasons": {
+        "REVOKED": "retirée",
+        "TEAM_DISABLED": "équipe désactivée",
+        "SUPERSEDED": "ajout direct"
+      }
     }
   }
 }

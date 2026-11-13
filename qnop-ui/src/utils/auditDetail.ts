@@ -20,7 +20,13 @@
  */
 
 import type { TFunction } from 'i18next';
-import { humanizeToken, humanizeWorkflowState, rawPhrase, type AuditPhrase } from './auditEvents';
+import {
+  humanizeToken,
+  humanizeWorkflowState,
+  rawPhrase,
+  type AuditKey,
+  type AuditPhrase,
+} from './auditEvents';
 
 const EM_DASH = '—';
 
@@ -71,6 +77,64 @@ function purgeSummary(obj: Record<string, unknown>): AuditPhrase {
     );
   }
   return bits.length > 0 ? { join: bits, separator: ' · ' } : NONE;
+}
+
+const TEAM_ROLE_KEYS: Record<string, AuditKey> = {
+  LEAD: 'detail.team.roles.LEAD',
+  MEMBER: 'detail.team.roles.MEMBER',
+};
+
+const TEAM_REASON_KEYS: Record<string, AuditKey> = {
+  REVOKED: 'detail.team.reasons.REVOKED',
+  TEAM_DISABLED: 'detail.team.reasons.TEAM_DISABLED',
+  SUPERSEDED: 'detail.team.reasons.SUPERSEDED',
+};
+
+/** A team role or revocation reason; an unknown (newer) token passes through humanized. */
+function teamToken(value: unknown, keys: Record<string, AuditKey>): AuditPhrase {
+  const token = String(value);
+  const key = keys[token];
+  return key ? { key } : rawPhrase(humanizeToken(token));
+}
+
+/**
+ * Renders a team-membership event (issue #948) from the names snapshotted at the time — the
+ * team may since be renamed or deleted and the user gone, so the ids are never shown.
+ */
+function teamChange(eventType: string, obj: Record<string, unknown>): AuditPhrase {
+  const name = (value: unknown, fallback: AuditKey): AuditPhrase =>
+    typeof value === 'string' && value.length > 0 ? rawPhrase(value) : { key: fallback };
+  const subject: AuditPhrase = {
+    key: 'detail.team.subject',
+    values: {
+      user: name(obj.userName, 'detail.team.unknownUser'),
+      team: name(obj.teamName, 'detail.team.unknownTeam'),
+    },
+  };
+  const has = (value: unknown) => value !== null && value !== undefined;
+  if (eventType === 'team.member.role_changed' && has(obj.previousRole) && has(obj.role)) {
+    return {
+      key: 'detail.team.roleChange',
+      values: {
+        subject,
+        from: teamToken(obj.previousRole, TEAM_ROLE_KEYS),
+        to: teamToken(obj.role, TEAM_ROLE_KEYS),
+      },
+    };
+  }
+  if (eventType === 'team.invitation.revoked' && has(obj.reason)) {
+    return {
+      key: 'detail.team.withReason',
+      values: { subject, reason: teamToken(obj.reason, TEAM_REASON_KEYS) },
+    };
+  }
+  if (has(obj.role)) {
+    return {
+      key: 'detail.team.asRole',
+      values: { subject, role: teamToken(obj.role, TEAM_ROLE_KEYS) },
+    };
+  }
+  return subject;
 }
 
 function dueDateChange(
@@ -180,6 +244,14 @@ export function formatAuditDetail(
         : NONE;
     case 'review.purged':
       return purgeSummary(obj);
+    case 'team.invitation.created':
+    case 'team.invitation.accepted':
+    case 'team.invitation.declined':
+    case 'team.invitation.revoked':
+    case 'team.member.added':
+    case 'team.member.removed':
+    case 'team.member.role_changed':
+      return teamChange(eventType, obj);
     default:
       break;
   }

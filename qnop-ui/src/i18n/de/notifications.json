@@ -8,6 +8,7 @@
     "versionUploaded": "Neue Version",
     "workflowChanged": "Workflow",
     "reviewDeleted": "Review gelöscht",
+    "teamInvitation": "Team-Einladung",
     "fallback": "Benachrichtigung"
   },
   "quoted": "„{{text}}“",
@@ -70,6 +71,7 @@
     "context": "Kontext",
     "from": "Von",
     "review": "Review",
+    "team": "Team",
     "received": "Empfangen",
     "openReview": "Review öffnen"
   },
@@ -89,6 +91,7 @@
       "versionUploaded": "Neue Version hochgeladen",
       "workflowChanged": "Das Review ist jetzt „{{state}}“",
       "reviewDeleted": "Ein Review wurde gelöscht",
+      "teamInvitation": "{{actor}} hat dich in ein Team eingeladen",
       "tombstone": "Ein Review, auf das du keinen Zugriff mehr hast"
     },
     "body": {
@@ -105,11 +108,13 @@
       "versionUploaded": "{{actor}} hat Version {{version}} von „{{review}}“ hochgeladen.",
       "workflowChanged": "„{{review}}“ ist von „{{from}}“ zu „{{to}}“ gewechselt.",
       "reviewDeleted": "„{{review}}“ wurde von einem Administrator endgültig gelöscht.",
+      "teamInvitation": "{{actor}} hat dich eingeladen, dem Team „{{team}}“ beizutreten. Unter „Meine Teams“ kannst du annehmen oder ablehnen.",
       "tombstone": "Diese Benachrichtigung bezieht sich auf ein Review, das für dich nicht mehr verfügbar ist."
     },
     "action": {
       "openAnnotation": "Anmerkung öffnen",
-      "openReview": "Review öffnen"
+      "openReview": "Review öffnen",
+      "openMyTeams": "Meine Teams öffnen"
     }
   }
 }

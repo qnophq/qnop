@@ -80,6 +80,10 @@
     "description": "Correos sobre las revisiones en las que participas — cuando te añaden como revisor, nuevas anotaciones, respuestas en tus conversaciones, decisiones y cambios de estado.",
     "cadenceLabel": "Avisarme por correo de la actividad de las revisiones",
     "mentionsNote": "Las menciones te llegan al instante en cualquier caso — cuando alguien te nombra personalmente, esperar sí tiene un costo.",
+    "teamInvitations": {
+      "label": "Avisarme por correo cuando me inviten a un equipo",
+      "help": "Una invitación espera tu respuesta, así que se envía al momento. Aparece en tu bandeja de entrada en cualquier caso."
+    },
     "cadence": {
       "IMMEDIATE": {
         "label": "Al momento",

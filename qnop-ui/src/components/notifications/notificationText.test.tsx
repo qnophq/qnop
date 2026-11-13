@@ -186,4 +186,28 @@ describe('useNotificationText', () => {
     const n = detail({ actorName: '<b>Eve</b>', documentTitle: '{{actor}} <i>x</i>' });
     expect(words(n).body).toBe('<b>Eve</b> mentioned you in a comment on “{{actor}} <i>x</i>”.');
   });
+
+  it('words a team invitation, which is about a team and opens My Teams (#948)', async () => {
+    const invitation = detail({
+      type: 'TEAM_INVITATION',
+      actorName: 'Lena Lead',
+      documentTitle: undefined,
+      teamName: 'Legal',
+      actionTarget: 'TEAMS',
+    });
+    expect(words(invitation)).toEqual({
+      title: 'Lena Lead invited you to a team',
+      body: 'Lena Lead invited you to join “Legal”. Accept or decline it under My Teams.',
+      action: 'Open My Teams',
+    });
+    // Without a team name the server's text is kept rather than a sentence with a hole.
+    expect(words({ ...invitation, teamName: undefined }).body).toBe('server body');
+
+    await act(() => applyLocale('de'));
+    expect(words(invitation)).toEqual({
+      title: 'Lena Lead hat dich in ein Team eingeladen',
+      body: 'Lena Lead hat dich eingeladen, dem Team „Legal“ beizutreten. Unter „Meine Teams“ kannst du annehmen oder ablehnen.',
+      action: 'Meine Teams öffnen',
+    });
+  });
 });

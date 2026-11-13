@@ -80,6 +80,10 @@
     "description": "E-mails sur les révisions auxquelles vous participez — ajout en tant que réviseur, nouvelles annotations, réponses dans vos discussions, décisions et changements de statut.",
     "cadenceLabel": "M’informer par e-mail de l’activité des révisions",
     "mentionsNote": "Les mentions vous parviennent immédiatement dans tous les cas — quand on vous nomme personnellement, attendre a un coût.",
+    "teamInvitations": {
+      "label": "M’informer par e-mail quand on m’invite dans une équipe",
+      "help": "Une invitation attend votre réponse, elle est donc envoyée immédiatement. Elle apparaît dans votre boîte de réception dans tous les cas."
+    },
     "cadence": {
       "IMMEDIATE": {
         "label": "En temps réel",

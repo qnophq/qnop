@@ -142,6 +142,34 @@
       "label": "Secret re-encryption failed",
       "description": "The start-up re-encryption of stored secrets failed (issue #927). The instance started anyway and retries on the next start; the details give the error type, the server log has the rest."
     },
+    "teamInvitationCreated": {
+      "label": "Team invitation sent",
+      "description": "A team lead invited a user into the team. The invitation grants nothing until the user accepts it."
+    },
+    "teamInvitationAccepted": {
+      "label": "Team invitation accepted",
+      "description": "The invited user accepted and became a member of the team."
+    },
+    "teamInvitationDeclined": {
+      "label": "Team invitation declined",
+      "description": "The invited user declined; the invitation was deleted."
+    },
+    "teamInvitationRevoked": {
+      "label": "Team invitation withdrawn",
+      "description": "A pending invitation was removed — revoked by a lead or an administrator, dropped when an administrator disabled the team, or made moot by a direct add."
+    },
+    "teamMemberAdded": {
+      "label": "Team member added",
+      "description": "An administrator added a user to a team directly, with the role shown — including a new team's first lead."
+    },
+    "teamMemberRemoved": {
+      "label": "Team member removed",
+      "description": "A lead or an administrator removed a member from a team; the role is the one they held."
+    },
+    "teamMemberRoleChanged": {
+      "label": "Team role changed",
+      "description": "A member's team role changed — granting or removing Lead, which carries the right to manage the team."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "A recorded review event."
@@ -174,6 +202,23 @@
       "storageObjects_one": "{{count}} storage object",
       "storageObjects_other": "{{count}} storage objects",
       "more": "{{titles}} +{{remaining}} more"
+    },
+    "team": {
+      "subject": "{{user}} · {{team}}",
+      "asRole": "{{subject}} · as {{role}}",
+      "roleChange": "{{subject}} · {{from}} → {{to}}",
+      "withReason": "{{subject}} · {{reason}}",
+      "unknownUser": "a former user",
+      "unknownTeam": "a former team",
+      "roles": {
+        "LEAD": "Lead",
+        "MEMBER": "Member"
+      },
+      "reasons": {
+        "REVOKED": "revoked",
+        "TEAM_DISABLED": "team disabled",
+        "SUPERSEDED": "added directly"
+      }
     }
   }
 }

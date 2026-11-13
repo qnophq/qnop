@@ -142,6 +142,34 @@
       "label": "Falha na recriptografia",
       "description": "A recriptografia dos segredos armazenados na inicialização falhou (issue #927). A instância iniciou mesmo assim e tentará novamente na próxima inicialização; os detalhes indicam o tipo de erro e o log do servidor, o restante."
     },
+    "teamInvitationCreated": {
+      "label": "Convite para equipe enviado",
+      "description": "Um líder de equipe convidou uma pessoa para a equipe. O convite não concede nada até ser aceito."
+    },
+    "teamInvitationAccepted": {
+      "label": "Convite para equipe aceito",
+      "description": "A pessoa convidada aceitou e agora é membro da equipe."
+    },
+    "teamInvitationDeclined": {
+      "label": "Convite para equipe recusado",
+      "description": "A pessoa convidada recusou; o convite foi excluído."
+    },
+    "teamInvitationRevoked": {
+      "label": "Convite para equipe retirado",
+      "description": "Um convite pendente foi removido — retirado por um líder ou administrador, descartado quando a equipe foi desativada ou tornado desnecessário por uma inclusão direta."
+    },
+    "teamMemberAdded": {
+      "label": "Membro adicionado à equipe",
+      "description": "Um administrador adicionou uma pessoa diretamente à equipe com a função indicada — inclusive o primeiro líder de uma equipe nova."
+    },
+    "teamMemberRemoved": {
+      "label": "Membro removido da equipe",
+      "description": "Um líder ou administrador removeu um membro da equipe; a função mostrada é a que ele tinha."
+    },
+    "teamMemberRoleChanged": {
+      "label": "Função na equipe alterada",
+      "description": "A função de um membro na equipe mudou — concessão ou retirada da função de líder, que dá o direito de gerenciar a equipe."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "Um evento de revisão registrado."
@@ -176,6 +204,23 @@
       "storageObjects_many": "{{count}} objetos de armazenamento",
       "storageObjects_other": "{{count}} objetos de armazenamento",
       "more": "{{titles}} e mais {{remaining}}"
+    },
+    "team": {
+      "subject": "{{user}} · {{team}}",
+      "asRole": "{{subject}} · como {{role}}",
+      "roleChange": "{{subject}} · {{from}} → {{to}}",
+      "withReason": "{{subject}} · {{reason}}",
+      "unknownUser": "um usuário anterior",
+      "unknownTeam": "uma equipe anterior",
+      "roles": {
+        "LEAD": "Líder",
+        "MEMBER": "Membro"
+      },
+      "reasons": {
+        "REVOKED": "retirado",
+        "TEAM_DISABLED": "equipe desativada",
+        "SUPERSEDED": "adicionado diretamente"
+      }
     }
   }
 }

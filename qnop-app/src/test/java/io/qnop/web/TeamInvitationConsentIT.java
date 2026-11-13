@@ -59,6 +59,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -83,6 +84,7 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
   @Autowired TeamMembershipRepository teamMemberships;
   @Autowired TeamInvitationRepository invitations;
   @Autowired PasswordEncoder passwordEncoder;
+  @Autowired JdbcTemplate jdbc;
 
   private final List<UUID> createdUsers = new ArrayList<>();
 
@@ -117,6 +119,13 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
   void cleanup() {
     documents.findById(documentId).ifPresent(documents::delete);
     teams.findById(teamId).ifPresent(teams::delete); // cascades memberships + invitations
+    // Membership changes are audited now (issue #948), and an audit row keeps its actor
+    // (FK RESTRICT). TRUNCATE is the sanctioned wipe, as clean.sql does for the seeded suites;
+    // the chain triggers block a scoped DELETE. This wipes EVERY audit row, so it assumes the
+    // IT classes run sequentially in one JVM (as configured today): a parallel IT, or one that
+    // counts audit rows across classes, would race it.
+    jdbc.execute("TRUNCATE TABLE audit_event");
+    jdbc.update("UPDATE audit_chain_head SET last_seq = 0, last_hash = repeat('0', 64)");
     createdUsers.forEach(id -> users.findById(id).ifPresent(users::delete));
     createdUsers.clear();
   }
@@ -182,18 +191,28 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
         .perform(post("/api/v1/teams/invitations/{id}/accept", teamId).with(asUser(invitee)))
         .andExpect(status().isNotFound());
 
-    invite(invitee).andExpect(status().isCreated());
+    // One invitation per user and team a day (issue #948): the lead cannot simply invite again.
     invite(invitee)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("REINVITE_COOLDOWN"));
+
+    invite(stranger).andExpect(status().isCreated());
+    invite(stranger)
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("ALREADY_INVITED"));
     mockMvc
-        .perform(delete("/api/v1/teams/{id}/invitations/{uid}", teamId, invitee).with(asUser(lead)))
+        .perform(
+            delete("/api/v1/teams/{id}/invitations/{uid}", teamId, stranger).with(asUser(lead)))
         .andExpect(status().isNoContent());
-    assertThat(invitations.existsByTeamIdAndUserId(teamId, invitee)).isFalse();
+    assertThat(invitations.existsByTeamIdAndUserId(teamId, stranger)).isFalse();
     mockMvc
-        .perform(post("/api/v1/teams/invitations/{id}/accept", teamId).with(asUser(invitee)))
+        .perform(post("/api/v1/teams/invitations/{id}/accept", teamId).with(asUser(stranger)))
         .andExpect(status().isNotFound());
-    assertThat(teamMemberships.existsByTeamIdAndUserId(teamId, invitee)).isFalse();
+    assertThat(teamMemberships.existsByTeamIdAndUserId(teamId, stranger)).isFalse();
+    // Nor after revoking it (issue #948): otherwise invite -> revoke -> invite loops freely.
+    invite(stranger)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("REINVITE_COOLDOWN"));
   }
 
   @Test
@@ -282,7 +301,9 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
     ExecutorService pool = Executors.newFixedThreadPool(2);
     try {
       for (int round = 0; round < 5; round++) {
-        invite(invitee).andExpect(status().isCreated());
+        // A fresh invitee per round: the same pair may be invited once a day (issue #948).
+        UUID candidate = createUser();
+        invite(candidate).andExpect(status().isCreated());
         CyclicBarrier start = new CyclicBarrier(2);
         Future<Integer> accept =
             pool.submit(
@@ -291,7 +312,7 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
                   return mockMvc
                       .perform(
                           post("/api/v1/teams/invitations/{id}/accept", teamId)
-                              .with(asUser(invitee)))
+                              .with(asUser(candidate)))
                       .andReturn()
                       .getResponse()
                       .getStatus();
@@ -302,7 +323,7 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
                   start.await(5, TimeUnit.SECONDS);
                   return mockMvc
                       .perform(
-                          delete("/api/v1/teams/{id}/invitations/{uid}", teamId, invitee)
+                          delete("/api/v1/teams/{id}/invitations/{uid}", teamId, candidate)
                               .with(asUser(lead)))
                       .andReturn()
                       .getResponse()
@@ -314,10 +335,10 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
         // Exactly one of them took the invitation; the loser saw it gone.
         assertThat(List.of(accepted, revoked)).containsAnyOf(200, 204);
         assertThat(accepted == 200 ? revoked : accepted).isEqualTo(404);
-        assertThat(teamMemberships.existsByTeamIdAndUserId(teamId, invitee))
+        assertThat(teamMemberships.existsByTeamIdAndUserId(teamId, candidate))
             .isEqualTo(accepted == 200);
-        assertThat(invitations.existsByTeamIdAndUserId(teamId, invitee)).isFalse();
-        teamMemberships.findByTeamIdAndUserId(teamId, invitee).ifPresent(teamMemberships::delete);
+        assertThat(invitations.existsByTeamIdAndUserId(teamId, candidate)).isFalse();
+        teamMemberships.findByTeamIdAndUserId(teamId, candidate).ifPresent(teamMemberships::delete);
       }
     } finally {
       pool.shutdownNow();

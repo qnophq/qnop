@@ -46,6 +46,7 @@ import { AvatarUploader } from '../components/profile/AvatarUploader';
 import { TimezoneSetting } from '../components/profile/TimezoneSetting';
 import {
   EMAIL_REVIEW_NOTIFICATIONS_KEY,
+  EMAIL_TEAM_INVITATIONS_KEY,
   useUpdateUserSettings,
   useUserSettings,
 } from '../api/hooks/useUserSettings';
@@ -109,6 +110,20 @@ export function ProfilePage() {
     notificationsOn: reviewMailsCadence !== 'OFF',
   });
   const earnedCount = achievements.filter((a) => a.earned).length;
+
+  // Team invitations are mailed at once under their own opt-out (issue #948); the server
+  // reports the registry default ("true") when the user never chose.
+  const teamInvitationMails =
+    settingsQuery.data?.settings.find((setting) => setting.key === EMAIL_TEAM_INVITATIONS_KEY)
+      ?.value !== 'false';
+  const onToggleTeamInvitationMails = (enabled: boolean) => {
+    updateSettings.mutate(
+      { [EMAIL_TEAM_INVITATIONS_KEY]: String(enabled) },
+      {
+        onError: () => setToast({ message: t('toast.settingSaveFailed'), severity: 'error' }),
+      },
+    );
+  };
 
   const onChangeReviewMails = (cadence: string) => {
     updateSettings.mutate(
@@ -320,6 +335,20 @@ export function ProfilePage() {
         </TextField>
         <Typography color="text.secondary" sx={{ fontSize: 13, mt: 1.5 }}>
           {t('notifications.mentionsNote')}
+        </Typography>
+        <FormControlLabel
+          sx={{ mt: 1.5 }}
+          control={
+            <Switch
+              checked={teamInvitationMails}
+              onChange={(event) => onToggleTeamInvitationMails(event.target.checked)}
+              disabled={settingsQuery.isPending}
+            />
+          }
+          label={t('notifications.teamInvitations.label')}
+        />
+        <Typography color="text.secondary" sx={{ fontSize: 13 }}>
+          {t('notifications.teamInvitations.help')}
         </Typography>
       </Paper>
 

@@ -96,7 +96,7 @@ Generate a new key (`openssl rand -base64 48`; optionally a new salt with `opens
 | `QNOP_HTTP_CLIENT_PROXY_HOST` / `_PORT` / `_NON_PROXY_HOSTS` | *(unset)* | Explicit egress proxy for OIDC and usage-tracking requests — a weaker mode; see [Outbound proxy](#outbound-proxy-oidc-and-usage-tracking) |
 | `QNOP_AUTH_OIDC_FRONTEND_BASE_URL` | *(empty)* | Public base URL the OIDC login flow redirects back to, when it differs from the request origin |
 
-SMTP for e-mail notifications (verification, reset, review events) is configured at runtime under **Administration → Settings**, not via environment.
+SMTP for e-mail notifications (verification, reset, review events, team invitations) is configured at runtime under **Administration → Settings**, not via environment. `smtp.enabled` is the master switch for all outgoing mail. `notifications.review_emails_enabled` only covers review activity: team invitations (#948) are not covered by it and are governed by the SMTP master switch plus each user's own opt-out.
 
 ## First login
 

@@ -198,7 +198,7 @@ export function NotificationRow({
                 display: { xs: 'none', sm: 'block' },
               }}
             >
-              {notification.documentTitle}
+              {notification.documentTitle ?? notification.teamName}
             </Typography>
             <Typography
               sx={{
@@ -233,9 +233,9 @@ function StackedBody({
   return (
     <>
       {title}
-      {notification.documentTitle && (
+      {(notification.documentTitle ?? notification.teamName) && (
         <Typography sx={{ ...CLAMP, fontSize: 12.5, color: 'text.secondary' }}>
-          {notification.documentTitle}
+          {notification.documentTitle ?? notification.teamName}
         </Typography>
       )}
       {notification.preview && (

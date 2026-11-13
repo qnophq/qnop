@@ -198,4 +198,35 @@ class MailNotificationSinkTest {
         .sendMailFromTemplate(
             MailTemplateKey.REVIEW_COMMENT_ADDED, "a@qnop.test", intent.mailVars(), "de");
   }
+
+  @Test
+  @DisplayName("a team invitation is mailed at once, even on the digest cadence (#948)")
+  void teamInvitationIgnoresTheReviewCadence() {
+    emailsEnabled(true);
+    when(userSettings.findByUserIdAndSettingKey(any(), any())).thenReturn(Optional.empty());
+    stored(UserSettingKey.EMAIL_REVIEW_NOTIFICATIONS, "OFF");
+
+    assertThat(sink().accepts(intent(NotificationType.TEAM_INVITATION, "a@qnop.test"))).isTrue();
+  }
+
+  @Test
+  @DisplayName(
+      "a team invitation is not review activity, so the review-mail switch spares it (#948)")
+  void teamInvitationIgnoresTheReviewSwitch() {
+    emailsEnabled(false);
+    when(userSettings.findByUserIdAndSettingKey(any(), any())).thenReturn(Optional.empty());
+
+    assertThat(sink().accepts(intent(NotificationType.TEAM_INVITATION, "a@qnop.test"))).isTrue();
+  }
+
+  @Test
+  @DisplayName("the team-invitation opt-out silences only that mail (#948)")
+  void teamInvitationOptOut() {
+    emailsEnabled(true);
+    when(userSettings.findByUserIdAndSettingKey(any(), any())).thenReturn(Optional.empty());
+    optOut(UserSettingKey.EMAIL_TEAM_INVITATIONS);
+
+    assertThat(sink().accepts(intent(NotificationType.TEAM_INVITATION, "a@qnop.test"))).isFalse();
+    assertThat(sink().accepts(intent(NotificationType.MENTION, "a@qnop.test"))).isTrue();
+  }
 }

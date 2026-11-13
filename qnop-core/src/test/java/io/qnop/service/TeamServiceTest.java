@@ -51,23 +51,29 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 /** Unit tests for {@link TeamService} (issue #105): name/membership guards and mapping. */
 class TeamServiceTest {
+
+  private static final UUID ADMIN_ACTOR = UUID.randomUUID();
 
   private final TeamRepository teams = mock(TeamRepository.class);
   private final TeamMembershipRepository memberships = mock(TeamMembershipRepository.class);
   private final TeamInvitationRepository invitations = mock(TeamInvitationRepository.class);
   private final UserRepository users = mock(UserRepository.class);
   private final TeamSlugService slugs = mock(TeamSlugService.class);
+  private final TeamMembershipAudit audit = mock(TeamMembershipAudit.class);
+  private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
   private final TeamService service =
-      new TeamService(teams, memberships, invitations, users, slugs, noLimits());
+      new TeamService(teams, memberships, invitations, users, slugs, noLimits(), audit, events);
 
   @Test
   @DisplayName("create rejects a team name with control or bidi-override characters")
   void createRejectsControlCharactersInName() {
     for (String name : new String[] {"Core\r\nTeam", "Core\u202ETeam"}) {
-      assertThatThrownBy(() -> service.create(name, null, UUID.randomUUID(), null, null, null))
+      assertThatThrownBy(
+              () -> service.create(name, null, UUID.randomUUID(), null, null, null, ADMIN_ACTOR))
           .isInstanceOf(InvalidTextException.class);
     }
     verify(teams, never()).save(any());
@@ -87,7 +93,7 @@ class TeamServiceTest {
     when(memberships.existsByTeamIdAndUserId(teamId, leadId)).thenReturn(false);
     when(memberships.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    var view = service.create("  Core  ", "The core team", leadId, null, null, null);
+    var view = service.create("  Core  ", "The core team", leadId, null, null, null, ADMIN_ACTOR);
 
     assertThat(view.name()).isEqualTo("Core");
     assertThat(view.enabled()).isTrue();
@@ -100,7 +106,7 @@ class TeamServiceTest {
         .save(argThat(m -> m.getTeamRole() == TeamRole.LEAD && leadId.equals(m.getUserId())));
 
     when(teams.existsByNameIgnoreCase("Core")).thenReturn(true);
-    assertThatThrownBy(() -> service.create("Core", null, leadId, null, null, null))
+    assertThatThrownBy(() -> service.create("Core", null, leadId, null, null, null, ADMIN_ACTOR))
         .isInstanceOf(TeamConflictException.class)
         .extracting("code")
         .isEqualTo("NAME_TAKEN");
@@ -120,7 +126,7 @@ class TeamServiceTest {
     when(memberships.existsByTeamIdAndUserId(teamId, leadId)).thenReturn(false);
     when(memberships.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    var view = service.create("Ops", null, leadId, false, true, true);
+    var view = service.create("Ops", null, leadId, false, true, true, ADMIN_ACTOR);
 
     assertThat(view.enabled()).isFalse();
     assertThat(view.profileShowMembers()).isTrue();
@@ -138,7 +144,7 @@ class TeamServiceTest {
     when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team(teamId)));
     when(users.findById(leadId)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.create("Core", null, leadId, null, null, null))
+    assertThatThrownBy(() -> service.create("Core", null, leadId, null, null, null, ADMIN_ACTOR))
         .isInstanceOf(UserNotFoundException.class);
   }
 
@@ -164,14 +170,14 @@ class TeamServiceTest {
     // Another team already owns "Platform".
     when(teams.findByNameIgnoreCase("Platform"))
         .thenReturn(Optional.of(teamWithId(UUID.randomUUID(), "Platform")));
-    assertThatThrownBy(() -> service.update(id, "Platform", null, null, null, null))
+    assertThatThrownBy(() -> service.update(id, "Platform", null, null, null, null, ADMIN_ACTOR))
         .isInstanceOf(TeamConflictException.class)
         .extracting("code")
         .isEqualTo("NAME_TAKEN");
 
     // Renaming to a name owned by the same team is allowed.
     when(teams.findByNameIgnoreCase("Core")).thenReturn(Optional.of(team));
-    var view = service.update(id, "Core", "desc", false, null, null);
+    var view = service.update(id, "Core", "desc", false, null, null, ADMIN_ACTOR);
     assertThat(view.name()).isEqualTo("Core");
     assertThat(view.enabled()).isFalse();
   }
@@ -192,25 +198,25 @@ class TeamServiceTest {
     UUID userId = UUID.randomUUID();
 
     when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.empty());
-    assertThatThrownBy(() -> service.addMember(teamId, userId, "MEMBER"))
+    assertThatThrownBy(() -> service.addMember(teamId, userId, "MEMBER", ADMIN_ACTOR))
         .isInstanceOf(TeamNotFoundException.class);
 
     when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team(teamId)));
     when(users.findById(userId)).thenReturn(Optional.empty());
-    assertThatThrownBy(() -> service.addMember(teamId, userId, "MEMBER"))
+    assertThatThrownBy(() -> service.addMember(teamId, userId, "MEMBER", ADMIN_ACTOR))
         .isInstanceOf(UserNotFoundException.class);
 
     User user = User.internal("Alice", "alice@example.com", "alice", "h");
     when(users.findById(userId)).thenReturn(Optional.of(user));
     when(memberships.existsByTeamIdAndUserId(teamId, userId)).thenReturn(true);
-    assertThatThrownBy(() -> service.addMember(teamId, userId, "MEMBER"))
+    assertThatThrownBy(() -> service.addMember(teamId, userId, "MEMBER", ADMIN_ACTOR))
         .isInstanceOf(TeamConflictException.class)
         .extracting("code")
         .isEqualTo("ALREADY_MEMBER");
 
     when(memberships.existsByTeamIdAndUserId(teamId, userId)).thenReturn(false);
     when(memberships.save(any())).thenAnswer(inv -> inv.getArgument(0));
-    TeamMemberView view = service.addMember(teamId, userId, "LEAD");
+    TeamMemberView view = service.addMember(teamId, userId, "LEAD", ADMIN_ACTOR);
     assertThat(view.displayName()).isEqualTo("Alice");
     assertThat(view.teamRole()).isEqualTo("LEAD");
   }
@@ -222,9 +228,9 @@ class TeamServiceTest {
     UUID userId = UUID.randomUUID();
     when(memberships.findByTeamIdAndUserId(teamId, userId)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.setMemberRole(teamId, userId, "LEAD"))
+    assertThatThrownBy(() -> service.setMemberRole(teamId, userId, "LEAD", ADMIN_ACTOR))
         .isInstanceOf(TeamNotFoundException.class);
-    assertThatThrownBy(() -> service.removeMember(teamId, userId))
+    assertThatThrownBy(() -> service.removeMember(teamId, userId, ADMIN_ACTOR))
         .isInstanceOf(TeamNotFoundException.class);
     verify(memberships, never()).delete(any());
   }
@@ -239,7 +245,7 @@ class TeamServiceTest {
     when(users.findById(userId))
         .thenReturn(Optional.of(User.internal("Bob", "bob@example.com", "bob", "h")));
 
-    TeamMemberView view = service.setMemberRole(teamId, userId, "LEAD");
+    TeamMemberView view = service.setMemberRole(teamId, userId, "LEAD", ADMIN_ACTOR);
 
     assertThat(membership.getTeamRole()).isEqualTo(TeamRole.LEAD);
     assertThat(view.teamRole()).isEqualTo("LEAD");
@@ -463,7 +469,7 @@ class TeamServiceTest {
     verify(invitations).deleteInvitation(teamId, target);
     verify(memberships, never()).existsByTeamIdAndUserIdAndTeamRole(teamId, admin, TeamRole.LEAD);
     // The admin console keeps the address.
-    assertThat(service.addMember(teamId, target, "MEMBER").email()).isNotNull();
+    assertThat(service.addMember(teamId, target, "MEMBER", ADMIN_ACTOR).email()).isNotNull();
   }
 
   @Test
@@ -587,7 +593,7 @@ class TeamServiceTest {
     UUID user = UUID.randomUUID();
     when(invitations.deleteInvitation(teamId, user)).thenReturn(0); // answered concurrently
 
-    assertThatThrownBy(() -> service.revokeInvitation(teamId, user))
+    assertThatThrownBy(() -> service.revokeInvitation(teamId, user, ADMIN_ACTOR))
         .isInstanceOf(TeamNotFoundException.class);
     assertThatThrownBy(() -> service.declineInvitation(teamId, user))
         .isInstanceOf(TeamNotFoundException.class);
@@ -601,7 +607,8 @@ class TeamServiceTest {
     org.mockito.Mockito.doThrow(new IllegalStateException("team full"))
         .when(full)
         .requireTeamMemberCapacity(any());
-    TeamService guarded = new TeamService(teams, memberships, invitations, users, slugs, full);
+    TeamService guarded =
+        new TeamService(teams, memberships, invitations, users, slugs, full, audit, events);
     UUID teamId = UUID.randomUUID();
     UUID member = UUID.randomUUID();
     UUID newcomer = UUID.randomUUID();
@@ -643,10 +650,10 @@ class TeamServiceTest {
     UUID teamId = UUID.randomUUID();
     when(teams.findById(teamId)).thenReturn(Optional.of(teamWithId(teamId, "Core")));
 
-    service.update(teamId, null, null, true, null, null);
+    service.update(teamId, null, null, true, null, null, ADMIN_ACTOR);
     verify(invitations, never()).deleteAllOfTeam(any());
 
-    service.update(teamId, null, null, false, null, null);
+    service.update(teamId, null, null, false, null, null, ADMIN_ACTOR);
     verify(invitations).deleteAllOfTeam(teamId);
   }
 
@@ -816,11 +823,11 @@ class TeamServiceTest {
     when(memberships.countByTeamId(teamId)).thenReturn(2L); // a second member remains
 
     // The admin endpoints call the base methods directly — the guard must fire there too.
-    assertThatThrownBy(() -> service.setMemberRole(teamId, lead, "MEMBER"))
+    assertThatThrownBy(() -> service.setMemberRole(teamId, lead, "MEMBER", ADMIN_ACTOR))
         .isInstanceOf(TeamConflictException.class)
         .extracting("code")
         .isEqualTo("LAST_LEAD");
-    assertThatThrownBy(() -> service.removeMember(teamId, lead))
+    assertThatThrownBy(() -> service.removeMember(teamId, lead, ADMIN_ACTOR))
         .isInstanceOf(TeamConflictException.class)
         .extracting("code")
         .isEqualTo("LAST_LEAD");
@@ -840,8 +847,178 @@ class TeamServiceTest {
     when(memberships.findByTeamIdAndUserId(teamId, lead)).thenReturn(Optional.of(sole));
     when(memberships.countByTeamId(teamId)).thenReturn(1L); // the sole member
 
-    service.removeMember(teamId, lead); // empties the team — allowed
+    service.removeMember(teamId, lead, ADMIN_ACTOR); // empties the team — allowed
     verify(memberships).delete(sole);
+  }
+
+  // --- audit and notification of membership changes (issue #948) -------------
+
+  private static TeamMembershipAudit.Subject subject(UUID id, String name) {
+    return new TeamMembershipAudit.Subject(id, name);
+  }
+
+  @Test
+  @DisplayName("a lead's invitation is audited and announced for after-commit notification (#948)")
+  void invitationIsAuditedAndPublished() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    Team team = teamWithId(teamId, "Core");
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team));
+    when(users.findById(target))
+        .thenReturn(Optional.of(User.internal("Al", "al@example.com", "al", "h")));
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+    when(invitations.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service.addMemberAsLead(teamId, lead, false, target, "MEMBER");
+
+    verify(audit).invitationCreated(lead, team, subject(target, "Al"));
+    verify(events).publishEvent(new TeamInvitationCreated(teamId, target, lead));
+  }
+
+  @Test
+  @DisplayName(
+      "a re-invite within a day of any invitation is refused with REINVITE_COOLDOWN (#948)")
+  void reinviteWithinADayIsCooledDown() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(teamWithId(teamId, "Core")));
+    when(users.findById(target))
+        .thenReturn(Optional.of(User.internal("Al", "al@example.com", "al", "h")));
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+    when(audit.invitedSince(eq(teamId), eq(target), any())).thenReturn(true);
+
+    assertThatThrownBy(() -> service.addMemberAsLead(teamId, lead, false, target, "MEMBER"))
+        .isInstanceOf(TeamConflictException.class)
+        .extracting("code")
+        .isEqualTo("REINVITE_COOLDOWN");
+    verify(invitations, never()).saveAndFlush(any());
+    verify(events, never()).publishEvent(any(Object.class));
+    // The window is the documented cooldown, measured back from now.
+    verify(audit)
+        .invitedSince(
+            eq(teamId),
+            eq(target),
+            argThat(
+                since ->
+                    since.isAfter(
+                            Instant.now().minus(TeamService.REINVITE_COOLDOWN).minusSeconds(5))
+                        && since.isBefore(
+                            Instant.now().minus(TeamService.REINVITE_COOLDOWN).plusSeconds(5))));
+  }
+
+  @Test
+  @DisplayName("a refused invitation is neither audited nor announced (#948)")
+  void refusedInvitationLeavesNoTrace() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(teamWithId(teamId, "Core")));
+    when(users.findById(target))
+        .thenReturn(Optional.of(User.internal("Al", "al@example.com", "al", "h")));
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+    when(invitations.existsByTeamIdAndUserId(teamId, target)).thenReturn(true);
+
+    assertThatThrownBy(() -> service.addMemberAsLead(teamId, lead, false, target, "MEMBER"))
+        .isInstanceOf(TeamConflictException.class);
+
+    verify(audit, never()).invitationCreated(any(), any(), any());
+    verify(events, never()).publishEvent(any(Object.class));
+  }
+
+  @Test
+  @DisplayName("accept, decline and revoke are each audited with their actor (#948)")
+  void answersAreAudited() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    UUID user = UUID.randomUUID();
+    Team team = teamWithId(teamId, "Core");
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team));
+    when(invitations.deleteInvitation(teamId, user)).thenReturn(1);
+    when(memberships.findByTeamIdAndUserId(teamId, user)).thenReturn(Optional.empty());
+    when(memberships.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+    when(users.findById(user))
+        .thenReturn(Optional.of(User.internal("Ivy", "ivy@example.com", "ivy", "h")));
+
+    service.acceptInvitation(teamId, user);
+    service.declineInvitation(teamId, user);
+    service.revokeInvitationAsLead(teamId, lead, false, user);
+
+    verify(audit).invitationAccepted(team, subject(user, "Ivy"));
+    verify(audit).invitationDeclined(team, subject(user, "Ivy"));
+    verify(audit)
+        .invitationRevoked(lead, team, subject(user, "Ivy"), TeamMembershipAudit.REASON_REVOKED);
+  }
+
+  @Test
+  @DisplayName("disabling a team audits every invitation it drops (#948)")
+  void disablingAuditsDroppedInvitations() {
+    UUID teamId = UUID.randomUUID();
+    UUID ivy = UUID.randomUUID();
+    UUID bo = UUID.randomUUID();
+    Team team = teamWithId(teamId, "Core");
+    when(teams.findById(teamId)).thenReturn(Optional.of(team));
+    when(invitations.findPendingByTeamId(teamId))
+        .thenReturn(
+            List.of(
+                new TeamInvitationProjection(ivy, "Ivy", "ivy", "i@example.com", Instant.now()),
+                new TeamInvitationProjection(bo, "Bo", "bo", "b@example.com", Instant.now())));
+
+    service.update(teamId, null, null, false, null, null, ADMIN_ACTOR);
+
+    verify(audit)
+        .invitationRevoked(
+            ADMIN_ACTOR, team, subject(ivy, "Ivy"), TeamMembershipAudit.REASON_TEAM_DISABLED);
+    verify(audit)
+        .invitationRevoked(
+            ADMIN_ACTOR, team, subject(bo, "Bo"), TeamMembershipAudit.REASON_TEAM_DISABLED);
+  }
+
+  @Test
+  @DisplayName("a direct add is audited and supersedes a pending invitation on record (#948)")
+  void directAddIsAudited() {
+    UUID teamId = UUID.randomUUID();
+    UUID user = UUID.randomUUID();
+    Team team = teamWithId(teamId, "Core");
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team));
+    when(users.findById(user))
+        .thenReturn(Optional.of(User.internal("Ivy", "ivy@example.com", "ivy", "h")));
+    when(memberships.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(invitations.deleteInvitation(teamId, user)).thenReturn(1);
+
+    service.addMember(teamId, user, "LEAD", ADMIN_ACTOR);
+
+    verify(audit)
+        .invitationRevoked(
+            ADMIN_ACTOR, team, subject(user, "Ivy"), TeamMembershipAudit.REASON_SUPERSEDED);
+    verify(audit).memberAdded(ADMIN_ACTOR, team, subject(user, "Ivy"), TeamRole.LEAD);
+  }
+
+  @Test
+  @DisplayName("role changes and removals are audited with the role before and after (#948)")
+  void roleChangeAndRemovalAreAudited() {
+    UUID teamId = UUID.randomUUID();
+    UUID user = UUID.randomUUID();
+    Team team = teamWithId(teamId, "Core");
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team));
+    when(users.findById(user))
+        .thenReturn(Optional.of(User.internal("Ivy", "ivy@example.com", "ivy", "h")));
+    TeamMembership membership = TeamMembership.of(teamId, user, TeamRole.MEMBER);
+    when(memberships.findByTeamIdAndUserId(teamId, user)).thenReturn(Optional.of(membership));
+    when(memberships.countByTeamIdAndTeamRole(teamId, TeamRole.LEAD)).thenReturn(2L);
+
+    service.setMemberRole(teamId, user, "LEAD", ADMIN_ACTOR);
+    verify(audit)
+        .roleChanged(ADMIN_ACTOR, team, subject(user, "Ivy"), TeamRole.MEMBER, TeamRole.LEAD);
+
+    service.removeMember(teamId, user, ADMIN_ACTOR);
+    verify(audit).memberRemoved(ADMIN_ACTOR, team, subject(user, "Ivy"), TeamRole.LEAD);
   }
 
   private static Team teamWithId(UUID id, String name) {

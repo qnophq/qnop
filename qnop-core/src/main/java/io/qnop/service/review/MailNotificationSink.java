@@ -55,7 +55,10 @@ public class MailNotificationSink implements ReviewNotificationSink {
 
   @Override
   public boolean accepts(ReviewNotificationIntent intent) {
-    if (!settings.getBoolean(ApplicationSettingKey.NOTIFICATIONS_REVIEW_EMAILS_ENABLED)) {
+    // The instance switch is about review activity; a team invitation is not one, and it
+    // asks for an answer the invited user cannot give without hearing of it (issue #948).
+    if (intent.type() != NotificationType.TEAM_INVITATION
+        && !settings.getBoolean(ApplicationSettingKey.NOTIFICATIONS_REVIEW_EMAILS_ENABLED)) {
       return false;
     }
     User recipient = intent.recipient();
@@ -80,6 +83,11 @@ public class MailNotificationSink implements ReviewNotificationSink {
    * "someone named you"; everything else follows the general review-mail opt-out.
    */
   private boolean optedOut(UUID userId, NotificationType type) {
+    if (type == NotificationType.TEAM_INVITATION) {
+      // Its own plain opt-out (issue #948): an invitation waits for an answer, so it is
+      // never held for the review digest either.
+      return booleanOptOut(userId, UserSettingKey.EMAIL_TEAM_INVITATIONS);
+    }
     if (type == NotificationType.MENTION) {
       // Still a plain opt-out: being named personally is the case where latency
       // actually costs something, so a mention is never held for a digest.
@@ -92,6 +100,13 @@ public class MailNotificationSink implements ReviewNotificationSink {
     // immediate channel, so it stays silent for DAILY — the digest job picks
     // those up from the notification rows the in-app sink writes regardless.
     return cadenceFor(userId) != ReviewMailCadence.IMMEDIATE;
+  }
+
+  private boolean booleanOptOut(UUID userId, UserSettingKey key) {
+    return userSettings
+        .findByUserIdAndSettingKey(userId, key.getKey())
+        .map(setting -> "false".equalsIgnoreCase(setting.getSettingValue()))
+        .orElse(false);
   }
 
   /** The recipient's chosen cadence, or the registry default where they never chose. */

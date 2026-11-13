@@ -41,6 +41,7 @@
       "LAST_ADMIN": "At least one enabled admin must remain.",
       "SELF_LOCKOUT": "You can't disable or change the role of your own account.",
       "SELF_DELETE": "You can't delete your own account.",
+      "USER_HAS_AUDIT_HISTORY": "This account appears in the audit trail and can't be deleted. Disable it instead.",
       "EMAIL_TAKEN": "An account with this email already exists.",
       "USERNAME_TAKEN": "This username is already taken.",
       "USER_PENDING_VERIFICATION": "This account is still waiting for its email verification. Send a password-reset link instead — it becomes active once its owner sets a password."
@@ -500,7 +501,7 @@
       },
       "notifications__review_emails_enabled": {
         "label": "Review emails enabled",
-        "description": "Send email notifications for review activity (reviewer added, annotations, replies, status changes)."
+        "description": "Send email notifications for review activity (reviewer added, annotations, replies, status changes). Team invitations are not covered: they have their own per-user opt-out, and the SMTP master switch still stops them."
       },
       "notifications__retain_days": {
         "label": "Retain days",
@@ -715,7 +716,8 @@
       "review__workflow_changed": "Review status change",
       "review__deleted": "Review deleted",
       "review__version_uploaded": "New document version",
-      "review__mention": "You were mentioned"
+      "review__mention": "You were mentioned",
+      "team__invitation": "Team invitation"
     },
     "localeStatus": {
       "custom": "Customised",

@@ -127,3 +127,21 @@ describe('humanizeToken', () => {
     expect(humanizeToken('CHANGES_REQUESTED')).toBe('Changes requested');
   });
 });
+
+describe('team-membership audit events (#948)', () => {
+  it('labels every membership change and flags privilege changes in amber', () => {
+    const types = [
+      'team.invitation.created',
+      'team.invitation.accepted',
+      'team.invitation.declined',
+      'team.invitation.revoked',
+      'team.member.added',
+      'team.member.removed',
+      'team.member.role_changed',
+    ];
+    expect(AUDIT_EVENT_TYPES).toEqual(expect.arrayContaining(types));
+    expect(english(auditEventMeta('team.member.role_changed').labelKey)).toBe('Team role changed');
+    expect(auditEventMeta('team.member.role_changed').tone).toBe('amber');
+    expect(auditEventMeta('team.invitation.accepted').tone).toBe('green');
+  });
+});

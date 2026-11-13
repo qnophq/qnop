@@ -112,7 +112,8 @@ public class TeamController implements AdminTeamsApi {
             request.getLeadUserId(),
             request.getEnabled(),
             request.getProfileShowMembers(),
-            request.getProfileShowReviews());
+            request.getProfileShowReviews(),
+            CurrentUser.requireUserId());
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(toSummary(created, teamAvatarUrl(created.id())));
   }
@@ -131,7 +132,8 @@ public class TeamController implements AdminTeamsApi {
             request.getDescription(),
             request.getEnabled(),
             request.getProfileShowMembers(),
-            request.getProfileShowReviews());
+            request.getProfileShowReviews(),
+            CurrentUser.requireUserId());
     return ResponseEntity.ok(toSummary(updated, teamAvatarUrl(updated.id())));
   }
 
@@ -150,26 +152,29 @@ public class TeamController implements AdminTeamsApi {
   public ResponseEntity<AdminTeamMember> addTeamMember(
       UUID teamId, AdminTeamMemberRequest request) {
     TeamMemberView member =
-        teams.addMember(teamId, request.getUserId(), request.getTeamRole().name());
+        teams.addMember(
+            teamId, request.getUserId(), request.getTeamRole().name(), CurrentUser.requireUserId());
     return ResponseEntity.status(HttpStatus.CREATED).body(toMember(member));
   }
 
   @Override
   public ResponseEntity<AdminTeamMember> setTeamMemberRole(
       UUID teamId, UUID userId, AdminTeamMemberRoleUpdateRequest request) {
-    TeamMemberView member = teams.setMemberRole(teamId, userId, request.getTeamRole().name());
+    TeamMemberView member =
+        teams.setMemberRole(
+            teamId, userId, request.getTeamRole().name(), CurrentUser.requireUserId());
     return ResponseEntity.ok(toMember(member));
   }
 
   @Override
   public ResponseEntity<Void> removeTeamMember(UUID teamId, UUID userId) {
-    teams.removeMember(teamId, userId);
+    teams.removeMember(teamId, userId, CurrentUser.requireUserId());
     return ResponseEntity.noContent().build();
   }
 
   @Override
   public ResponseEntity<Void> revokeTeamInvitation(UUID teamId, UUID userId) {
-    teams.revokeInvitation(teamId, userId);
+    teams.revokeInvitation(teamId, userId, CurrentUser.requireUserId());
     return ResponseEntity.noContent().build();
   }
 

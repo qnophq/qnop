@@ -27,6 +27,9 @@ import { useAuthStore } from '../../stores/authStore';
 /** The per-user opt-out for review activity mails (issue #316). */
 export const EMAIL_REVIEW_NOTIFICATIONS_KEY = 'email_review_notifications';
 
+/** The per-user opt-out for team-invitation mails (issue #948); absent means "send". */
+export const EMAIL_TEAM_INVITATIONS_KEY = 'email_team_invitations';
+
 export const userSettingKeys = {
   all: ['user-settings'] as const,
 };

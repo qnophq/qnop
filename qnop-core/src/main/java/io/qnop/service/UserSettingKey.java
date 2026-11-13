@@ -78,6 +78,14 @@ public enum UserSettingKey {
       "true",
       "Receive an email when someone @mentions you in a review. Kept separate from general review"
           + " activity, so muting the rest does not mute being addressed personally."),
+  // A team invitation asks for an answer, so it is mailed as it happens rather than
+  // folded into the review digest; this is its own opt-out (issue #948). The in-app
+  // inbox records it either way.
+  EMAIL_TEAM_INVITATIONS(
+      "email_team_invitations",
+      SettingValueType.BOOLEAN,
+      "true",
+      "Receive an email when a team lead invites you to join a team."),
   // Tied to the account rather than the browser (issue #666): somebody who has
   // opted out has opted out on their laptop and their tablet, and a cleared
   // browser store must not quietly re-enrol them.

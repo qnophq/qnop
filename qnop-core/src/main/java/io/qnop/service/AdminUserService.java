@@ -23,6 +23,7 @@ package io.qnop.service;
 import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.entity.UserSource;
+import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.OidcIdentityRepository;
 import io.qnop.repository.UserProviderName;
 import io.qnop.repository.UserRepository;
@@ -37,6 +38,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -74,7 +76,11 @@ public class AdminUserService {
           "createdat", "createdAt",
           "lastloginat", "lastLoginAt");
 
+  /** {@code code} of a delete refused because the audit trail references the user (#948). */
+  public static final String USER_HAS_AUDIT_HISTORY = "USER_HAS_AUDIT_HISTORY";
+
   private final UserRepository users;
+  private final AuditEventRepository auditEvents;
   private final OidcIdentityRepository oidcIdentities;
   private final PasswordEncoder passwordEncoder;
   private final PasswordResetFlowService passwordResetFlow;
@@ -88,8 +94,10 @@ public class AdminUserService {
       PasswordResetFlowService passwordResetFlow,
       RefreshTokenService refreshTokens,
       UserSlugService slugs,
-      InstanceLimitService limits) {
+      InstanceLimitService limits,
+      AuditEventRepository auditEvents) {
     this.limits = limits;
+    this.auditEvents = auditEvents;
     this.users = users;
     this.oidcIdentities = oidcIdentities;
     this.passwordEncoder = passwordEncoder;
@@ -220,7 +228,8 @@ public class AdminUserService {
    * Permanently deletes a user; the database cascades their tokens, settings, OIDC identity and
    * team memberships. Their still-unexpired access tokens stop working at once, because a token
    * whose user no longer exists counts as revoked (issue #901). Rejects (409) deleting your own
-   * account or the last enabled admin.
+   * account, the last enabled admin, or a user the audit trail names as an actor ({@code
+   * USER_HAS_AUDIT_HISTORY}, issue #948 — such an account can only be disabled).
    */
   @Transactional
   public void delete(UUID id, UUID actingUserId) {
@@ -229,12 +238,30 @@ public class AdminUserService {
       throw new AdminUserConflictException("SELF_DELETE", "You cannot delete your own account.");
     }
     requireAnotherEnabledAdmin(user);
+    // The audit trail keeps its actors (fk_audit_event_actor is ON DELETE RESTRICT, ADR-0043):
+    // refuse with a clear 409 instead of letting the foreign key surface as a 500 (issue #948).
+    if (auditEvents.existsByActorId(id)) {
+      throw auditHistoryConflict();
+    }
     // Lock the user row, then revoke the refresh tokens, then delete: user-then-tokens is the order
     // rotation locks in too, so a concurrent refresh of this user cannot deadlock the delete. The
     // revocation also ends a session that a rotation in flight just extended.
     users.lockById(id);
     refreshTokens.revokeAllForUser(id);
-    users.deleteById(id);
+    try {
+      users.deleteById(id);
+      // Flushed here so an audit row written concurrently after the check above still fails
+      // inside this method, as the same 409, rather than at commit as a 500.
+      users.flush();
+    } catch (DataIntegrityViolationException e) {
+      throw auditHistoryConflict();
+    }
+  }
+
+  private static AdminUserConflictException auditHistoryConflict() {
+    return new AdminUserConflictException(
+        USER_HAS_AUDIT_HISTORY,
+        "This account appears in the audit trail and cannot be deleted. Disable it instead.");
   }
 
   /**

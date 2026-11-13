@@ -49,5 +49,15 @@ public enum NotificationType {
    * review's title travels in {@code excerpt} instead, which is why this one renders without
    * loading anything.
    */
-  REVIEW_DELETED
+  REVIEW_DELETED,
+  /**
+   * A team lead invited the recipient into a team (issue #948, ADR-0064 amendment) — the one type
+   * that is not about a review at all.
+   *
+   * <p>Like {@link #REVIEW_DELETED} it never competes with another candidate and carries no {@code
+   * documentId}; the team's name travels in {@code excerpt} and the inviting lead in {@code
+   * actorId}. It links to "My Teams", where the invitation is accepted or declined, and it is
+   * mailed immediately rather than collected into the review digest.
+   */
+  TEAM_INVITATION
 }

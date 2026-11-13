@@ -414,6 +414,32 @@ public enum MailTemplateKey {
       "actorName",
       "documentTitle",
       "commentExcerpt",
+      "actionUrl"),
+  TEAM_INVITATION(
+      "team.invitation",
+      "Team invitation",
+      "{{actorName}} invited you to join “{{teamName}}”",
+      """
+      Hi {{recipientName}},
+
+      {{actorName}} invited you to join the team "{{teamName}}" on {{siteName}}.
+
+      You only become a member once you accept. Accept or decline the invitation under My Teams:
+
+      {{actionUrl}}
+      """,
+      """
+      <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Team invitation</h1>
+      <p style="margin:0 0 14px;">Hi {{recipientName}},</p>
+      <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> invited you to join the team <strong style="color:#18191f;">&#8220;{{teamName}}&#8221;</strong>.</p>
+      <p style="margin:0;color:#9a9ea8;font-size:13px;">You only become a member once you accept. Accept or decline the invitation under My Teams.</p>
+      """,
+      "Open My Teams",
+      "{{actorName}} invited you to join “{{teamName}}”.",
+      "siteName",
+      "recipientName",
+      "actorName",
+      "teamName",
       "actionUrl");
 
   /**
@@ -433,7 +459,8 @@ public enum MailTemplateKey {
           Map.entry("decision", "resolved"),
           Map.entry("versionNumber", "3"),
           Map.entry("oldState", "In review"),
-          Map.entry("newState", "Changes requested"));
+          Map.entry("newState", "Changes requested"),
+          Map.entry("teamName", "Legal review"));
 
   private final String key;
   private final String friendlyName;

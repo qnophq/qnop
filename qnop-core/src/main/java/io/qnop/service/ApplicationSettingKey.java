@@ -177,7 +177,9 @@ public enum ApplicationSettingKey {
       "notifications.review_emails_enabled",
       SettingValueType.BOOLEAN,
       "true",
-      "Send email notifications for review activity (reviewer added, annotations, replies, status changes)."),
+      "Send email notifications for review activity (reviewer added, annotations, replies, status changes)."
+          + " Team invitations are not covered: they have their own per-user opt-out, and the SMTP"
+          + " master switch still stops them."),
   NOTIFICATIONS_RETAIN_DAYS(
       "notifications.retain_days",
       SettingValueType.INTEGER,

@@ -43,6 +43,7 @@
       "LAST_ADMIN": "Debe quedar al menos un administrador activo.",
       "SELF_LOCKOUT": "No puedes desactivar tu propia cuenta ni cambiar su rol.",
       "SELF_DELETE": "No puedes eliminar tu propia cuenta.",
+      "USER_HAS_AUDIT_HISTORY": "Esta cuenta aparece en el registro de auditoría y no se puede eliminar. Desactívala en su lugar.",
       "EMAIL_TAKEN": "Ya existe una cuenta con este correo electrónico.",
       "USERNAME_TAKEN": "Este nombre de usuario ya está en uso.",
       "USER_PENDING_VERIFICATION": "Esta cuenta aún espera la confirmación de su correo electrónico. Envía en su lugar un enlace para restablecer la contraseña: se activará cuando su titular establezca una contraseña."
@@ -507,7 +508,7 @@
       },
       "notifications__review_emails_enabled": {
         "label": "Correos de revisión activados",
-        "description": "Enviar notificaciones por correo sobre la actividad de las revisiones (revisor añadido, anotaciones, respuestas, cambios de estado)."
+        "description": "Enviar notificaciones por correo sobre la actividad de las revisiones (revisor añadido, anotaciones, respuestas, cambios de estado). Las invitaciones a equipos no están incluidas: tienen su propia exclusión por persona, y el interruptor general de SMTP las sigue deteniendo."
       },
       "notifications__retain_days": {
         "label": "Conservación (días)",
@@ -727,7 +728,8 @@
       "review__workflow_changed": "Cambio de estado de la revisión",
       "review__deleted": "Revisión eliminada",
       "review__version_uploaded": "Nueva versión del documento",
-      "review__mention": "Te han mencionado"
+      "review__mention": "Te han mencionado",
+      "team__invitation": "Invitación a un equipo"
     },
     "localeStatus": {
       "custom": "Personalizada",

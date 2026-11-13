@@ -69,6 +69,7 @@ const CONFLICT_MESSAGES: Record<string, ParseKeys<'admin'>> = {
   LAST_ADMIN: 'users.conflicts.LAST_ADMIN',
   SELF_LOCKOUT: 'users.conflicts.SELF_LOCKOUT',
   SELF_DELETE: 'users.conflicts.SELF_DELETE',
+  USER_HAS_AUDIT_HISTORY: 'users.conflicts.USER_HAS_AUDIT_HISTORY',
 };
 
 /** Admin user management: search/filter/sort, paginate, create, edit, delete and reset (#104/#124). */

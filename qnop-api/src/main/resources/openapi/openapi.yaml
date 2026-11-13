@@ -1113,7 +1113,10 @@ paths:
       description: |
         Permanently deletes the user and, by cascade, their tokens, settings,
         OIDC identity and team memberships. The self-lockout guard rejects (409)
-        deleting your own account or the last enabled admin.
+        deleting your own account or the last enabled admin. A user the audit
+        trail names as an actor cannot be deleted either (409
+        `USER_HAS_AUDIT_HISTORY`, issue #948): the trail keeps its actors, so
+        such an account is disabled instead.
       operationId: deleteUser
       security:
         - bearerAuth: []
@@ -1129,7 +1132,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: Self-lockout or last-admin guard violated
+          description: |
+            Self-lockout or last-admin guard violated (`SELF_DELETE`,
+            `LAST_ADMIN`), or the user is an actor in the audit trail
+            (`USER_HAS_AUDIT_HISTORY`)
           content:
             application/json:
               schema:
@@ -1903,7 +1909,9 @@ paths:
         `LEAD_GRANT_REQUIRES_ADMIN`. 409 `ALREADY_MEMBER` / `ALREADY_INVITED`
         when the user is already in the team or already invited, and 409
         `TOO_MANY_PENDING_INVITATIONS` when the team already holds 50 unanswered
-        invitations.
+        invitations. 409 `REINVITE_COOLDOWN` when the user was already invited
+        into this team in the last 24 hours, however that invitation ended
+        (accepted, declined, revoked or superseded; issue #948).
       operationId: addMyTeamMember
       security:
         - bearerAuth: []
@@ -7922,6 +7930,12 @@ components:
         `REVIEW_DELETED` (issue #421) is the one type whose review no longer
         exists: it carries no `documentId` and no action to follow, and its
         `documentTitle` is the deleted review's name rather than a link to it.
+
+        `TEAM_INVITATION` (issue #948) is the one type that is not about a
+        review: a team lead invited the recipient into a team. It carries no
+        `documentId`/`documentTitle`; `teamName` names the team, the actor is
+        the inviting lead, and `actionPath` opens "My Teams" (`actionTarget`
+        `TEAMS`), where the invitation is accepted or declined.
       enum:
         - PARTICIPANT_ADDED
         - ANNOTATION_CREATED
@@ -7931,6 +7945,7 @@ components:
         - VERSION_UPLOADED
         - WORKFLOW_CHANGED
         - REVIEW_DELETED
+        - TEAM_INVITATION
       example: COMMENT_ADDED
     NotificationSummary:
       type: object
@@ -8014,8 +8029,15 @@ components:
           type: string
           nullable: true
           description: |
-            What `actionPath` opens: `ANNOTATION` or `REVIEW`. Null when there
-            is nothing to open (a tombstone or a deleted review).
+            What `actionPath` opens: `ANNOTATION`, `REVIEW` or `TEAMS` (the
+            "My Teams" page, for a `TEAM_INVITATION`). Null when there is
+            nothing to open (a tombstone or a deleted review).
+        teamName:
+          type: string
+          nullable: true
+          description: |
+            The team the recipient was invited into, on `TEAM_INVITATION`
+            (snapshotted when the invitation was sent); null for other types.
         readAt:
           type: string
           format: date-time
@@ -8108,8 +8130,15 @@ components:
           type: string
           nullable: true
           description: |
-            What `actionPath` opens: `ANNOTATION` or `REVIEW`. Null when there
-            is nothing to open (a tombstone or a deleted review).
+            What `actionPath` opens: `ANNOTATION`, `REVIEW` or `TEAMS` (the
+            "My Teams" page, for a `TEAM_INVITATION`). Null when there is
+            nothing to open (a tombstone or a deleted review).
+        teamName:
+          type: string
+          nullable: true
+          description: |
+            The team the recipient was invited into, on `TEAM_INVITATION`
+            (snapshotted when the invitation was sent); null for other types.
         readAt:
           type: string
           format: date-time

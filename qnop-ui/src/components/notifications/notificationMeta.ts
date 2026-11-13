@@ -46,6 +46,7 @@ const LABEL_KEYS: Record<NotificationType, NotificationsKey> = {
   [NotificationType.VersionUploaded]: 'types.versionUploaded',
   [NotificationType.WorkflowChanged]: 'types.workflowChanged',
   [NotificationType.ReviewDeleted]: 'types.reviewDeleted',
+  [NotificationType.TeamInvitation]: 'types.teamInvitation',
 };
 
 /** Index into the brand's avatar ramp — see `tokens.ts`. */
@@ -60,6 +61,8 @@ const TONE_INDEX: Record<NotificationType, number> = {
   // Red, the only one: everything else in this inbox reports work moving along,
   // and this reports work that is gone (issue #421).
   [NotificationType.ReviewDeleted]: 4,
+  // Violet like being added to a review: both say "you were asked to join" (issue #948).
+  [NotificationType.TeamInvitation]: 5,
 };
 
 /** The `notifications` catalog key naming the type; a type the UI does not know yet gets a generic one. */

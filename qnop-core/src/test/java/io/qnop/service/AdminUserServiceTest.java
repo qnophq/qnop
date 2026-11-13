@@ -64,6 +64,8 @@ class AdminUserServiceTest {
   private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
   private final PasswordResetFlowService passwordResetFlow = mock(PasswordResetFlowService.class);
   private final RefreshTokenService refreshTokens = mock(RefreshTokenService.class);
+  private final io.qnop.repository.AuditEventRepository auditEvents =
+      mock(io.qnop.repository.AuditEventRepository.class);
   // The mocked repositories report every slug candidate free in both namespaces (issue #595), so
   // the base slug wins (issue #486).
   private final AdminUserService service =
@@ -74,7 +76,8 @@ class AdminUserServiceTest {
           passwordResetFlow,
           refreshTokens,
           new UserSlugService(new SlugNamespace(users, mock(TeamRepository.class))),
-          noLimits());
+          noLimits(),
+          auditEvents);
 
   private void noClash() {
     when(users.existsByEmailIgnoreCaseAndSource(any(), any())).thenReturn(false);
@@ -388,6 +391,38 @@ class AdminUserServiceTest {
     order.verify(users).lockById(memberId);
     order.verify(refreshTokens).revokeAllForUser(memberId);
     order.verify(users).deleteById(memberId);
+  }
+
+  @Test
+  @DisplayName("delete refuses a user the audit trail names as an actor, with a 409 code (#948)")
+  void deleteRefusesAnAuditActor() {
+    UUID memberId = UUID.randomUUID();
+    User member = User.internal("Member", "member@example.com", "member", "h");
+    when(users.findById(memberId)).thenReturn(Optional.of(member));
+    when(auditEvents.existsByActorId(memberId)).thenReturn(true);
+
+    assertThatThrownBy(() -> service.delete(memberId, UUID.randomUUID()))
+        .isInstanceOf(AdminUserConflictException.class)
+        .extracting("code")
+        .isEqualTo(AdminUserService.USER_HAS_AUDIT_HISTORY);
+    org.mockito.Mockito.verify(users, org.mockito.Mockito.never()).deleteById(any());
+  }
+
+  @Test
+  @DisplayName("an audit reference that appears after the check is still a 409, not a 500 (#948)")
+  void deleteMapsTheForeignKeyToAConflict() {
+    UUID memberId = UUID.randomUUID();
+    User member = User.internal("Member", "member@example.com", "member", "h");
+    when(users.findById(memberId)).thenReturn(Optional.of(member));
+    org.mockito.Mockito.doThrow(
+            new org.springframework.dao.DataIntegrityViolationException("fk_audit_event_actor"))
+        .when(users)
+        .flush();
+
+    assertThatThrownBy(() -> service.delete(memberId, UUID.randomUUID()))
+        .isInstanceOf(AdminUserConflictException.class)
+        .extracting("code")
+        .isEqualTo(AdminUserService.USER_HAS_AUDIT_HISTORY);
   }
 
   @Test

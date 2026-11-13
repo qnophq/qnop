@@ -23,8 +23,10 @@ package io.qnop.service.notification;
 import io.qnop.entity.Document;
 import io.qnop.entity.Notification;
 import io.qnop.entity.NotificationType;
+import io.qnop.entity.User;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.NotificationRepository;
+import io.qnop.repository.UserRepository;
 import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.review.ReviewIdentityResolver;
 import java.time.Instant;
@@ -60,16 +62,19 @@ public class NotificationService {
   private final DocumentRepository documents;
   private final DocumentAccessService access;
   private final ReviewIdentityResolver identity;
+  private final UserRepository users;
 
   public NotificationService(
       NotificationRepository notifications,
       DocumentRepository documents,
       DocumentAccessService access,
-      ReviewIdentityResolver identity) {
+      ReviewIdentityResolver identity,
+      UserRepository users) {
     this.notifications = notifications;
     this.documents = documents;
     this.access = access;
     this.identity = identity;
+    this.users = users;
   }
 
   /** One page of the recipient's inbox, newest first; {@code unread} null means "both". */
@@ -138,6 +143,9 @@ public class NotificationService {
       // which review went — with "no longer available to you".
       return deletedReview(notification);
     }
+    if (notification.getType() == NotificationType.TEAM_INVITATION) {
+      return teamInvitation(notification);
+    }
     UUID documentId = notification.getDocumentId();
     boolean accessible = documentId != null && context.isVisible(documentId, access);
     Document document = accessible ? context.document(documentId, documents) : null;
@@ -201,6 +209,39 @@ public class NotificationService {
   }
 
   /**
+   * A team invitation (issue #948): not about a review, so there is no visibility to re-check and
+   * no per-review identity rule — the inviting lead acts under their public name, resolved from the
+   * user row on read like any other actor. The team's name was snapshotted into the excerpt; the
+   * action opens "My Teams", where the invitation is answered (or is already gone, which that page
+   * shows on its own).
+   */
+  private NotificationView teamInvitation(Notification notification) {
+    String teamName = blankToNull(notification.getExcerpt());
+    Optional<User> actor =
+        notification.getActorId() == null
+            ? Optional.empty()
+            : users.findById(notification.getActorId());
+    String actorName = actor.map(User::getDisplayName).orElse("A team lead");
+    String team = teamName == null ? "a team" : "the team “" + teamName + "”";
+    return new NotificationView(
+        notification.getId(),
+        notification.getType().name(),
+        actorName + " invited you to a team",
+        actorName + " invited you to join " + team + ". Accept or decline it under My Teams.",
+        null,
+        actor.map(User::getDisplayName).orElse(null),
+        actor.map(User::getSlug).orElse(null),
+        null,
+        null,
+        TeamInvitationNotifier.MY_TEAMS_PATH,
+        "Open My Teams",
+        true,
+        notification.getReadAt(),
+        notification.getCreatedAt(),
+        new NotificationFacts(null, null, null, null, ACTION_TARGET_TEAMS, teamName));
+  }
+
+  /**
    * What a notification looks like once the caller may no longer see its review — the record that
    * something happened survives, everything that would describe it does not.
    */
@@ -235,6 +276,8 @@ public class NotificationService {
       // Rendered by deletedReview before this is reached; listed so the switch
       // stays exhaustive and a new type cannot slip past the compiler.
       case REVIEW_DELETED -> "A review was deleted";
+      // Rendered by teamInvitation, likewise.
+      case TEAM_INVITATION -> "You were invited to a team";
     };
   }
 
@@ -264,6 +307,7 @@ public class NotificationService {
       // Rendered by deletedReview before this is reached; listed so a new type
       // cannot slip past the compiler.
       case REVIEW_DELETED -> review + " was permanently deleted by an administrator.";
+      case TEAM_INVITATION -> actorName + " invited you to join a team.";
     };
   }
 
@@ -298,7 +342,8 @@ public class NotificationService {
         notification.getType() == NotificationType.VERSION_UPLOADED
             ? notification.getVersionNumber()
             : null,
-        notification.getAnnotationId() != null ? "ANNOTATION" : "REVIEW");
+        notification.getAnnotationId() != null ? "ANNOTATION" : "REVIEW",
+        null);
   }
 
   private static String blankToNull(String value) {
@@ -389,20 +434,25 @@ public class NotificationService {
       Instant createdAt,
       NotificationFacts facts) {}
 
+  /** {@link NotificationFacts#actionTarget()} of a team invitation: the "My Teams" page. */
+  public static final String ACTION_TARGET_TEAMS = "TEAMS";
+
   /**
    * The structured parts of a notification (issue #836): what was decided ({@code resolved}, {@code
-   * reopened}, {@code dismissed}), the workflow transition, the uploaded version and what the
-   * action opens ({@code ANNOTATION} or {@code REVIEW}). All null where the type carries none, and
-   * on a tombstone or a deleted review, whose text says everything there is to say.
+   * reopened}, {@code dismissed}), the workflow transition, the uploaded version, what the action
+   * opens ({@code ANNOTATION}, {@code REVIEW} or, for a team invitation, {@code TEAMS}) and the
+   * invited-into team's name (issue #948). All null where the type carries none, and on a tombstone
+   * or a deleted review, whose text says everything there is to say.
    */
   public record NotificationFacts(
       String decision,
       String fromState,
       String toState,
       Integer versionNumber,
-      String actionTarget) {
+      String actionTarget,
+      String teamName) {
 
-    static final NotificationFacts NONE = new NotificationFacts(null, null, null, null, null);
+    static final NotificationFacts NONE = new NotificationFacts(null, null, null, null, null, null);
   }
 
   /** One page of the caller's inbox plus the inbox-wide unread total. */

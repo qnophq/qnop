@@ -142,6 +142,34 @@
       "label": "Falló el recifrado",
       "description": "El recifrado de los secretos almacenados al arrancar falló (issue #927). La instancia arrancó de todos modos y lo reintentará en el próximo arranque; los detalles indican el tipo de error y el registro del servidor, el resto."
     },
+    "teamInvitationCreated": {
+      "label": "Invitación a un equipo enviada",
+      "description": "Un líder de equipo invitó a una persona al equipo. La invitación no concede nada hasta que la acepte."
+    },
+    "teamInvitationAccepted": {
+      "label": "Invitación a un equipo aceptada",
+      "description": "La persona invitada aceptó y ahora es miembro del equipo."
+    },
+    "teamInvitationDeclined": {
+      "label": "Invitación a un equipo rechazada",
+      "description": "La persona invitada la rechazó; la invitación se eliminó."
+    },
+    "teamInvitationRevoked": {
+      "label": "Invitación a un equipo retirada",
+      "description": "Se eliminó una invitación pendiente: la retiró un líder o un administrador, se descartó al desactivar el equipo o quedó sin efecto por una incorporación directa."
+    },
+    "teamMemberAdded": {
+      "label": "Miembro añadido al equipo",
+      "description": "Un administrador añadió a una persona directamente al equipo con el rol indicado, incluido el primer líder de un equipo nuevo."
+    },
+    "teamMemberRemoved": {
+      "label": "Miembro quitado del equipo",
+      "description": "Un líder o un administrador quitó a un miembro del equipo; se muestra el rol que tenía."
+    },
+    "teamMemberRoleChanged": {
+      "label": "Rol en el equipo cambiado",
+      "description": "Cambió el rol de un miembro en el equipo: se concedió o retiró el rol de líder, que permite gestionar el equipo."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "Un evento de revisión registrado."
@@ -176,6 +204,23 @@
       "storageObjects_other": "{{count}} objetos de almacenamiento",
       "storageObjects_many": "{{count}} objetos de almacenamiento",
       "more": "{{titles}} y {{remaining}} más"
+    },
+    "team": {
+      "subject": "{{user}} · {{team}}",
+      "asRole": "{{subject}} · como {{role}}",
+      "roleChange": "{{subject}} · {{from}} → {{to}}",
+      "withReason": "{{subject}} · {{reason}}",
+      "unknownUser": "un usuario anterior",
+      "unknownTeam": "un equipo anterior",
+      "roles": {
+        "LEAD": "Líder",
+        "MEMBER": "Miembro"
+      },
+      "reasons": {
+        "REVOKED": "retirada",
+        "TEAM_DISABLED": "equipo desactivado",
+        "SUPERSEDED": "añadido directamente"
+      }
     }
   }
 }

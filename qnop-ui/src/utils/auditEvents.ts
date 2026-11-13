@@ -193,6 +193,42 @@ export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
     descriptionKey: 'events.secretsReencryptionFailed.description',
     tone: 'amber',
   },
+  // Team membership (issue #948): who was let into which team, and who may manage it.
+  'team.invitation.created': {
+    labelKey: 'events.teamInvitationCreated.label',
+    descriptionKey: 'events.teamInvitationCreated.description',
+    tone: 'blue',
+  },
+  'team.invitation.accepted': {
+    labelKey: 'events.teamInvitationAccepted.label',
+    descriptionKey: 'events.teamInvitationAccepted.description',
+    tone: 'green',
+  },
+  'team.invitation.declined': {
+    labelKey: 'events.teamInvitationDeclined.label',
+    descriptionKey: 'events.teamInvitationDeclined.description',
+    tone: 'neutral',
+  },
+  'team.invitation.revoked': {
+    labelKey: 'events.teamInvitationRevoked.label',
+    descriptionKey: 'events.teamInvitationRevoked.description',
+    tone: 'amber',
+  },
+  'team.member.added': {
+    labelKey: 'events.teamMemberAdded.label',
+    descriptionKey: 'events.teamMemberAdded.description',
+    tone: 'blue',
+  },
+  'team.member.removed': {
+    labelKey: 'events.teamMemberRemoved.label',
+    descriptionKey: 'events.teamMemberRemoved.description',
+    tone: 'amber',
+  },
+  'team.member.role_changed': {
+    labelKey: 'events.teamMemberRoleChanged.label',
+    descriptionKey: 'events.teamMemberRoleChanged.description',
+    tone: 'amber',
+  },
 };
 
 /** The event types in a sensible display order — drives the filter and the legend. */
