@@ -399,15 +399,32 @@ class AdminUserServiceTest {
     when(users.findById(memberId)).thenReturn(Optional.of(member));
 
     UUID adminId = UUID.randomUUID();
+    when(users.keyShareLock(adminId)).thenReturn(1L);
     service.delete(memberId, adminId);
 
     org.mockito.InOrder order = org.mockito.Mockito.inOrder(users, refreshTokens);
     order.verify(users).lockById(memberId);
     order.verify(refreshTokens).revokeAllForUser(memberId);
-    // The database attributes its user.erased event to the announced admin.
+    // The database attributes its user.erased event to the announced (and locked) admin.
+    order.verify(users).keyShareLock(adminId);
     order.verify(users).announceErasingActor(adminId.toString());
     order.verify(users).deleteById(memberId);
     order.verify(users).flush();
+  }
+
+  @Test
+  @DisplayName("an acting admin deleted meanwhile is announced as nobody (#952)")
+  void deleteAnnouncesNoActorWhenTheAdminIsGone() {
+    UUID memberId = UUID.randomUUID();
+    User member = User.internal("Member", "member@example.com", "member", "h");
+    when(users.findById(memberId)).thenReturn(Optional.of(member));
+    UUID adminId = UUID.randomUUID();
+    when(users.keyShareLock(adminId)).thenReturn(0L);
+
+    service.delete(memberId, adminId);
+
+    org.mockito.Mockito.verify(users).announceErasingActor("");
+    org.mockito.Mockito.verify(users).deleteById(memberId);
   }
 
   @Test

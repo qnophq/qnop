@@ -30,6 +30,7 @@ DROP TRIGGER IF EXISTS trg_qnop_user_redact_audit ON qnop_user;
 DROP FUNCTION IF EXISTS qnop_user_redact_audit();
 DROP FUNCTION IF EXISTS audit_event_redact_user(uuid, uuid);
 DROP FUNCTION IF EXISTS audit_event_redact_detail(jsonb, text, text);
+DROP FUNCTION IF EXISTS audit_event_redact_detail_at(jsonb, text, text, integer);
 
 CREATE OR REPLACE FUNCTION audit_event_seal()
 RETURNS TRIGGER

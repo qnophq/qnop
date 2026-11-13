@@ -315,6 +315,43 @@ class AuditRedactionIT extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName("an arbitrarily deep detail cannot block the erasure, and keeps no trace of the id")
+  void deeplyNestedDetailIsBoundedNotFatal() {
+    User erased = newUser("Dee Deep");
+    String id = erased.getId().toString();
+    int depth = 2000;
+    String deep =
+        "[".repeat(depth)
+            + "{\"userId\":\""
+            + id
+            + "\",\"userName\":\"Dee Deep\"}"
+            + "]".repeat(depth);
+    String shallowAndDeep = "{\"userId\":\"" + id + "\",\"keep\":\"kept\",\"nested\":" + deep + "}";
+    // Written as a plain INSERT, the way any role allowed to append audit rows could write it.
+    UUID nestedId = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO audit_event (id, scope, event_type, actor_id, detail, created_at)"
+            + " VALUES (?, 'SYSTEM', 'test.nested', ?, ?::jsonb, now())",
+        nestedId,
+        erased.getId(),
+        shallowAndDeep);
+
+    deleteUser(erased.getId(), null);
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM qnop_user WHERE id = ?", Long.class, erased.getId()))
+        .isZero();
+    String detail = (String) row(nestedId).get("detail");
+    assertThat(detail)
+        .doesNotContain(id)
+        .doesNotContain("Dee Deep")
+        .contains("[erased: nested too deep]")
+        .contains("\"keep\": \"kept\"");
+    assertThat(verification.verify().problems()).isEmpty();
+  }
+
+  @Test
   @DisplayName("updates outside the erasure trigger are rejected, even with a self-made context")
   void redactionOutsideTheSanctionedPathIsRejected() {
     User actor = newUser("Rex Rejected");

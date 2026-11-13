@@ -184,7 +184,17 @@ $fn$;
 -- Strings that merely equal a name elsewhere are left alone: names are chosen
 -- by users, so matching them anywhere would let one user's name blank out
 -- unrelated content. Free text that mentions a person is not covered.
-CREATE FUNCTION audit_event_redact_detail(p_detail JSONB, p_user_id TEXT, p_pseudonym TEXT)
+--
+-- The walk is bounded (audit_event_redact_detail_at): from nesting depth 32
+-- on, a subtree that contains the user's id anywhere is replaced as a whole by
+-- the fixed string '[erased: nested too deep]', and any other subtree is kept
+-- as it is. An arbitrarily deep detail — which any role that may INSERT audit
+-- rows can write — can therefore neither exhaust the stack inside the
+-- user-delete trigger (which would make that user undeletable for good) nor
+-- keep the user's id. The update guard calls this same function, so it admits
+-- exactly the bounded result.
+CREATE FUNCTION audit_event_redact_detail_at(
+  p_detail JSONB, p_user_id TEXT, p_pseudonym TEXT, p_depth INTEGER)
 RETURNS JSONB
 LANGUAGE plpgsql
 IMMUTABLE
@@ -193,6 +203,12 @@ DECLARE
   v_result JSONB;
   v_subject BOOLEAN;
 BEGIN
+  IF p_depth >= 32 THEN
+    IF position(p_user_id IN lower(p_detail::text)) > 0 THEN
+      RETURN to_jsonb('[erased: nested too deep]'::text);
+    END IF;
+    RETURN p_detail;
+  END IF;
   CASE jsonb_typeof(p_detail)
     WHEN 'object' THEN
       v_subject := lower(p_detail ->> 'userId') = p_user_id;
@@ -204,14 +220,15 @@ BEGIN
                                     'userDisplayName', 'email', 'userEmail')
                       AND jsonb_typeof(e.value) = 'string'
                    THEN to_jsonb(p_pseudonym)
-                 ELSE audit_event_redact_detail(e.value, p_user_id, p_pseudonym)
+                 ELSE audit_event_redact_detail_at(e.value, p_user_id, p_pseudonym, p_depth + 1)
                END), '{}'::jsonb)
         INTO v_result
         FROM jsonb_each(p_detail) e;
       RETURN v_result;
     WHEN 'array' THEN
       SELECT coalesce(jsonb_agg(
-               audit_event_redact_detail(a.value, p_user_id, p_pseudonym) ORDER BY a.ord),
+               audit_event_redact_detail_at(a.value, p_user_id, p_pseudonym, p_depth + 1)
+               ORDER BY a.ord),
              '[]'::jsonb)
         INTO v_result
         FROM jsonb_array_elements(p_detail) WITH ORDINALITY AS a(value, ord);
@@ -225,6 +242,14 @@ BEGIN
       RETURN p_detail;
   END CASE;
 END;
+$fn$;
+
+CREATE FUNCTION audit_event_redact_detail(p_detail JSONB, p_user_id TEXT, p_pseudonym TEXT)
+RETURNS JSONB
+LANGUAGE sql
+IMMUTABLE
+AS $fn$
+  SELECT audit_event_redact_detail_at(p_detail, p_user_id, p_pseudonym, 0)
 $fn$;
 
 -- --- update guard ---------------------------------------------------------
@@ -466,6 +491,7 @@ BEGIN
     'audit_redaction_context_current()',
     'audit_event_redaction_canonical(text, uuid, timestamptz)',
     'audit_event_seal()',
+    'audit_event_redact_detail_at(jsonb, text, text, integer)',
     'audit_event_redact_detail(jsonb, text, text)',
     'audit_event_reject_update()',
     'audit_event_guard_insert()',

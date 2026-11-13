@@ -242,8 +242,12 @@ public class AdminUserService {
     // revocation also ends a session that a rotation in flight just extended.
     users.lockById(id);
     refreshTokens.revokeAllForUser(id);
-    // The database writes a user.erased audit event attributed to whoever is announced here.
-    users.announceErasingActor(actingUserId == null ? "" : actingUserId.toString());
+    // The database writes a user.erased audit event attributed to whoever is announced here. The
+    // acting admin's row is key-share locked first, so a concurrent deletion of that admin cannot
+    // make this delete fail on the event's actor foreign key; an admin already gone is announced
+    // as nobody (the event then has no actor).
+    boolean actorPresent = actingUserId != null && users.keyShareLock(actingUserId) > 0;
+    users.announceErasingActor(actorPresent ? actingUserId.toString() : "");
     users.deleteById(id);
     // Flushed here so the DELETE — and with it the audit redaction its trigger runs — happens
     // inside this method rather than at commit.

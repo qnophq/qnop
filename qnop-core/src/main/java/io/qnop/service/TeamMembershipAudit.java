@@ -152,9 +152,10 @@ public class TeamMembershipAudit {
       String eventType, UUID actorId, Team team, Subject user, Consumer<ObjectNode> extra) {
     // The detail names the user by id (issue #952): hold a key-share lock on their row until
     // commit, so a concurrent deletion of the user waits and then erases this row too, or — if
-    // the deletion came first — this write fails instead of leaving their data behind.
+    // the deletion came first — this write fails (as a 404 for the vanished user) instead of
+    // leaving their data behind.
     if (users.keyShareLock(user.id()) == 0) {
-      throw new IllegalStateException("The user " + user.id() + " no longer exists");
+      throw new UserNotFoundException(user.id());
     }
     ObjectNode detail = MAPPER.createObjectNode();
     detail.put("teamId", team.getId() == null ? null : team.getId().toString());

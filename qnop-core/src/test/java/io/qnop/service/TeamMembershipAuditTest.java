@@ -70,7 +70,7 @@ class TeamMembershipAuditTest {
             () ->
                 audit.memberAdded(
                     actor, team, new TeamMembershipAudit.Subject(userId, "Ann"), TeamRole.MEMBER))
-        .isInstanceOf(IllegalStateException.class);
+        .isInstanceOf(UserNotFoundException.class);
     verify(auditEvents, never()).save(org.mockito.ArgumentMatchers.any());
   }
 
