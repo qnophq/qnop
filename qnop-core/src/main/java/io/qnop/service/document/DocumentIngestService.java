@@ -25,6 +25,7 @@ import io.qnop.entity.AnnotationPlacement;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ThreadParticipation;
+import io.qnop.observability.metrics.IngestMeters;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.DocumentRepository;
@@ -75,6 +76,8 @@ public class DocumentIngestService {
   /** Instance quotas (issue #673). */
   private final InstanceLimitService limits;
 
+  private final IngestMeters meters;
+
   /** The job type consumed by {@code DocumentExtractionJobHandler}. */
   public static final String EXTRACTION_JOB_TYPE = "document.extract";
 
@@ -112,8 +115,10 @@ public class DocumentIngestService {
       PlatformTransactionManager transactionManager,
       ApplicationEventPublisher events,
       DocumentRenditionService renditions,
-      InstanceLimitService limits) {
+      InstanceLimitService limits,
+      IngestMeters meters) {
     this.limits = limits;
+    this.meters = meters;
     this.documents = documents;
     this.versions = versions;
     this.storage = storage;
@@ -254,6 +259,7 @@ public class DocumentIngestService {
     jobs.enqueue(
         EXTRACTION_JOB_TYPE,
         JobPayloadCodec.serialize(new JobPayload.DocumentVersionRef(version.getId())));
+    meters.uploaded(IngestMeters.Format.ofContentType(contentType), staged.sizeBytes());
     return version;
   }
 

@@ -30,6 +30,8 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qnop.service.job.JobService;
 import io.qnop.service.job.JobService.QueueStats;
+import java.time.Duration;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -39,6 +41,11 @@ class JobQueueMetricsTest {
   private final JobService jobs = mock(JobService.class);
   private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
   private final SteppingClock clock = new SteppingClock();
+
+  @BeforeEach
+  void nothingIsDue() {
+    when(jobs.oldestPendingAge()).thenReturn(Duration.ZERO);
+  }
 
   @Test
   @DisplayName("binds a qnop.jobs gauge per state, each reading the snapshot")
@@ -78,6 +85,19 @@ class JobQueueMetricsTest {
     clock.advance(JobQueueMetrics.SNAPSHOT_MAX_AGE);
 
     assertThat(gauge("pending")).isEqualTo(9.0);
+  }
+
+  @Test
+  @DisplayName("publishes how long the oldest due job has waited, in seconds (issue #962)")
+  void publishesTheOldestPendingAge() {
+    when(jobs.queueStats()).thenReturn(new QueueStats(1, 0, 0, 0));
+    when(jobs.oldestPendingAge()).thenReturn(Duration.ofMillis(90_500));
+
+    new JobQueueMetrics(jobs, clock).bindTo(registry);
+
+    Gauge age = registry.find("qnop.jobs.oldest.pending.age").gauge();
+    assertThat(age.value()).isEqualTo(90.5);
+    assertThat(age.getId().getBaseUnit()).isEqualTo("seconds");
   }
 
   @Test

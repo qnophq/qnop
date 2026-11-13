@@ -36,10 +36,12 @@ import org.springframework.stereotype.Component;
  * failed}. Spring Boot binds every {@link MeterBinder} bean to the meter registry, so scraping
  * {@code /actuator/prometheus} evaluates these gauges.
  *
- * <p>The four gauges share one snapshot that is at most {@link #SNAPSHOT_MAX_AGE} old (issue #962),
- * so a scrape costs one read of the queue rather than one per gauge. The counts come from the
- * database and are therefore the same on every instance: aggregate them with {@code max}, not
- * {@code sum}.
+ * <p>{@code qnop.jobs.oldest.pending.age} says whether the queue is moving: a short queue whose
+ * oldest job has waited for minutes is stuck.
+ *
+ * <p>The gauges share one snapshot that is at most {@link #SNAPSHOT_MAX_AGE} old (issue #962), so a
+ * scrape costs one read of the queue rather than one per gauge. The counts come from the database
+ * and are therefore the same on every instance: aggregate them with {@code max}, not {@code sum}.
  */
 @Component
 class JobQueueMetrics implements MeterBinder {
@@ -47,7 +49,12 @@ class JobQueueMetrics implements MeterBinder {
   /** Well under any sensible scrape interval's alerting window, and long enough to be shared. */
   static final Duration SNAPSHOT_MAX_AGE = Duration.ofSeconds(15);
 
-  private final CachedSnapshot<JobService.QueueStats> snapshot;
+  private static final double MILLIS_PER_SECOND = 1000.0;
+
+  /** Everything the gauges need, read from the queue in one go. */
+  private record Snapshot(JobService.QueueStats stats, Duration oldestPendingAge) {}
+
+  private final CachedSnapshot<Snapshot> snapshot;
 
   @Autowired
   JobQueueMetrics(JobService jobs) {
@@ -55,7 +62,11 @@ class JobQueueMetrics implements MeterBinder {
   }
 
   JobQueueMetrics(JobService jobs, Clock clock) {
-    this.snapshot = new CachedSnapshot<>(jobs::queueStats, SNAPSHOT_MAX_AGE, clock);
+    this.snapshot =
+        new CachedSnapshot<>(
+            () -> new Snapshot(jobs.queueStats(), jobs.oldestPendingAge()),
+            SNAPSHOT_MAX_AGE,
+            clock);
   }
 
   @Override
@@ -64,11 +75,18 @@ class JobQueueMetrics implements MeterBinder {
     gauge(registry, "running", stats -> stats.running());
     gauge(registry, "stale", stats -> stats.staleRunning());
     gauge(registry, "failed", stats -> stats.failed());
+    Gauge.builder(
+            "qnop.jobs.oldest.pending.age",
+            snapshot,
+            s -> s.get().oldestPendingAge().toMillis() / MILLIS_PER_SECOND)
+        .baseUnit("seconds")
+        .description("How long the longest-waiting due job has been waiting; 0 when none is due")
+        .register(registry);
   }
 
   private void gauge(
       MeterRegistry registry, String state, ToDoubleFunction<JobService.QueueStats> value) {
-    Gauge.builder("qnop.jobs", snapshot, s -> value.applyAsDouble(s.get()))
+    Gauge.builder("qnop.jobs", snapshot, s -> value.applyAsDouble(s.get().stats()))
         .tag("state", state)
         .description("Durable job-queue depth by lifecycle state")
         .register(registry);

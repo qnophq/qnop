@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.qnop.observability.metrics.ConversionMeters;
 import io.qnop.service.convert.OfficeConverter;
 import io.qnop.service.convert.OfficeConverterProperties;
 import io.qnop.service.convert.ThrottledOfficeConverter;
@@ -82,7 +83,8 @@ class OfficeConversionMetricsTest {
     ThrottledOfficeConverter converter =
         new ThrottledOfficeConverter(
             delegate,
-            new OfficeConverterProperties(null, null, 1, Duration.ofSeconds(5), null, null));
+            new OfficeConverterProperties(null, null, 1, Duration.ofSeconds(5), null, null),
+            new ConversionMeters(new SimpleMeterRegistry()));
     new OfficeConversionMetrics(converter).bindTo(registry);
 
     assertThat(gauge("active")).isZero();

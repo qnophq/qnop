@@ -25,6 +25,8 @@ import io.qnop.entity.JobStatus;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Data access for the durable async job queue (ADR-0033). */
 public interface JobRepository extends JpaRepository<Job, UUID>, JobRepositoryCustom {
@@ -37,4 +39,12 @@ public interface JobRepository extends JpaRepository<Job, UUID>, JobRepositoryCu
    * poller/reaper), issue #348.
    */
   long countByStatusAndUpdatedAtBefore(JobStatus status, Instant updatedBefore);
+
+  /**
+   * When the longest-waiting job in {@code status} became due, considering only jobs already due at
+   * {@code now}; null when there is none. A retry scheduled for later is not waiting yet, so it
+   * does not count (issue #962).
+   */
+  @Query("select min(j.runAfter) from Job j where j.status = :status and j.runAfter <= :now")
+  Instant findEarliestRunAfter(@Param("status") JobStatus status, @Param("now") Instant now);
 }

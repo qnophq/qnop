@@ -26,7 +26,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qnop.entity.JobStatus;
+import io.qnop.observability.metrics.JobMeters;
 import io.qnop.repository.JobRepository;
 import io.qnop.service.job.JobService.QueueStats;
 import java.time.Instant;
@@ -39,7 +41,9 @@ import org.mockito.ArgumentCaptor;
 class JobServiceQueueStatsTest {
 
   private final JobRepository repository = mock(JobRepository.class);
-  private final JobService service = new JobService(repository, mock(JobEnqueuer.class), List.of());
+  private final JobService service =
+      new JobService(
+          repository, mock(JobEnqueuer.class), List.of(), new JobMeters(new SimpleMeterRegistry()));
 
   @Test
   @DisplayName("assembles the per-state counts, measuring stale RUNNING against the threshold")

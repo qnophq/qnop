@@ -23,6 +23,9 @@ package io.qnop.service.convert;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.qnop.observability.metrics.ConversionMeters;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -102,10 +105,14 @@ class ThrottledOfficeConverterTest {
     }
   }
 
-  private static ThrottledOfficeConverter throttled(
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+
+  private ThrottledOfficeConverter throttled(
       OfficeConverter delegate, int maxConcurrent, Duration maxWait) {
     return new ThrottledOfficeConverter(
-        delegate, new OfficeConverterProperties(null, null, maxConcurrent, maxWait, null, null));
+        delegate,
+        new OfficeConverterProperties(null, null, maxConcurrent, maxWait, null, null),
+        new ConversionMeters(registry));
   }
 
   @Test
@@ -153,6 +160,39 @@ class ThrottledOfficeConverterTest {
         .isInstanceOf(OfficeConverterBusyException.class)
         .satisfies(
             thrown -> assertThat(((OfficeConversionException) thrown).isPermanent()).isFalse());
+    // Refused is its own outcome: the converter never ran, so it is not a failure of it.
+    assertThat(conversions("busy")).isEqualTo(1);
+    assertThat(conversions("failure")).isZero();
+  }
+
+  @Test
+  @Timeout(30)
+  @DisplayName("times a conversion that succeeds, and the wait for its slot")
+  void timesASuccessfulConversion() {
+    OfficeConverter echo =
+        new OfficeConverter() {
+          @Override
+          public boolean isAvailable() {
+            return true;
+          }
+
+          @Override
+          public byte[] toPdf(byte[] source, String sourceExtension) {
+            return source;
+          }
+        };
+    ThrottledOfficeConverter converter = throttled(echo, 1, SOON);
+
+    converter.toPdf(SOURCE, "docx");
+
+    assertThat(conversions("success")).isEqualTo(1);
+    assertThat(registry.find(ConversionMeters.SLOT_WAIT).timer().count()).isEqualTo(1);
+  }
+
+  /** How many conversions were timed with this outcome (issue #962). */
+  private long conversions(String outcome) {
+    Timer timer = registry.find(ConversionMeters.CONVERSION).tag("outcome", outcome).timer();
+    return timer == null ? 0 : timer.count();
   }
 
   @Test
@@ -165,6 +205,7 @@ class ThrottledOfficeConverterTest {
 
     assertThatThrownBy(() -> converter.toPdf(SOURCE, "docx"))
         .isInstanceOf(OfficeConversionException.class);
+    assertThat(conversions("failure")).isEqualTo(1);
 
     // A leaked permit would surface only once the limit is exhausted — hours later
     // and nowhere near the failure that caused it.
