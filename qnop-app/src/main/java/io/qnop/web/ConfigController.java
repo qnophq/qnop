@@ -50,11 +50,8 @@ import io.qnop.service.tracking.TrackingRuntimeConfig;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.info.BuildProperties;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -75,12 +72,11 @@ public class ConfigController implements ServerConfigApi {
   private static final int DEFAULT_MAX_DOCUMENT_SIZE_MB = 50;
 
   /** Reported when no build manifest is available (e.g. when running from exploded classes). */
-  private static final String UNKNOWN_VERSION = "unknown";
-
   private final OidcProviderService oidcProviders;
+
   private final ApplicationSettingsService settings;
   private final BrandingService branding;
-  private final BuildProperties buildProperties;
+  private final RunningVersion runningVersion;
   private final AnnotationExportService exports;
   private final DocumentRenditionService renditions;
   private final List<io.qnop.spi.extract.DocumentExtractor> extractors;
@@ -98,7 +94,7 @@ public class ConfigController implements ServerConfigApi {
       InfoBannerService banners,
       TrackingConfigService tracking,
       FeatureToggleProperties features,
-      ObjectProvider<BuildProperties> buildProperties) {
+      RunningVersion runningVersion) {
     this.oidcProviders = oidcProviders;
     this.settings = settings;
     this.branding = branding;
@@ -108,14 +104,14 @@ public class ConfigController implements ServerConfigApi {
     this.banners = banners;
     this.tracking = tracking;
     this.features = features;
-    this.buildProperties = buildProperties.getIfAvailable();
+    this.runningVersion = runningVersion;
   }
 
   @Override
   public ResponseEntity<ServerConfigResponse> getServerConfig() {
     ServerConfigResponse body =
         new ServerConfigResponse()
-            .version(resolveVersion(buildProperties))
+            .version(runningVersion.value())
             .edition(Edition.COMMUNITY)
             .general(
                 new ServerConfigGeneral()
@@ -250,19 +246,5 @@ public class ConfigController implements ServerConfigApi {
                     .accountPickerLoginUrl(v.accountPickerLoginUrl())
                     .accountSwitchHintUrl(v.accountSwitchHintUrl()))
         .toList();
-  }
-
-  /** Reads the server version from the JAR manifest, falling back to {@code "unknown"}. */
-  /**
-   * The running version, from Boot's build-info.properties (stamped by {@code springBoot {
-   * buildInfo() }}, issue #495) with the jar manifest as fallback — "unknown" only when running
-   * from exploded classes without build info (e.g. IDE runs).
-   */
-  private static String resolveVersion(BuildProperties buildProperties) {
-    if (buildProperties != null && buildProperties.getVersion() != null) {
-      return buildProperties.getVersion();
-    }
-    return Optional.ofNullable(ConfigController.class.getPackage().getImplementationVersion())
-        .orElse(UNKNOWN_VERSION);
   }
 }

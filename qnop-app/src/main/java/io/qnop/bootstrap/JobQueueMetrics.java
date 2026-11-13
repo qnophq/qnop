@@ -24,23 +24,38 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.MeterBinder;
 import io.qnop.service.job.JobService;
+import java.time.Clock;
+import java.time.Duration;
 import java.util.function.ToDoubleFunction;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
  * Publishes job-queue depth as Prometheus gauges (issue #348): {@code qnop.jobs{state="pending"}}
  * (the backlog), {@code running}, {@code stale} (in-flight past the stale threshold) and {@code
  * failed}. Spring Boot binds every {@link MeterBinder} bean to the meter registry, so scraping
- * {@code /actuator/prometheus} evaluates these gauges live — each reads a fresh snapshot at scrape
- * time.
+ * {@code /actuator/prometheus} evaluates these gauges.
+ *
+ * <p>The four gauges share one snapshot that is at most {@link #SNAPSHOT_MAX_AGE} old (issue #962),
+ * so a scrape costs one read of the queue rather than one per gauge. The counts come from the
+ * database and are therefore the same on every instance: aggregate them with {@code max}, not
+ * {@code sum}.
  */
 @Component
 class JobQueueMetrics implements MeterBinder {
 
-  private final JobService jobs;
+  /** Well under any sensible scrape interval's alerting window, and long enough to be shared. */
+  static final Duration SNAPSHOT_MAX_AGE = Duration.ofSeconds(15);
 
+  private final CachedSnapshot<JobService.QueueStats> snapshot;
+
+  @Autowired
   JobQueueMetrics(JobService jobs) {
-    this.jobs = jobs;
+    this(jobs, Clock.systemUTC());
+  }
+
+  JobQueueMetrics(JobService jobs, Clock clock) {
+    this.snapshot = new CachedSnapshot<>(jobs::queueStats, SNAPSHOT_MAX_AGE, clock);
   }
 
   @Override
@@ -53,7 +68,7 @@ class JobQueueMetrics implements MeterBinder {
 
   private void gauge(
       MeterRegistry registry, String state, ToDoubleFunction<JobService.QueueStats> value) {
-    Gauge.builder("qnop.jobs", jobs, j -> value.applyAsDouble(j.queueStats()))
+    Gauge.builder("qnop.jobs", snapshot, s -> value.applyAsDouble(s.get()))
         .tag("state", state)
         .description("Durable job-queue depth by lifecycle state")
         .register(registry);

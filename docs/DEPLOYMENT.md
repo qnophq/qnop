@@ -91,6 +91,8 @@ Generate a new key (`openssl rand -base64 48`; optionally a new salt with `opens
 | `QNOP_CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Only needed when a browser client runs on a *different* origin; the embedded UI is same-origin and needs none |
 | `QNOP_HTTP_FORWARD_HEADERS_STRATEGY` | `none` | Set `framework` behind a trusted reverse proxy so `X-Forwarded-*` drive scheme/host |
 | `QNOP_AUTH_RATELIMIT_TRUSTEDPROXYCIDRS` | *(empty)* | Comma-separated CIDRs of your reverse proxies; see [Behind a reverse proxy](#behind-a-reverse-proxy) |
+| `QNOP_MANAGEMENT_PORT` | *(blank)* | Serve Actuator (health, metrics) on its own port; see [Metrics](#metrics) |
+| `QNOP_METRICS_SCRAPE_TOKEN` | *(blank)* | Long-lived bearer token for a Prometheus scrape (≥ 32 chars); see [Metrics](#metrics) |
 | `QNOP_HTTP_SHUTDOWN_GRACE` | `30s` | Graceful-shutdown drain window (align your orchestrator's stop grace period) |
 | `QNOP_ATTACHMENTS_MAX_IMAGE_MEGAPIXELS` | `50` | Image attachments larger than this (or 32768 px per side), or whose size cannot be read, are stored download-only: linked, never shown inline or embedded in exports |
 | `QNOP_HTTP_CLIENT_PROXY_HOST` / `_PORT` / `_NON_PROXY_HOSTS` | *(unset)* | Explicit egress proxy for OIDC and usage-tracking requests — a weaker mode; see [Outbound proxy](#outbound-proxy-oidc-and-usage-tracking) |
@@ -112,11 +114,43 @@ docker compose exec qnop sh -c 'cat /tmp/qnop-bootstrap-*/admin-password.txt'
 
 ## Health & operations
 
-- **Health**: `GET /actuator/health` is anonymous — wire it into your load balancer / orchestrator probes. All other actuator endpoints require an ADMIN bearer token.
+- **Health**: `GET /actuator/health` is anonymous — wire it into your load balancer / orchestrator probes. All other actuator endpoints require an ADMIN bearer token, except the metrics scrape where you opt in (see [Metrics](#metrics)).
 - **Version**: `GET /api/v1/config` reports the running version and edition.
 - **JVM flags**: extend via `JDK_JAVA_OPTS`; the image defaults to `-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError` and runs as a non-root user.
 - **TLS**: terminate TLS at a reverse proxy and set `QNOP_HTTP_FORWARD_HEADERS_STRATEGY=framework`. The refresh cookie is `Secure` — plain-HTTP deployments are for local evaluation only.
 - **Backups**: the PostgreSQL database and the object-storage bucket together form the complete state; back them up as a pair.
+
+## Metrics
+
+`GET /actuator/prometheus` publishes metrics in the Prometheus text format (ADR-0037, ADR-0065): request rates and latency histograms, JVM, connection pool, Tomcat threads, log-event counts, and qnop's own `qnop_*` series such as the job-queue depth and the audit-chain status. Every series carries `application="qnop"`; `qnop_info` reports the running version and edition.
+
+By default the scrape needs an ADMIN access token, which is short-lived and so of little use to an unattended Prometheus. Choose one of two ways to let a scraper in — both are off until you set them:
+
+**A management port (preferred).** Set `QNOP_MANAGEMENT_PORT` (for example `9090`). Actuator then listens on that port instead of the application port, and a scrape arriving there needs no credential. **Do not publish this port**: keep it on the internal network, reachable by Prometheus and your orchestrator's probes only. Point the probes at the new port too, because `/actuator/health` moves with it.
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: qnop
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['qnop:9090']
+```
+
+**A scrape token.** Where Prometheus can only reach the application port, set `QNOP_METRICS_SCRAPE_TOKEN` to a random value of at least 32 characters (`openssl rand -hex 32`); a shorter one stops the instance from starting. The token opens `GET /actuator/prometheus` and nothing else, and it is not an admin: health details stay hidden from it.
+
+```yaml
+scrape_configs:
+  - job_name: qnop
+    metrics_path: /actuator/prometheus
+    scheme: https
+    authorization:
+      credentials_file: /etc/prometheus/qnop-scrape-token
+    static_configs:
+      - targets: ['qnop.example.com']
+```
+
+With several instances, counters and timers are per instance (`sum` them); gauges that describe the database, such as `qnop_jobs` and `qnop_audit_chain_intact`, are the same on every instance (take the `max`).
 
 ## Audit-trail integrity
 

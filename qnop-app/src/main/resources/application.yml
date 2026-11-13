@@ -105,17 +105,48 @@ server:
   # so X-Forwarded-* drive scheme/host (Secure cookies, redirect URLs).
   forward-headers-strategy: ${QNOP_HTTP_FORWARD_HEADERS_STRATEGY:none}
   tomcat:
+    # Publishes Tomcat's thread-pool and connection meters (issue #962); without it only the
+    # session meters exist and a saturated request pool is invisible.
+    mbeanregistry:
+      enabled: true
     connection-timeout: ${QNOP_HTTP_CONNECTION_TIMEOUT:20s}
     # Reap idle keep-alive connections rather than holding a thread per socket.
     keep-alive-timeout: ${QNOP_HTTP_KEEP_ALIVE_TIMEOUT:20s}
 
 management:
+  server:
+    # Optional separate port for Actuator (issue #962, ADR-0065). Blank = Actuator shares the
+    # application port. On its own port, /actuator/prometheus needs no credential: do not publish
+    # that port through the ingress — reaching it is the access control.
+    port: ${QNOP_MANAGEMENT_PORT:}
   endpoints:
     web:
       exposure:
-        # health is public (probes); prometheus is admin-only (SecurityConfiguration), scraped by
-        # an ops Prometheus with an admin token (issue #348, ADR-0013).
+        # health is public (probes). prometheus needs ROLE_ADMIN unless the scrape arrives on the
+        # management port or carries qnop.metrics.scrape-token (MetricsScrapeAccess, ADR-0065).
         include: health,prometheus
+  metrics:
+    tags:
+      # On every series, so a shared Prometheus can tell qnop from its neighbours.
+      application: qnop
+    distribution:
+      # Histogram buckets instead of client-side percentiles: buckets can be aggregated across
+      # instances, percentiles cannot. A fixed, short list rather than percentiles-histogram,
+      # which publishes ~60 buckets for every route, method and status.
+      slo:
+        http.server.requests: 10ms,25ms,50ms,100ms,250ms,500ms,1s,2500ms,5s,10s,30s
+    enable:
+      # One timer per repository method: hundreds of series that say less than the request
+      # timer and the connection-pool meters already do.
+      spring.data.repository.invocations: false
+      # In-flight requests per route. Tomcat's busy-thread gauge answers the same question
+      # with one series.
+      http.server.requests.active: false
+  observations:
+    enable:
+      # A timer for every filter and authorization decision of every request: ~90 series of
+      # framework internals. Login outcomes get their own qnop.auth.* meters instead.
+      spring.security: false
   endpoint:
     health:
       probes:
@@ -132,6 +163,10 @@ management:
 # placeholder below trips @ValidSecret so a deployment that forgot to set real
 # values refuses to start. CORS origins gate SPA / front-end access.
 qnop:
+  metrics:
+    # Optional long-lived bearer token for an unattended Prometheus (issue #962, ADR-0065). It
+    # opens GET /actuator/prometheus and nothing else. Blank = off; at least 32 characters.
+    scrape-token: ${QNOP_METRICS_SCRAPE_TOKEN:}
   auth:
     jwt-secret: ${QNOP_AUTH_JWT_SECRET:CHANGE_ME}
     encryption-key: ${QNOP_AUTH_ENCRYPTION_KEY:CHANGE_ME}

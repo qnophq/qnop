@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-05
 - **Deciders:** qnop core team
+- **Amended by:** [ADR-0065](0065-metrics-conventions-and-scrape-access.md) — scrape access (management port, scrape token) and the deferred latency metrics
 
 ## Context
 

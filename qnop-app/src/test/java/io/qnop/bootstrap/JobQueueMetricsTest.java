@@ -22,6 +22,8 @@ package io.qnop.bootstrap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.micrometer.core.instrument.Gauge;
@@ -36,13 +38,14 @@ class JobQueueMetricsTest {
 
   private final JobService jobs = mock(JobService.class);
   private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+  private final SteppingClock clock = new SteppingClock();
 
   @Test
-  @DisplayName("binds a qnop.jobs gauge per state, each reading the live snapshot")
+  @DisplayName("binds a qnop.jobs gauge per state, each reading the snapshot")
   void bindsQueueDepthGauges() {
     when(jobs.queueStats()).thenReturn(new QueueStats(5, 2, 1, 3));
 
-    new JobQueueMetrics(jobs).bindTo(registry);
+    new JobQueueMetrics(jobs, clock).bindTo(registry);
 
     assertThat(gauge("pending")).isEqualTo(5.0);
     assertThat(gauge("running")).isEqualTo(2.0);
@@ -51,13 +54,29 @@ class JobQueueMetricsTest {
   }
 
   @Test
-  @DisplayName("re-reads the snapshot on each scrape")
+  @DisplayName("a scrape of all four gauges reads the queue once (issue #962)")
+  void oneScrapeReadsTheQueueOnce() {
+    when(jobs.queueStats()).thenReturn(new QueueStats(5, 2, 1, 3));
+    new JobQueueMetrics(jobs, clock).bindTo(registry);
+
+    gauge("pending");
+    gauge("running");
+    gauge("stale");
+    gauge("failed");
+
+    verify(jobs, times(1)).queueStats();
+  }
+
+  @Test
+  @DisplayName("reflects a changed queue once the snapshot has expired")
   void gaugesReflectTheLatestSnapshot() {
     when(jobs.queueStats()).thenReturn(new QueueStats(1, 0, 0, 0));
-    new JobQueueMetrics(jobs).bindTo(registry);
+    new JobQueueMetrics(jobs, clock).bindTo(registry);
     assertThat(gauge("pending")).isEqualTo(1.0);
 
     when(jobs.queueStats()).thenReturn(new QueueStats(9, 0, 0, 0));
+    clock.advance(JobQueueMetrics.SNAPSHOT_MAX_AGE);
+
     assertThat(gauge("pending")).isEqualTo(9.0);
   }
 
