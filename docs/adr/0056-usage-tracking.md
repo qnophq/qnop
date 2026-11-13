@@ -132,6 +132,21 @@ Each request carries the route pattern (as an absolute URL on qnop's origin wher
 
 **Consequences.** No third-party JavaScript executes in qnop's origin under any configuration, and the unauthenticated collect endpoint passes on nothing qnop's own client would not have sent. The vendors' scripts are no longer a moving part, so a vendor release cannot change what qnop sends; the price is that qnop now owns five small request builders (`qnop-ui/src/tracking/providers.ts`), each pinned by a test against the server's allowlist — a change to a vendor's collect API is a code change here rather than an automatic pickup. Features that only the scripts provided — Plausible's engagement/scroll-depth events, Umami's performance and error reports, PostHog's remote config — are gone, all of them things qnop did not want to collect anyway.
 
+### Amendment (2026-11, issue #944): verified against live backends; Pirsch's limitation stands
+
+The #910 request formats had been checked only against vendor scripts and documentation. They have now been run against live, locally self-hosted instances: qnop's boot jar with the embedded UI, the tracking settings set through the admin API with `forward_client_ip=anonymized`, and qnop's own request builders (`providers.ts`) replayed through `/t/c/…` for three page views and all four events per simulated visitor, using several client addresses and user agents. A real browser session (consent accepted, two page views) went through the same path.
+
+| Backend | Version | Result | Backend configuration needed |
+|---|---|---|---|
+| Matomo | 5.14.2 | Page views and the four events (`e_c=qnop`) arrive with route patterns only. Visitor address = the forwarded, truncated one; distinct /24 networks count as distinct visits. | `proxy_client_headers[] = HTTP_X_FORWARDED_FOR`. Without it every visit carries qnop's address. |
+| Umami | 3.5.0 | Same; sessions split by forwarded network + user agent. With `forward_client_ip=none` two clients collapse into one session, which confirms the header is what Umami uses. | None. |
+| Plausible CE | v3.2.1 | Same; unique visitors split by forwarded network + user agent; `none` collapses them. | None for ingestion. The dashboard lists custom events only once they are goals. |
+| PostHog | capture service (`master`, 2026-11-13) | Same: capture accepts the body and records the truncated IPv4/IPv6 address as the event's `ip`. Capture keeps no user agent, so PostHog has no browser/OS breakdown for these events. | None. Only the ingest edge (capture → Kafka) ran; the full self-hosted stack needs about 16 GB RAM and was not run. |
+
+Nothing the server-side validator refuses turned out to be needed: every backend accepted the rebuilt requests without warnings in its logs, and no request format or validator change was required. Two things the earlier text left implicit are now stated in `docs/DEPLOYMENT.md`: with the default `anonymized` mode, people in the same /24 (or /64) network with the same browser count as one visitor, which is the intended cost of truncation; and Plausible needs a goal per custom event before its dashboard shows them.
+
+**Pirsch.** Pirsch is cloud-only, and no account was available, so it was not tested. The limitation in the #910 amendment stands as a stated limitation, not a verified one: Pirsch's identification-code endpoints (`/hit`, `/event`) are meant for browsers, so through qnop's proxy it may attribute every visitor to qnop's address and collapse unique-visitor counts. The server-side access-token mode that would fix this, and its live check, moved to issue #961; until then the deployment guide advises another backend where unique-visitor counts matter.
+
 ## Consequences
 
 **Positive.** The CSP is unchanged. No reviewer's browser contacts an analytics host. Ad blockers have nothing to act on, so the numbers describe everyone who consented rather than everyone who consented and did not block. Switching backends is a settings change, not a deployment change.
@@ -148,3 +163,5 @@ Each request carries the route pattern (as an absolute URL on qnop's origin wher
 - **Issue #21** — the OIDC SSRF guard, extracted here into `OutboundUriGuard` and shared
 - **Issue #904** — the guard resolves host names and pins the connection to the validated addresses (amendment above)
 - **Issue #910** — no vendor script; first-party collect requests and HTTPS for public hosts (amendment above)
+- **Issue #944** — live verification against Matomo, Umami, Plausible and PostHog (amendment above)
+- **Issue #961** — Pirsch server-side access-token mode
