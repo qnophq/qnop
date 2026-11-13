@@ -127,8 +127,12 @@ public class ThrottledOfficeConverter implements OfficeConverter {
           ConversionMeters.Outcome.SUCCESS, Duration.ofNanos(System.nanoTime() - startedAt));
       return pdf;
     } catch (RuntimeException e) {
+      // A document the converter can never read is the upload's fault, not the converter's:
+      // counted apart, so a run of corrupt files does not look like a broken LibreOffice.
+      boolean unreadable = e instanceof OfficeConversionException failed && failed.isPermanent();
       meters.converted(
-          ConversionMeters.Outcome.FAILURE, Duration.ofNanos(System.nanoTime() - startedAt));
+          unreadable ? ConversionMeters.Outcome.REJECTED : ConversionMeters.Outcome.FAILURE,
+          Duration.ofNanos(System.nanoTime() - startedAt));
       throw e;
     }
   }

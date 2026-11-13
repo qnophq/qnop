@@ -257,6 +257,9 @@ class SchedulerServiceTest {
     verify(auditEvents).save(captor.capture());
     assertThat(captor.getValue().getActorId()).isEqualTo(actor);
     assertThat(captor.getValue().getEventType()).isEqualTo("scheduler.job.run");
+    assertThat(runsTimed(TOKEN_JOB, "success", "manual")).isEqualTo(1);
+    assertThat(runsTimed(TOKEN_JOB, "success", "scheduled")).isZero();
+    assertThat(registry.find(SchedulerMeters.RUN).tag("dry_run", "false").timer()).isNotNull();
   }
 
   @Test

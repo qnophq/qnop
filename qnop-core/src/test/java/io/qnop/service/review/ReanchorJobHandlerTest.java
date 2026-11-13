@@ -38,6 +38,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Unit tests for {@link ReanchorJobHandler} (issue #248): pending placements resolve to
@@ -118,6 +120,28 @@ class ReanchorJobHandlerTest {
     assertThat(geometric.getStatus()).isEqualTo(PlacementStatus.MOVED);
     assertThat(geometric.getAnchor()).isEqualTo(anchor);
     assertThat(reanchored("moved")).isEqualTo(1.0);
+  }
+
+  @Test
+  @DisplayName("counts the results only once the placements are committed (issue #962)")
+  void countsAfterCommit() {
+    AnnotationPlacement gone =
+        pending("{\"textQuote\":{\"quote\":\"a clause that no longer exists anywhere\"}}");
+    when(placements.findByDocumentVersionIdAndStatus(versionId, PlacementStatus.PENDING))
+        .thenReturn(List.of(gone));
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      handler.handle("{\"versionId\":\"" + versionId + "\"}");
+
+      // Still inside the transaction: a rollback from here must leave the counter alone.
+      assertThat(reanchored("orphaned")).isZero();
+
+      TransactionSynchronizationManager.getSynchronizations()
+          .forEach(TransactionSynchronization::afterCommit);
+      assertThat(reanchored("orphaned")).isEqualTo(1.0);
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
   }
 
   /** The re-anchoring counter for one result (issue #962). */

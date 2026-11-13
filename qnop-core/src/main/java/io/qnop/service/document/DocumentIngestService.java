@@ -25,6 +25,7 @@ import io.qnop.entity.AnnotationPlacement;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ThreadParticipation;
+import io.qnop.observability.metrics.AfterCommit;
 import io.qnop.observability.metrics.IngestMeters;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AnnotationRepository;
@@ -259,7 +260,10 @@ public class DocumentIngestService {
     jobs.enqueue(
         EXTRACTION_JOB_TYPE,
         JobPayloadCodec.serialize(new JobPayload.DocumentVersionRef(version.getId())));
-    meters.uploaded(IngestMeters.Format.ofContentType(contentType), staged.sizeBytes());
+    // An accepted version is a committed one: a request that loses a slug race rolls back
+    // here and must not be counted.
+    AfterCommit.run(
+        () -> meters.uploaded(IngestMeters.Format.ofContentType(contentType), staged.sizeBytes()));
     return version;
   }
 

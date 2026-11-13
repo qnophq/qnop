@@ -277,26 +277,31 @@ public class SchedulerService {
       }
     } catch (RuntimeException e) {
       log.error("Scheduler job {} ({}) failed", jobId, trigger, e);
-      time(jobId, SchedulerMeters.Outcome.FAILURE, trigger, startedAt);
+      time(jobId, SchedulerMeters.Outcome.FAILURE, trigger, dryRun, startedAt);
       recordOutcome(jobId, RunOutcome.FAILURE, trigger, summarize(e), dryRun, actorId);
       return RunOutcome.FAILURE;
     }
     // The job's own summary becomes the dashboard's last-run detail; a job with
     // nothing to say still leaves a marker for a dry run.
-    time(jobId, SchedulerMeters.Outcome.SUCCESS, trigger, startedAt);
+    time(jobId, SchedulerMeters.Outcome.SUCCESS, trigger, dryRun, startedAt);
     String detail = summary != null ? clamp(summary) : (dryRun ? "Dry run" : null);
     recordOutcome(jobId, RunOutcome.SUCCESS, trigger, detail, dryRun, actorId);
     return RunOutcome.SUCCESS;
   }
 
   private void time(
-      String jobId, SchedulerMeters.Outcome outcome, RunTrigger trigger, long startedAt) {
+      String jobId,
+      SchedulerMeters.Outcome outcome,
+      RunTrigger trigger,
+      boolean dryRun,
+      long startedAt) {
     meters.ran(
         jobId,
         outcome,
         trigger == RunTrigger.MANUAL
             ? SchedulerMeters.Trigger.MANUAL
             : SchedulerMeters.Trigger.SCHEDULED,
+        dryRun,
         Duration.ofNanos(System.nanoTime() - startedAt));
   }
 

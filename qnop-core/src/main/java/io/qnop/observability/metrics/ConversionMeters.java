@@ -20,6 +20,7 @@
  */
 package io.qnop.observability.metrics;
 
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
@@ -27,21 +28,25 @@ import org.springframework.stereotype.Component;
 
 /**
  * Meters of the out-of-process office converter (ADR-0010): how long a conversion waited for a
- * slot, how long it ran and how it ended.
+ * slot, how long it ran and how it ended, and how often one was refused for want of a slot.
+ *
+ * <p>A refusal is counted, not timed: it never ran, and a zero-length sample would pull every
+ * duration figure towards zero exactly when the converter is saturated.
  */
 @Component
 public class ConversionMeters {
 
   public static final String CONVERSION = "qnop.office.conversion";
   public static final String SLOT_WAIT = "qnop.office.conversion.wait";
+  public static final String REFUSED = "qnop.office.conversion.refused";
 
-  /** How a conversion request ended. */
+  /** How a conversion that ran ended. */
   public enum Outcome {
     SUCCESS,
-    /** The converter ran and failed, or ran out of time. */
-    FAILURE,
-    /** No slot came free within the wait limit; the converter never ran. */
-    BUSY
+    /** The document cannot be converted, however often it is tried: the upload is at fault. */
+    REJECTED,
+    /** The converter failed or ran out of time: the environment is at fault, a retry may work. */
+    FAILURE
   }
 
   private static final Duration[] BUCKETS = {
@@ -57,6 +62,7 @@ public class ConversionMeters {
 
   private final MeterRegistry registry;
   private final Timer slotWait;
+  private final Counter refused;
 
   public ConversionMeters(MeterRegistry registry) {
     this.registry = registry;
@@ -64,6 +70,10 @@ public class ConversionMeters {
         Timer.builder(SLOT_WAIT)
             .description("Time a conversion waited for a free converter slot")
             .serviceLevelObjectives(BUCKETS)
+            .register(registry);
+    this.refused =
+        Counter.builder(REFUSED)
+            .description("Conversions refused because no converter slot came free in time")
             .register(registry);
   }
 
@@ -77,10 +87,10 @@ public class ConversionMeters {
         .record(duration);
   }
 
-  /** A conversion was refused after waiting {@code waited} for a slot. */
+  /** A conversion was refused after waiting {@code waited} for a slot; the converter never ran. */
   public void refused(Duration waited) {
     slotWait.record(waited);
-    converted(Outcome.BUSY, Duration.ZERO);
+    refused.increment();
   }
 
   public void waitedForSlot(Duration waited) {

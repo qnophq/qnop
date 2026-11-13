@@ -82,7 +82,13 @@ public class JobMeters {
             .register(registry);
   }
 
-  /** One attempt at a job finished, successfully or not. */
+  /**
+   * One attempt at a job finished, successfully or not. {@code type} must be the type of a
+   * registered handler; the queue only gets here for one, which keeps the tag a closed set.
+   *
+   * <p>A conversion refused for want of a slot surfaces here as {@code retry}: the job did not
+   * fail, it comes back under the queue's backoff.
+   */
   public void executed(String type, Outcome outcome, Duration duration) {
     Timer.builder(EXECUTION)
         .description("Duration of one attempt at a queued job")

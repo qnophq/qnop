@@ -23,6 +23,7 @@ package io.qnop.service.job;
 import io.qnop.entity.Job;
 import io.qnop.entity.JobStatus;
 import io.qnop.observability.LogContext;
+import io.qnop.observability.metrics.AfterCommit;
 import io.qnop.observability.metrics.JobMeters;
 import io.qnop.repository.JobRepository;
 import java.time.Duration;
@@ -176,7 +177,7 @@ public class JobService {
     Instant now = Instant.now();
     int reclaimed = repository.reapStaleRunning(now.minus(STALE_AFTER), now);
     if (reclaimed > 0) {
-      meters.reaped(reclaimed);
+      AfterCommit.run(() -> meters.reaped(reclaimed));
     }
     return reclaimed;
   }

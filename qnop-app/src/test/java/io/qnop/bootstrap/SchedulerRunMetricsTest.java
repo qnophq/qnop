@@ -47,8 +47,10 @@ class SchedulerRunMetricsTest {
   private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
   private static SchedulerJobView view(String jobId, Instant lastRunAt, String lastOutcome) {
+    // Only the never-run job is switched off, so one fixture covers both states.
+    boolean enabled = lastRunAt != null;
     return new SchedulerJobView(
-        jobId, jobId, "", "0 0 * * * *", false, true, false, lastRunAt, lastOutcome, null, null);
+        jobId, jobId, "", "0 0 * * * *", false, enabled, false, lastRunAt, lastOutcome, null, null);
   }
 
   private double gauge(String name, String jobId) {
@@ -92,6 +94,16 @@ class SchedulerRunMetricsTest {
 
     assertThat(gauge("qnop.scheduler.last.run.timestamp", NEVER_RAN)).isNaN();
     assertThat(gauge("qnop.scheduler.last.run.failed", NEVER_RAN)).isNaN();
+  }
+
+  @Test
+  @DisplayName("publishes whether a job is enabled, so a job switched off does not look dead")
+  void publishesWhetherAJobIsEnabled() {
+    bind();
+
+    assertThat(gauge("qnop.scheduler.job.enabled", RAN_OK)).isEqualTo(1.0);
+    // Known even for a job that has never run: the alert needs it exactly then.
+    assertThat(gauge("qnop.scheduler.job.enabled", NEVER_RAN)).isZero();
   }
 
   @Test

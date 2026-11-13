@@ -160,9 +160,11 @@ class ThrottledOfficeConverterTest {
         .isInstanceOf(OfficeConverterBusyException.class)
         .satisfies(
             thrown -> assertThat(((OfficeConversionException) thrown).isPermanent()).isFalse());
-    // Refused is its own outcome: the converter never ran, so it is not a failure of it.
-    assertThat(conversions("busy")).isEqualTo(1);
+    // Refused is counted, not timed: the converter never ran, so there is no duration, and
+    // it is not a failure of the converter.
+    assertThat(registry.find(ConversionMeters.REFUSED).counter().count()).isEqualTo(1.0);
     assertThat(conversions("failure")).isZero();
+    assertThat(conversions("rejected")).isZero();
   }
 
   @Test
@@ -187,6 +189,21 @@ class ThrottledOfficeConverterTest {
 
     assertThat(conversions("success")).isEqualTo(1);
     assertThat(registry.find(ConversionMeters.SLOT_WAIT).timer().count()).isEqualTo(1);
+  }
+
+  @Test
+  @Timeout(30)
+  @DisplayName("tells an unreadable document (rejected) from a broken converter (failure)")
+  void unreadableDocumentIsRejectedNotFailed() {
+    BlockingConverter delegate = new BlockingConverter(1);
+    delegate.failure = OfficeConversionException.unreadableDocument("not a Word document");
+    ThrottledOfficeConverter converter = throttled(delegate, 1, Duration.ZERO);
+
+    assertThatThrownBy(() -> converter.toPdf(SOURCE, "docx"))
+        .isInstanceOf(OfficeConversionException.class);
+
+    assertThat(conversions("rejected")).isEqualTo(1);
+    assertThat(conversions("failure")).isZero();
   }
 
   /** How many conversions were timed with this outcome (issue #962). */

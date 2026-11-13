@@ -95,6 +95,8 @@ class JobServiceMetersTest {
     assertThat(execution("success").count()).isEqualTo(1);
     assertThat(execution("retry")).isNull();
     assertThat(execution("failed")).isNull();
+    // Buckets, so a percentile can be computed across instances (ADR-0065).
+    assertThat(execution("success").takeSnapshot().histogramCounts()).isNotEmpty();
   }
 
   @Test

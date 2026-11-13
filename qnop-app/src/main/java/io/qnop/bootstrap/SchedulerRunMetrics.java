@@ -37,14 +37,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * Publishes when each scheduled maintenance job last ran and whether that run failed (issue #962):
- * {@code qnop.scheduler.last.run.timestamp{job}} in epoch seconds and {@code
- * qnop.scheduler.last.run.failed{job}} as 1 or 0. Both are {@code NaN} for a job that has never
- * run.
+ * Publishes the state of each scheduled maintenance job (issue #962): {@code
+ * qnop.scheduler.last.run.timestamp{job}} in epoch seconds, {@code
+ * qnop.scheduler.last.run.failed{job}} as 1 or 0, and {@code qnop.scheduler.job.enabled{job}} as 1
+ * or 0.
  *
  * <p>A nightly job that silently stops is invisible to a duration timer, which simply records
- * nothing. Alert on {@code time() - timestamp} exceeding the job's interval, or on {@code failed ==
- * 1}.
+ * nothing. Alert on {@code failed == 1}, and on a stale timestamp <em>only where the job is
+ * enabled</em>: {@code (time() - timestamp > interval) and enabled == 1}. A job an operator
+ * switched off stops running on purpose, and without the third gauge it would look dead.
+ *
+ * <p>A job that has never run reports {@code NaN} for the first two, and a comparison with {@code
+ * NaN} is never true: "enabled but never ran" needs its own rule ({@code enabled == 1 unless
+ * timestamp == timestamp}).
  *
  * <p>The values come from the scheduler's own table, so they are the same on every instance
  * (aggregate with {@code max}) and survive a restart. The gauges share one snapshot of that table,
@@ -83,14 +88,27 @@ class SchedulerRunMetrics implements MeterBinder {
           "seconds",
           "When the job last ran, as a Unix timestamp",
           jobId,
-          view -> view.lastRunAt().toEpochMilli() / MILLIS_PER_SECOND);
+          view ->
+              view.lastRunAt() == null
+                  ? Double.NaN
+                  : view.lastRunAt().toEpochMilli() / MILLIS_PER_SECOND);
       gauge(
           registry,
           "qnop.scheduler.last.run.failed",
           null,
           "1 if the job's last run failed, else 0",
           jobId,
-          view -> RunOutcome.FAILURE.name().equals(view.lastOutcome()) ? 1.0 : 0.0);
+          view ->
+              view.lastRunAt() == null
+                  ? Double.NaN
+                  : RunOutcome.FAILURE.name().equals(view.lastOutcome()) ? 1.0 : 0.0);
+      gauge(
+          registry,
+          "qnop.scheduler.job.enabled",
+          null,
+          "1 if the job runs on its schedule, 0 if an operator switched it off",
+          jobId,
+          view -> view.enabled() ? 1.0 : 0.0);
     }
   }
 
@@ -101,14 +119,16 @@ class SchedulerRunMetrics implements MeterBinder {
       String description,
       String jobId,
       ToDoubleFunction<SchedulerJobView> value) {
-    Gauge.builder(name, snapshot, s -> valueOf(s.get().get(jobId), value))
+    Gauge.builder(
+            name,
+            snapshot,
+            s -> {
+              SchedulerJobView view = s.get().get(jobId);
+              return view == null ? Double.NaN : value.applyAsDouble(view);
+            })
         .tag("job", jobId)
         .baseUnit(baseUnit)
         .description(description)
         .register(registry);
-  }
-
-  private static double valueOf(SchedulerJobView view, ToDoubleFunction<SchedulerJobView> value) {
-    return view == null || view.lastRunAt() == null ? Double.NaN : value.applyAsDouble(view);
   }
 }

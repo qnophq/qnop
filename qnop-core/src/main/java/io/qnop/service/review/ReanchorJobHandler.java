@@ -25,6 +25,7 @@ import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ExtractionStatus;
 import io.qnop.entity.PlacementStatus;
 import io.qnop.observability.LogContext;
+import io.qnop.observability.metrics.AfterCommit;
 import io.qnop.observability.metrics.ReanchorMeters;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.DocumentVersionRepository;
@@ -39,8 +40,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -145,26 +144,13 @@ public class ReanchorJobHandler implements JobHandler {
           versionId,
           moved,
           orphaned);
-      countOnceCommitted(pending.size() - moved - orphaned, moved, orphaned);
+      // Once committed, not now: an attempt that rolls back is retried by the queue and
+      // would count the same annotations twice.
+      int placed = pending.size() - moved - orphaned;
+      int movedCount = moved;
+      int orphanedCount = orphaned;
+      AfterCommit.run(() -> meters.reanchored(placed, movedCount, orphanedCount));
     }
-  }
-
-  /**
-   * Counts the results only once the placements are committed. Counted straight away, an attempt
-   * that rolls back and is retried by the queue would count the same annotations twice.
-   */
-  private void countOnceCommitted(int placed, int moved, int orphaned) {
-    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-      meters.reanchored(placed, moved, orphaned);
-      return;
-    }
-    TransactionSynchronizationManager.registerSynchronization(
-        new TransactionSynchronization() {
-          @Override
-          public void afterCommit() {
-            meters.reanchored(placed, moved, orphaned);
-          }
-        });
   }
 
   private static RenderedDocument readRendered(DocumentVersion version) {

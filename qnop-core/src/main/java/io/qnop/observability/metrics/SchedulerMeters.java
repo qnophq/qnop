@@ -66,12 +66,19 @@ public class SchedulerMeters {
     this.registry = registry;
   }
 
-  public void ran(String jobId, Outcome outcome, Trigger trigger, Duration duration) {
+  /**
+   * A run finished. {@code jobId} must be an id from the scheduler catalogue; the caller only gets
+   * here for a job that has registered work, which is what keeps the tag a closed set.
+   */
+  public void ran(
+      String jobId, Outcome outcome, Trigger trigger, boolean dryRun, Duration duration) {
     Timer.builder(RUN)
         .description("Duration of one run of a scheduled maintenance job")
         .tag("job", jobId)
         .tag("outcome", MeterTags.of(outcome))
         .tag("trigger", MeterTags.of(trigger))
+        // A dry run does none of the work, so its duration says nothing about a real one.
+        .tag("dry_run", String.valueOf(dryRun))
         .serviceLevelObjectives(BUCKETS)
         .register(registry)
         .record(duration);
