@@ -105,6 +105,7 @@ public class AuditController implements AuditApi {
         .actorSlug(view.actorSlug())
         .actorAvatarUrl(avatarUrlOf(view.actorId(), avatarTimestamps))
         .detail(view.detail())
+        .redacted(view.redacted())
         .createdAt(view.createdAt() == null ? null : view.createdAt().atOffset(ZoneOffset.UTC));
   }
 

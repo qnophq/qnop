@@ -54,6 +54,10 @@ import org.hibernate.type.SqlTypes;
  * into a hash chain at commit. The chain columns ({@code chain_seq}, {@code prev_hash}, {@code
  * row_hash}) are deliberately not mapped here; {@code AuditChainRepository} reads them for
  * verification.
+ *
+ * <p>The one sanctioned content change is a user erasure (issue #952): deleting a user makes the
+ * database pseudonymise every row naming them and fill in {@code redacted_at} and {@code
+ * actor_pseudonym}, which are therefore mapped read-only.
  */
 @Entity
 @Table(name = "audit_event")
@@ -98,6 +102,20 @@ public class AuditEvent {
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
+
+  /**
+   * When a user erasure pseudonymised this row (issue #952), or null. Written only by the
+   * database's redaction path, hence read-only here.
+   */
+  @Column(name = "redacted_at", insertable = false, updatable = false)
+  private Instant redactedAt;
+
+  /**
+   * The pseudonym ({@code erased-user:<uuid>}) that replaced an erased acting user (issue #952), or
+   * null. Read-only like {@link #redactedAt}.
+   */
+  @Column(name = "actor_pseudonym", insertable = false, updatable = false)
+  private String actorPseudonym;
 
   protected AuditEvent() {
     // for JPA
@@ -155,6 +173,14 @@ public class AuditEvent {
 
   public Instant getCreatedAt() {
     return createdAt;
+  }
+
+  public Instant getRedactedAt() {
+    return redactedAt;
+  }
+
+  public String getActorPseudonym() {
+    return actorPseudonym;
   }
 
   @Override

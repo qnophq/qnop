@@ -1113,10 +1113,12 @@ paths:
       description: |
         Permanently deletes the user and, by cascade, their tokens, settings,
         OIDC identity and team memberships. The self-lockout guard rejects (409)
-        deleting your own account or the last enabled admin. A user the audit
-        trail names as an actor cannot be deleted either (409
-        `USER_HAS_AUDIT_HISTORY`, issue #948): the trail keeps its actors, so
-        such an account is disabled instead.
+        deleting your own account or the last enabled admin. Audit events that
+        name the user — as actor or in their details — are pseudonymised in the
+        same transaction (issue #952, ADR-0043): the user's id and names are
+        replaced by an `erased-user:<uuid>` pseudonym, and an
+        `audit.chain.redacted` event records which chain positions changed, so
+        the audit chain keeps verifying.
       operationId: deleteUser
       security:
         - bearerAuth: []
@@ -1134,8 +1136,7 @@ paths:
         '409':
           description: |
             Self-lockout or last-admin guard violated (`SELF_DELETE`,
-            `LAST_ADMIN`), or the user is an actor in the audit trail
-            (`USER_HAS_AUDIT_HISTORY`)
+            `LAST_ADMIN`)
           content:
             application/json:
               schema:
@@ -6244,7 +6245,9 @@ components:
             placement.confirmed,
             placement.reattached, placement.repositioned, workflow.transition,
             document.due_date.changed, or the SYSTEM-scoped
-            scheduler.job.enabled / scheduler.job.dry_run / scheduler.job.run_now.
+            scheduler.job.enabled / scheduler.job.dry_run / scheduler.job.run_now
+            and the audit-chain events audit.chain.pruned /
+            audit.chain.redacted / audit.chain.broken.
         documentId:
           type: string
           format: uuid
@@ -6267,7 +6270,9 @@ components:
           nullable: true
           description: >-
             The acting user's real display name; "System" when the event has no
-            actor, and null if the actor is no longer resolvable.
+            actor; the pseudonym (`erased-user:<uuid>`) when the acting user was
+            erased (issue #952, then actorId is null and redacted is true); and
+            null if the actor is no longer resolvable.
         actorSlug:
           type: string
           nullable: true
@@ -6289,6 +6294,13 @@ components:
         createdAt:
           type: string
           format: date-time
+        redacted:
+          type: boolean
+          description: >-
+            True when a user erasure pseudonymised this event (issue #952,
+            ADR-0043): the erased user's id and names in actor and detail were
+            replaced by a pseudonym. Its content is then no longer covered by
+            the hash chain; its position and hash still are.
     AuditEventListResponse:
       type: object
       description: A page of audit events, newest first.

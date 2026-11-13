@@ -40,7 +40,7 @@ import type { AuditKey } from '../../utils/auditEvents';
 import { PersonLink } from '../dashboard/PersonLink';
 import { reviewPath } from '../dashboard/dashboardModel';
 import { AuditEventBadge } from './AuditEventBadge';
-import { SystemActor } from './SystemActor';
+import { ErasedActor, SystemActor } from './SystemActor';
 
 const COLUMNS: AuditKey[] = [
   'table.columns.time',
@@ -174,6 +174,9 @@ export function AuditTable({
                         onClick={() => onFilterActor(event.actorId!, actorName)}
                       />
                     </Stack>
+                  ) : event.redacted && event.actorDisplayName ? (
+                    // An erased person (issue #952): not the system, and nothing to filter by.
+                    <ErasedActor pseudonym={event.actorDisplayName} />
                   ) : (
                     <Stack
                       direction="row"

@@ -41,6 +41,9 @@
     "name": "Sistema",
     "tooltip": "Ação automática do sistema — sem pessoa envolvida"
   },
+  "erased": {
+    "tooltip": "Usuário apagado — a conta foi excluída e os dados pessoais pseudonimizados na trilha de auditoria"
+  },
   "events": {
     "annotationCreated": {
       "label": "Anotação aberta",
@@ -125,6 +128,10 @@
     "auditChainPruned": {
       "label": "Trilha de auditoria podada",
       "description": "Uma revisão foi excluída e os próprios eventos de auditoria dela foram junto (issue #928). Este marcador registra quais posições da cadeia de auditoria à prova de adulteração foram removidas, para que a verificação da cadeia distinga esta exclusão autorizada de uma adulteração."
+    },
+    "auditChainRedacted": {
+      "label": "Usuário apagado da trilha de auditoria",
+      "description": "Uma conta de usuário foi excluída e cada entrada de auditoria que o mencionava foi pseudonimizada (issue #952): o identificador e os nomes foram substituídos por um pseudônimo de usuário apagado. Os detalhes listam quais posições da cadeia de auditoria à prova de adulteração foram alteradas, para que a verificação da cadeia distinga este apagamento autorizado de uma adulteração. Não mencionam ninguém."
     },
     "auditChainBroken": {
       "label": "Cadeia de auditoria rompida",

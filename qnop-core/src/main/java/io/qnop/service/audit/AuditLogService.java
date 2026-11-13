@@ -85,6 +85,10 @@ public class AuditLogService {
    * actorId} is null for a system event; {@code actorDisplayName} is then {@code "System"}, and
    * null only when a real actor's user row no longer resolves. {@code detail} is the raw jsonb
    * string.
+   *
+   * <p>{@code redacted} marks a row a user erasure pseudonymised (issue #952). When the erased user
+   * was the actor, {@code actorId} is null and {@code actorDisplayName} is the pseudonym ({@code
+   * erased-user:<uuid>}) — never {@code "System"}.
    */
   public record AuditEventView(
       UUID id,
@@ -97,7 +101,8 @@ public class AuditLogService {
       String actorDisplayName,
       String actorSlug,
       String detail,
-      Instant createdAt) {}
+      Instant createdAt,
+      boolean redacted) {}
 
   public record AuditPage(List<AuditEventView> items, long total, int page, int size) {}
 
@@ -162,7 +167,9 @@ public class AuditLogService {
         predicates.add(cb.equal(root.get("eventType"), eventType));
       }
       if (actorSystem) {
+        // An erased actor (issue #952) has no id either, but was a person, not the system.
         predicates.add(cb.isNull(root.get("actorId")));
+        predicates.add(cb.isNull(root.get("actorPseudonym")));
       } else if (actorId != null) {
         predicates.add(cb.equal(root.get("actorId"), actorId));
       }
@@ -248,7 +255,14 @@ public class AuditLogService {
     Document document =
         event.getDocumentId() == null ? null : documentById.get(event.getDocumentId());
     UUID actorId = event.getActorId();
-    String actorDisplayName = actorId == null ? SYSTEM_ACTOR_NAME : actorNames.get(actorId);
+    String actorDisplayName;
+    if (actorId != null) {
+      actorDisplayName = actorNames.get(actorId);
+    } else if (event.getActorPseudonym() != null) {
+      actorDisplayName = event.getActorPseudonym();
+    } else {
+      actorDisplayName = SYSTEM_ACTOR_NAME;
+    }
     String actorSlug = actorId == null ? null : actorSlugs.get(actorId);
     return new AuditEventView(
         event.getId(),
@@ -261,6 +275,7 @@ public class AuditLogService {
         actorDisplayName,
         actorSlug,
         event.getDetail(),
-        event.getCreatedAt());
+        event.getCreatedAt(),
+        event.getRedactedAt() != null);
   }
 }

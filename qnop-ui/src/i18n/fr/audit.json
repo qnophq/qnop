@@ -41,6 +41,9 @@
     "name": "Système",
     "tooltip": "Action automatique du système — aucun auteur humain"
   },
+  "erased": {
+    "tooltip": "Utilisateur effacé — le compte a été supprimé et ses données personnelles pseudonymisées dans le journal d’audit"
+  },
   "events": {
     "annotationCreated": {
       "label": "Annotation créée",
@@ -125,6 +128,10 @@
     "auditChainPruned": {
       "label": "Journal d’audit élagué",
       "description": "Une révision a été supprimée et ses propres événements d’audit avec elle (issue #928). Cette marque enregistre quelles positions de la chaîne d’audit infalsifiable ont été retirées, afin que la vérification de la chaîne distingue cette suppression autorisée d’une falsification."
+    },
+    "auditChainRedacted": {
+      "label": "Utilisateur effacé du journal d’audit",
+      "description": "Un compte utilisateur a été supprimé et chaque entrée d’audit qui le nommait a été pseudonymisée (issue #952) : son identifiant et ses noms ont été remplacés par un pseudonyme d’utilisateur effacé. Les détails indiquent quelles positions de la chaîne d’audit infalsifiable ont changé, afin que la vérification de la chaîne distingue cet effacement autorisé d’une falsification. Ils ne nomment personne."
     },
     "auditChainBroken": {
       "label": "Chaîne d’audit rompue",

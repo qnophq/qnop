@@ -59,12 +59,6 @@ public interface AuditEventRepository
   Optional<AuditEvent> findFirstByEventTypeOrderByCreatedAtDesc(String eventType);
 
   /**
-   * Whether any event names this user as its actor — such a user cannot be hard-deleted, because
-   * {@code fk_audit_event_actor} is {@code ON DELETE RESTRICT} (issue #948).
-   */
-  boolean existsByActorId(UUID actorId);
-
-  /**
    * Whether a SYSTEM event of {@code eventType} about {@code userId} in {@code teamId} was recorded
    * after {@code since} — the re-invite cooldown (issue #948). The scope and time bound let {@code
    * ix_audit_event_scope_created_at} narrow it to the window before the jsonb filter applies.

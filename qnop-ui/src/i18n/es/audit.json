@@ -41,6 +41,9 @@
     "name": "Sistema",
     "tooltip": "Acción automática del sistema — sin autor humano"
   },
+  "erased": {
+    "tooltip": "Usuario borrado: la cuenta se eliminó y sus datos personales se seudonimizaron en el registro de auditoría"
+  },
   "events": {
     "annotationCreated": {
       "label": "Anotación abierta",
@@ -125,6 +128,10 @@
     "auditChainPruned": {
       "label": "Registro de auditoría depurado",
       "description": "Se eliminó una revisión y sus propios eventos de auditoría se eliminaron con ella (issue #928). Esta marca registra qué posiciones de la cadena de auditoría a prueba de manipulaciones se eliminaron, para que la verificación de la cadena distinga esta eliminación autorizada de una manipulación."
+    },
+    "auditChainRedacted": {
+      "label": "Usuario borrado del registro de auditoría",
+      "description": "Se eliminó una cuenta de usuario y cada entrada de auditoría que lo nombraba se seudonimizó (issue #952): su identificador y sus nombres se sustituyeron por un seudónimo de usuario borrado. Los detalles indican qué posiciones de la cadena de auditoría a prueba de manipulaciones cambiaron, para que la verificación de la cadena distinga este borrado autorizado de una manipulación. No nombran a nadie."
     },
     "auditChainBroken": {
       "label": "Cadena de auditoría rota",

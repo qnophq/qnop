@@ -80,10 +80,14 @@ describe('auditEventMeta', () => {
 
   it('knows the audit-chain integrity events, and flags a broken chain in red', () => {
     expect(AUDIT_EVENT_TYPES).toEqual(
-      expect.arrayContaining(['audit.chain.pruned', 'audit.chain.broken']),
+      expect.arrayContaining(['audit.chain.pruned', 'audit.chain.redacted', 'audit.chain.broken']),
     );
     expect(auditEventMeta('audit.chain.broken').tone).toBe('red');
     expect(english(auditEventMeta('audit.chain.pruned').labelKey)).toBe('Audit trail pruned');
+    expect(english(auditEventMeta('audit.chain.redacted').labelKey)).toBe(
+      'User erased from audit trail',
+    );
+    expect(auditEventMeta('audit.chain.redacted').tone).toBe('neutral');
   });
 
   it('knows the secrets-at-rest maintenance events, and flags unreadable secrets in red', () => {
