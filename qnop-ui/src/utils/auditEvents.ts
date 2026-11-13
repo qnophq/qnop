@@ -178,6 +178,12 @@ export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
     descriptionKey: 'events.auditChainRedacted.description',
     tone: 'neutral',
   },
+  // Who deleted (and so erased) a user account; names nobody but the actor (issue #952).
+  'user.erased': {
+    labelKey: 'events.userErased.label',
+    descriptionKey: 'events.userErased.description',
+    tone: 'red',
+  },
   'audit.chain.broken': {
     labelKey: 'events.auditChainBroken.label',
     descriptionKey: 'events.auditChainBroken.description',

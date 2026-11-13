@@ -88,6 +88,7 @@ describe('auditEventMeta', () => {
       'User erased from audit trail',
     );
     expect(auditEventMeta('audit.chain.redacted').tone).toBe('neutral');
+    expect(english(auditEventMeta('user.erased').labelKey)).toBe('User account erased');
   });
 
   it('knows the secrets-at-rest maintenance events, and flags unreadable secrets in red', () => {

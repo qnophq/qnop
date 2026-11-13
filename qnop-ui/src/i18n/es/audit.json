@@ -133,6 +133,10 @@
       "label": "Usuario borrado del registro de auditoría",
       "description": "Se eliminó una cuenta de usuario y cada entrada de auditoría que lo nombraba se seudonimizó (issue #952): su identificador y sus nombres se sustituyeron por un seudónimo de usuario borrado. Los detalles indican qué posiciones de la cadena de auditoría a prueba de manipulaciones cambiaron, para que la verificación de la cadena distinga este borrado autorizado de una manipulación. No nombran a nadie."
     },
+    "userErased": {
+      "label": "Cuenta de usuario borrada",
+      "description": "Un administrador eliminó una cuenta de usuario (issue #952). El actor es quien la eliminó; los detalles solo hacen referencia a la redacción que seudonimizó las entradas de auditoría de la cuenta (null si ninguna la nombraba) y nunca identifican a la persona borrada."
+    },
     "auditChainBroken": {
       "label": "Cadena de auditoría rota",
       "description": "La verificación de la cadena de auditoría encontró eventos de auditoría modificados, eliminados o insertados fuera de la aplicación (issue #928). Los detalles sitúan cada ruptura por su posición en la cadena; investíguelo antes de confiar en las entradas afectadas."

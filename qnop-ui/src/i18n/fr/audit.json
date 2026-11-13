@@ -133,6 +133,10 @@
       "label": "Utilisateur effacé du journal d’audit",
       "description": "Un compte utilisateur a été supprimé et chaque entrée d’audit qui le nommait a été pseudonymisée (issue #952) : son identifiant et ses noms ont été remplacés par un pseudonyme d’utilisateur effacé. Les détails indiquent quelles positions de la chaîne d’audit infalsifiable ont changé, afin que la vérification de la chaîne distingue cet effacement autorisé d’une falsification. Ils ne nomment personne."
     },
+    "userErased": {
+      "label": "Compte utilisateur effacé",
+      "description": "Un administrateur a supprimé un compte utilisateur (issue #952). L’acteur est la personne qui l’a supprimé ; les détails ne font référence qu’au caviardage qui a pseudonymisé les entrées d’audit du compte (null si aucune ne le nommait) et n’identifient jamais la personne effacée."
+    },
     "auditChainBroken": {
       "label": "Chaîne d’audit rompue",
       "description": "La vérification de la chaîne d’audit a trouvé des événements d’audit modifiés, supprimés ou insérés en dehors de l’application (issue #928). Les détails situent chaque rupture par sa position dans la chaîne ; enquêtez avant de vous fier aux entrées concernées."

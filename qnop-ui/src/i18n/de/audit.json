@@ -133,6 +133,10 @@
       "label": "Benutzer aus dem Audit-Trail gelöscht",
       "description": "Ein Benutzerkonto wurde gelöscht und jeder Audit-Eintrag, der den Benutzer nannte, wurde pseudonymisiert (Issue #952): ID und Namen wurden durch ein Pseudonym für gelöschte Benutzer ersetzt. Die Details listen auf, welche Positionen der manipulationssicheren Audit-Kette geändert wurden, damit die Kettenprüfung diese zulässige Löschung von einer Manipulation unterscheiden kann. Sie nennen niemanden."
     },
+    "userErased": {
+      "label": "Benutzerkonto gelöscht",
+      "description": "Ein Administrator hat ein Benutzerkonto gelöscht (Issue #952). Der Akteur ist, wer es gelöscht hat; die Details verweisen nur auf die Schwärzung, die die Audit-Einträge des Kontos pseudonymisiert hat (null, wenn keiner es nannte), und identifizieren die gelöschte Person nie."
+    },
     "auditChainBroken": {
       "label": "Audit-Kette unterbrochen",
       "description": "Die Prüfung der Audit-Kette hat Audit-Ereignisse gefunden, die außerhalb der Anwendung verändert, entfernt oder eingefügt wurden (Issue #928). Die Details benennen jede Unterbrechung mit ihrer Kettenposition; prüfen Sie den Vorfall, bevor Sie den betroffenen Einträgen vertrauen."

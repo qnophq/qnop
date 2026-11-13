@@ -133,6 +133,10 @@
       "label": "User erased from audit trail",
       "description": "A user account was deleted and every audit entry that named the user was pseudonymised (issue #952): their id and names were replaced by an erased-user pseudonym. The details list which positions of the tamper-evident audit chain were changed, so the chain verification can tell this sanctioned erasure apart from tampering. They name no one."
     },
+    "userErased": {
+      "label": "User account erased",
+      "description": "An administrator deleted a user account (issue #952). The actor is who deleted it; the details only reference the redaction that pseudonymised the account's audit entries (null when none named it) and never identify the erased person."
+    },
     "auditChainBroken": {
       "label": "Audit chain broken",
       "description": "The audit-chain verification found audit events that were altered, removed or inserted outside the application (issue #928). The details locate each break by chain position; investigate before trusting the affected entries."
