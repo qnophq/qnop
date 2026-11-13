@@ -23,6 +23,8 @@ package io.qnop.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.qnop.bootstrap.AbstractIntegrationTest;
+import io.qnop.service.oidc.GitHubEmailFetcher;
+import io.qnop.service.oidc.OidcHttpTransport;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,6 +62,8 @@ class OidcOutboundWiringIT extends AbstractIntegrationTest {
   @Autowired OAuth2UserService<OAuth2UserRequest, OAuth2User> guardedUserService;
   @Autowired OAuth2UserService<OidcUserRequest, OidcUser> guardedOidcUserService;
   @Autowired JwtDecoderFactory<ClientRegistration> guardedDecoderFactory;
+  @Autowired GitHubEmailFetcher gitHubEmailFetcher;
+  @Autowired OidcHttpTransport oidcTransport;
 
   @Test
   @DisplayName("the login filter's providers use the guarded token, user-info and JWK clients")
@@ -81,6 +85,17 @@ class OidcOutboundWiringIT extends AbstractIntegrationTest {
         ReflectionTestUtils.getField(oauth2, "authorizationCodeAuthenticationProvider");
     assertThat(ReflectionTestUtils.getField(codeProvider, "accessTokenResponseClient"))
         .isSameAs(guardedTokenClient);
+  }
+
+  @Test
+  @DisplayName("the GitHub e-mail lookup uses the guarded OIDC transport (issue #946)")
+  void gitHubEmailLookupUsesGuardedTransport() {
+    Object restClient = ReflectionTestUtils.getField(gitHubEmailFetcher, "restClient");
+
+    assertThat(ReflectionTestUtils.getField(restClient, "clientRequestFactory"))
+        .isSameAs(oidcTransport.requestFactory());
+    assertThat(ReflectionTestUtils.getField(gitHubEmailFetcher, "endpoint"))
+        .isEqualTo("https://api.github.com/user/emails");
   }
 
   private List<AuthenticationProvider> loginProviders() {

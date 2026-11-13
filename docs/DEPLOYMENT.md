@@ -207,7 +207,7 @@ Usage tracking is off by default and configured under *Administration → Settin
 
 ## Outbound proxy (OIDC and usage tracking)
 
-qnop's requests to OIDC providers (discovery, token, user-info, JWK set) and to the usage-tracking backend go through SSRF-guarded clients (ADR-0056): they resolve the destination themselves, refuse private/loopback/metadata addresses (unless `QNOP_AUTH_OIDC_ALLOW_PRIVATE_DISCOVERY_URIS` / `QNOP_TRACKING_ALLOW_PRIVATE_HOST` allow them), and connect only to the address they checked. They **ignore** the JVM proxy settings (`-Dhttps.proxyHost`, `-Dhttp.proxyHost`, `-Dhttp.nonProxyHosts`).
+qnop's requests to OIDC providers (discovery, token, user-info, JWK set, and GitHub's `/user/emails` lookup during GitHub login) and to the usage-tracking backend go through SSRF-guarded clients (ADR-0056): they resolve the destination themselves, refuse private/loopback/metadata addresses (unless `QNOP_AUTH_OIDC_ALLOW_PRIVATE_DISCOVERY_URIS` / `QNOP_TRACKING_ALLOW_PRIVATE_HOST` allow them), and connect only to the address they checked. They **ignore** the JVM proxy settings (`-Dhttps.proxyHost`, `-Dhttp.proxyHost`, `-Dhttp.nonProxyHosts`).
 
 If those destinations are reachable only through a mandatory egress proxy, opt in explicitly (deployment configuration only — there is no admin-UI setting for this):
 

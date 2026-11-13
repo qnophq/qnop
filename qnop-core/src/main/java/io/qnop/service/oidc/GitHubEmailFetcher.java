@@ -20,22 +20,28 @@
  */
 package io.qnop.service.oidc;
 
-import io.qnop.service.http.HttpClientProperties;
-import java.net.http.HttpClient;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 /**
  * Fetches a GitHub user's primary, verified email via {@code GET /user/emails} (issue #21). GitHub
  * omits the email from userinfo unless it is public, so when the login principal carries no email
  * this is the fallback. The user's OAuth2 access token authorizes the call (needs {@code
  * user:email} scope).
+ *
+ * <p>The call goes through the same SSRF-guarded transport as every other OIDC request ({@link
+ * OidcHttpTransport}, issue #946): the connection-time address check under the deployment's
+ * private-IdP opt-in, no redirects, the response size bound, the {@code
+ * qnop.http-client.outbound-*} timeouts and, when configured, the explicit {@code
+ * qnop.http-client.proxy.*} route (ADR-0056).
  */
 @Component
 public class GitHubEmailFetcher {
@@ -46,21 +52,22 @@ public class GitHubEmailFetcher {
   private static final Logger log = LoggerFactory.getLogger(GitHubEmailFetcher.class);
 
   private final RestClient restClient;
+  private final String endpoint;
 
-  // Bound the outbound call (issue #342): RestClient.create() uses the JDK HTTP
-  // client with no default timeout, so a slow/hung GitHub response would pin the
-  // login thread. The configurable connect + read timeouts keep OIDC login responsive.
-  public GitHubEmailFetcher(HttpClientProperties httpClientProperties) {
-    this.restClient =
-        RestClient.builder().requestFactory(timedFactory(httpClientProperties)).build();
+  @Autowired
+  public GitHubEmailFetcher(OidcHttpTransport transport) {
+    this(transport.requestFactory());
   }
 
-  private static JdkClientHttpRequestFactory timedFactory(HttpClientProperties properties) {
-    JdkClientHttpRequestFactory factory =
-        new JdkClientHttpRequestFactory(
-            HttpClient.newBuilder().connectTimeout(properties.outboundConnectTimeout()).build());
-    factory.setReadTimeout(properties.outboundReadTimeout());
-    return factory;
+  /** Over {@code requestFactory}, against GitHub's endpoint. */
+  GitHubEmailFetcher(ClientHttpRequestFactory requestFactory) {
+    this(requestFactory, EMAILS_ENDPOINT);
+  }
+
+  /** Over {@code requestFactory}, against {@code endpoint} (tests point both at a local server). */
+  GitHubEmailFetcher(ClientHttpRequestFactory requestFactory, String endpoint) {
+    this.restClient = RestClient.builder().requestFactory(requestFactory).build();
+    this.endpoint = endpoint;
   }
 
   /** The primary verified email for the token's user, or {@code null} if none is available. */
@@ -69,7 +76,7 @@ public class GitHubEmailFetcher {
       List<Map<String, Object>> emails =
           restClient
               .get()
-              .uri(EMAILS_ENDPOINT)
+              .uri(endpoint)
               .header("Authorization", "Bearer " + accessToken)
               .header("Accept", "application/vnd.github+json")
               .retrieve()
@@ -94,8 +101,12 @@ public class GitHubEmailFetcher {
         }
       }
       return firstVerified;
+    } catch (RestClientResponseException e) {
+      // Status only: the exception message can carry part of the response body.
+      log.warn("Failed to fetch GitHub primary email: HTTP {}", e.getStatusCode().value());
+      return null;
     } catch (RuntimeException e) {
-      log.warn("Failed to fetch GitHub primary email: {}", e.getMessage());
+      log.warn("Failed to fetch GitHub primary email: {}", e.getClass().getName());
       return null;
     }
   }

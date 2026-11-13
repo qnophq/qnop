@@ -34,10 +34,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * <ul>
  *   <li>{@code outbound*} — the connect/read timeouts for HTTP clients qnop makes calls through:
- *       the GitHub email fetch (OIDC login), the SSRF-guarded clients of {@link
- *       OutboundHttpClients} (OIDC discovery, token, user-info and JWK-set requests, and the
- *       usage-tracking proxy, issue #904) and, as JDK {@code HttpURLConnection} defaults, any
- *       remaining legacy client.
+ *       the SSRF-guarded clients of {@link OutboundHttpClients} (OIDC discovery, token, user-info
+ *       and JWK-set requests, the GitHub e-mail lookup, and the usage-tracking proxy, issues
+ *       #904/#946) and, as JDK {@code HttpURLConnection} defaults, any remaining legacy client.
  *   <li>{@code smtp*} — the SMTP transport connect/read/write timeouts for outgoing mail.
  *   <li>{@code proxy.*} — the explicit outbound proxy opt-in for the guarded clients (issue #940,
  *       ADR-0056 amendment); unset by default, which means direct connections.
