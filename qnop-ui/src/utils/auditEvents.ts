@@ -172,6 +172,18 @@ export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
     descriptionKey: 'events.auditChainPruned.description',
     tone: 'neutral',
   },
+  // A user erasure pseudonymised audit entries (issue #952); not a fault.
+  'audit.chain.redacted': {
+    labelKey: 'events.auditChainRedacted.label',
+    descriptionKey: 'events.auditChainRedacted.description',
+    tone: 'neutral',
+  },
+  // Who deleted (and so erased) a user account; names nobody but the actor (issue #952).
+  'user.erased': {
+    labelKey: 'events.userErased.label',
+    descriptionKey: 'events.userErased.description',
+    tone: 'red',
+  },
   'audit.chain.broken': {
     labelKey: 'events.auditChainBroken.label',
     descriptionKey: 'events.auditChainBroken.description',

@@ -98,6 +98,22 @@ describe('AuditTable', () => {
     expect(screen.getByRole('button', { name: 'Filter by System' })).toBeInTheDocument();
   });
 
+  it('shows an erased actor by pseudonym, never as System and with no filter (#952)', () => {
+    renderTable([
+      {
+        ...systemEvent,
+        id: 'e3',
+        actorDisplayName: 'erased-user:0190a1b2-c3d4-7e5f-8a9b-0000000000aa',
+        redacted: true,
+      },
+    ]);
+    expect(
+      screen.getByText('erased-user:0190a1b2-c3d4-7e5f-8a9b-0000000000aa'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('System')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Filter by System' })).not.toBeInTheDocument();
+  });
+
   it('filters to system-only events from the system filter button', () => {
     const { onFilterSystem } = renderTable([systemEvent]);
     fireEvent.click(screen.getByRole('button', { name: 'Filter by System' }));

@@ -34,10 +34,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.qnop.entity.AuditEvent;
+import io.qnop.entity.Document;
 import io.qnop.entity.NotificationType;
+import io.qnop.repository.AuditEventRepository;
+import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.NotificationRepository;
 import io.qnop.service.TeamMembershipAudit;
 import io.qnop.service.UserSettingKey;
+import io.qnop.service.audit.AuditChainVerificationService;
 import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailTemplateKey;
 import io.qnop.testsupport.SeededIntegrationTest;
@@ -45,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -54,6 +60,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Team invitations reach the invited user, and every membership change lands in the audit trail
@@ -73,6 +81,17 @@ class TeamMembershipNotificationAuditIT extends SeededIntegrationTest {
 
   @Autowired private NotificationRepository notifications;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private DocumentRepository documents;
+  @Autowired private AuditEventRepository auditEvents;
+  @Autowired private AuditChainVerificationService verification;
+  @Autowired private PlatformTransactionManager transactionManager;
+
+  private TransactionTemplate tx;
+
+  @BeforeEach
+  void transactions() {
+    tx = new TransactionTemplate(transactionManager);
+  }
 
   private MockHttpServletRequestBuilder as(MockHttpServletRequestBuilder builder, UUID user) {
     return builder.header("Authorization", "Bearer " + token(user));
@@ -301,21 +320,75 @@ class TeamMembershipNotificationAuditIT extends SeededIntegrationTest {
   }
 
   @Test
-  @DisplayName("a user the audit trail names cannot be hard-deleted: 409, never a 500")
-  void auditActorDeleteIsAConflict() throws Exception {
+  @DisplayName(
+      "deleting a user the audit trail names erases them from it; the chain still verifies")
+  void auditActorDeleteErasesThemFromTheTrail() throws Exception {
+    // SYSTEM rows: the lead's invitation names Avery in its detail, the decline has Avery as actor.
     invite(AUDITOR_ID).andExpect(status().isCreated());
     mockMvc
         .perform(as(post("/api/v1/teams/invitations/{id}/decline", BETA), AUDITOR_ID))
         .andExpect(status().isNoContent());
+    // A DOCUMENT row with Avery as actor, on a review someone else owns.
+    UUID documentId =
+        tx.execute(
+            status -> {
+              Document document = documents.save(new Document(MEMBER_ID, "Erasure"));
+              auditEvents.save(
+                  new AuditEvent(document.getId(), "annotation.created", AUDITOR_ID, "{}"));
+              return document.getId();
+            });
 
     mockMvc
         .perform(as(delete("/api/v1/admin/users/{id}", AUDITOR_ID), ADMIN_ID))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("USER_HAS_AUDIT_HISTORY"));
+        .andExpect(status().isNoContent());
+
     assertThat(
             jdbc.queryForObject(
                 "SELECT count(*) FROM qnop_user WHERE id = ?", Long.class, AUDITOR_ID))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM audit_event WHERE actor_id = ?", Long.class, AUDITOR_ID))
+        .isZero();
+    String allDetail =
+        jdbc.queryForObject("SELECT string_agg(detail::text, ' ') FROM audit_event", String.class);
+    assertThat(allDetail)
+        .doesNotContain(AUDITOR_ID.toString())
+        .doesNotContain("Avery Auditor")
+        .doesNotContain("avery-auditor")
+        .doesNotContain(INVITEE_EMAIL)
+        .contains("erased-user:");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM audit_event WHERE redacted_at IS NOT NULL"
+                    + " AND (document_id = ? OR scope = 'SYSTEM')",
+                Long.class,
+                documentId))
+        .isEqualTo(3L);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM audit_event WHERE event_type = 'audit.chain.redacted'",
+                Long.class))
         .isEqualTo(1L);
+    // Who erased the account is on record, without naming the erased user.
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT actor_id FROM audit_event WHERE event_type = 'user.erased'", UUID.class))
+        .isEqualTo(ADMIN_ID);
+    assertThat(verification.verify().problems()).isEmpty();
+
+    // The compliance view shows the erased actor by pseudonym, flagged as redacted.
+    mockMvc
+        .perform(
+            as(
+                get("/api/v1/audit/events").param("eventType", "team.invitation.declined"),
+                ADMIN_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].actorId").doesNotExist())
+        .andExpect(jsonPath("$.items[0].redacted").value(true))
+        .andExpect(
+            jsonPath("$.items[0].actorDisplayName")
+                .value(org.hamcrest.Matchers.startsWith("erased-user:")));
   }
 
   @Test

@@ -64,8 +64,6 @@ class AdminUserServiceTest {
   private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
   private final PasswordResetFlowService passwordResetFlow = mock(PasswordResetFlowService.class);
   private final RefreshTokenService refreshTokens = mock(RefreshTokenService.class);
-  private final io.qnop.repository.AuditEventRepository auditEvents =
-      mock(io.qnop.repository.AuditEventRepository.class);
   // The mocked repositories report every slug candidate free in both namespaces (issue #595), so
   // the base slug wins (issue #486).
   private final AdminUserService service =
@@ -76,8 +74,7 @@ class AdminUserServiceTest {
           passwordResetFlow,
           refreshTokens,
           new UserSlugService(new SlugNamespace(users, mock(TeamRepository.class))),
-          noLimits(),
-          auditEvents);
+          noLimits());
 
   private void noClash() {
     when(users.existsByEmailIgnoreCaseAndSource(any(), any())).thenReturn(false);
@@ -394,35 +391,40 @@ class AdminUserServiceTest {
   }
 
   @Test
-  @DisplayName("delete refuses a user the audit trail names as an actor, with a 409 code (#948)")
-  void deleteRefusesAnAuditActor() {
+  @DisplayName(
+      "delete no longer refuses an audit actor: announces the admin, deletes and flushes (#952)")
+  void deleteRemovesAnAuditActor() {
     UUID memberId = UUID.randomUUID();
     User member = User.internal("Member", "member@example.com", "member", "h");
     when(users.findById(memberId)).thenReturn(Optional.of(member));
-    when(auditEvents.existsByActorId(memberId)).thenReturn(true);
 
-    assertThatThrownBy(() -> service.delete(memberId, UUID.randomUUID()))
-        .isInstanceOf(AdminUserConflictException.class)
-        .extracting("code")
-        .isEqualTo(AdminUserService.USER_HAS_AUDIT_HISTORY);
-    org.mockito.Mockito.verify(users, org.mockito.Mockito.never()).deleteById(any());
+    UUID adminId = UUID.randomUUID();
+    when(users.keyShareLock(adminId)).thenReturn(1L);
+    service.delete(memberId, adminId);
+
+    org.mockito.InOrder order = org.mockito.Mockito.inOrder(users, refreshTokens);
+    order.verify(users).lockById(memberId);
+    order.verify(refreshTokens).revokeAllForUser(memberId);
+    // The database attributes its user.erased event to the announced (and locked) admin.
+    order.verify(users).keyShareLock(adminId);
+    order.verify(users).announceErasingActor(adminId.toString());
+    order.verify(users).deleteById(memberId);
+    order.verify(users).flush();
   }
 
   @Test
-  @DisplayName("an audit reference that appears after the check is still a 409, not a 500 (#948)")
-  void deleteMapsTheForeignKeyToAConflict() {
+  @DisplayName("an acting admin deleted meanwhile is announced as nobody (#952)")
+  void deleteAnnouncesNoActorWhenTheAdminIsGone() {
     UUID memberId = UUID.randomUUID();
     User member = User.internal("Member", "member@example.com", "member", "h");
     when(users.findById(memberId)).thenReturn(Optional.of(member));
-    org.mockito.Mockito.doThrow(
-            new org.springframework.dao.DataIntegrityViolationException("fk_audit_event_actor"))
-        .when(users)
-        .flush();
+    UUID adminId = UUID.randomUUID();
+    when(users.keyShareLock(adminId)).thenReturn(0L);
 
-    assertThatThrownBy(() -> service.delete(memberId, UUID.randomUUID()))
-        .isInstanceOf(AdminUserConflictException.class)
-        .extracting("code")
-        .isEqualTo(AdminUserService.USER_HAS_AUDIT_HISTORY);
+    service.delete(memberId, adminId);
+
+    org.mockito.Mockito.verify(users).announceErasingActor("");
+    org.mockito.Mockito.verify(users).deleteById(memberId);
   }
 
   @Test

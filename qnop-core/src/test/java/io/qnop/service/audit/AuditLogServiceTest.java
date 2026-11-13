@@ -59,6 +59,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * The audit-list mapping and paging rules (issue #466, ADR-0042): real actor/document resolution,
@@ -154,6 +155,21 @@ class AuditLogServiceTest {
   }
 
   @Test
+  @DisplayName("an erased actor renders as its pseudonym, never as System, and is flagged redacted")
+  void erasedActorRendersAsPseudonym() {
+    AuditEvent event = new AuditEvent(documentId, "annotation.created", null, null);
+    ReflectionTestUtils.setField(event, "actorPseudonym", "erased-user:1234");
+    ReflectionTestUtils.setField(event, "redactedAt", Instant.parse("2026-11-13T10:00:00Z"));
+
+    AuditEventView view =
+        AuditLogService.toViews(List.of(event), Map.of(), Map.of(), Map.of()).get(0);
+
+    assertThat(view.actorId()).isNull();
+    assertThat(view.actorDisplayName()).isEqualTo("erased-user:1234");
+    assertThat(view.redacted()).isTrue();
+  }
+
+  @Test
   @DisplayName("an unresolved actor or document yields null names, never a raw id")
   void unresolvedEntitiesYieldNulls() {
     AuditEvent event = new AuditEvent(documentId, "annotation.created", actorId, null);
@@ -239,7 +255,8 @@ class AuditLogServiceTest {
     AuditLogService.filter(null, actorId, true, null, null, null, null)
         .toPredicate(root, query, cb);
 
-    verify(cb).isNull(any());
+    // No actor id and no erased-actor pseudonym (issue #952).
+    verify(cb, times(2)).isNull(any());
     // actorSystem takes precedence — the actorId equality is never added.
     verify(cb, never()).equal(any(), any(Object.class));
     verify(cb).and(any(Predicate[].class));

@@ -21,7 +21,8 @@
 package io.qnop.repository;
 
 /**
- * One {@code audit.chain.pruned} tombstone as stored (issue #928): its own chain position (null if
- * somehow unsealed) and its raw jsonb detail text, parsed by the verifier.
+ * One {@code audit.chain.pruned} tombstone — or, with the same shape, one {@code
+ * audit.chain.redacted} event (issue #952) — as stored (issue #928): its own chain position (null
+ * if somehow unsealed) and its raw jsonb detail text, parsed by the verifier.
  */
 public record AuditChainTombstoneRow(Long recordedSeq, String detail) {}

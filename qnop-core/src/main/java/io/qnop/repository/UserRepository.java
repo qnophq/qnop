@@ -140,6 +140,27 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   Optional<User> lockById(@Param("id") UUID id);
 
   /**
+   * Key-share locks a user row (issue #952) and reports whether it still exists (1) or not (0). A
+   * writer that is about to name the user in an audit detail takes it, so the user's deletion —
+   * which erases them from the audit trail — waits for that writer to commit and then sees its row;
+   * and a writer that comes second finds the user gone instead of writing their data afterwards.
+   */
+  @Query(
+      value = "SELECT count(*) FROM (SELECT 1 FROM qnop_user WHERE id = :id FOR KEY SHARE) locked",
+      nativeQuery = true)
+  long keyShareLock(@Param("id") UUID id);
+
+  /**
+   * Announces, for the rest of this transaction, who is deleting users (issue #952). The database
+   * attributes the {@code user.erased} audit event of the next user deletion to this user; it is
+   * attribution only and authorises nothing. Returns the value set.
+   */
+  @Query(
+      value = "SELECT set_config('qnop.erasing_actor', CAST(:actorId AS text), true)",
+      nativeQuery = true)
+  String announceErasingActor(@Param("actorId") String actorId);
+
+  /**
    * Enabled accounts on this instance — the figure the user quota is measured against (issue #673).
    * Disabled accounts are excluded: they cannot sign in, so charging a seat for one would make
    * "deactivate the leaver" a worse move than deleting their history.

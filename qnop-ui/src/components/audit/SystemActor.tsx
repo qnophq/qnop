@@ -24,7 +24,7 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { Cpu } from 'lucide-react';
+import { Cpu, UserX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -94,6 +94,45 @@ export function SystemActor() {
           }}
         >
           {t('system.name')}
+        </Typography>
+      </Stack>
+    </Tooltip>
+  );
+}
+
+/**
+ * An actor erased from the audit trail (issue #952): the account was deleted
+ * and the entry now carries only its pseudonym (`erased-user:<uuid>`). Shown
+ * muted and inert — there is no profile to visit and nothing to filter by.
+ */
+export function ErasedActor({ pseudonym }: { pseudonym: string }) {
+  const { t } = useTranslation('audit');
+  return (
+    <Tooltip title={t('erased.tooltip')}>
+      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
+        <Box
+          aria-hidden
+          sx={{
+            width: 24,
+            height: 24,
+            flexShrink: 0,
+            borderRadius: '50%',
+            display: 'grid',
+            placeItems: 'center',
+            color: 'text.secondary',
+            border: 1,
+            borderStyle: 'dashed',
+            borderColor: 'divider',
+          }}
+        >
+          <UserX size={14} strokeWidth={2} />
+        </Box>
+        <Typography
+          component="span"
+          noWrap
+          sx={{ fontSize: '0.8rem', color: 'text.secondary', fontFamily: 'monospace', minWidth: 0 }}
+        >
+          {pseudonym}
         </Typography>
       </Stack>
     </Tooltip>

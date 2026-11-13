@@ -153,6 +153,10 @@ not erased, and its name stays in the snapshotted audit detail. An erasure path 
 actor and the snapshotted names) interacts with the hash chain (#928) and needs its own design; it
 is tracked in #952.
 
+*Superseded by #952 (ADR-0043 amendment, 2026-11):* deleting such a user now pseudonymises every
+audit row naming them in the same transaction and records an `audit.chain.redacted` event; the
+`409 USER_HAS_AUDIT_HISTORY` answer is gone.
+
 **Mail switches.** The invitation mail is exempt from `notifications.review_emails_enabled`, whose
 admin description now says so. It is not exempt from the mail layer's master switch: with
 `smtp.enabled` off or no host configured, the send is skipped like every other mail.

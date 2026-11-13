@@ -41,6 +41,9 @@
     "name": "System",
     "tooltip": "Automated system action — no human actor"
   },
+  "erased": {
+    "tooltip": "Erased user — the account was deleted and its personal data pseudonymised in the audit trail"
+  },
   "events": {
     "annotationCreated": {
       "label": "Annotation opened",
@@ -125,6 +128,14 @@
     "auditChainPruned": {
       "label": "Audit trail pruned",
       "description": "A review was deleted and its own audit events went with it (issue #928). This tombstone records which positions of the tamper-evident audit chain were removed, so the chain verification can tell this sanctioned deletion apart from tampering."
+    },
+    "auditChainRedacted": {
+      "label": "User erased from audit trail",
+      "description": "A user account was deleted and every audit entry that named the user was pseudonymised (issue #952): their id and names were replaced by an erased-user pseudonym. The details list which positions of the tamper-evident audit chain were changed, so the chain verification can tell this sanctioned erasure apart from tampering. They name no one."
+    },
+    "userErased": {
+      "label": "User account erased",
+      "description": "An administrator deleted a user account (issue #952). The actor is who deleted it; the details only reference the redaction that pseudonymised the account's audit entries (null when none named it) and never identify the erased person."
     },
     "auditChainBroken": {
       "label": "Audit chain broken",

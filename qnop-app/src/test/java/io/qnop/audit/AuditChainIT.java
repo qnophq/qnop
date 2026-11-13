@@ -88,6 +88,8 @@ class AuditChainIT extends AbstractIntegrationTest {
     createdUsers.forEach(id -> jdbc.update("DELETE FROM document WHERE owner_id = ?", id));
     wipeChain();
     createdUsers.forEach(id -> jdbc.update("DELETE FROM qnop_user WHERE id = ?", id));
+    // Deleting a user writes a user.erased event (issue #952).
+    wipeChain();
   }
 
   /** TRUNCATE bypasses the row triggers; the head is reset with it (as clean.sql does). */

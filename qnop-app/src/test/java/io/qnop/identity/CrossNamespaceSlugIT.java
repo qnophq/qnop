@@ -71,6 +71,9 @@ class CrossNamespaceSlugIT extends AbstractIntegrationTest {
   void cleanUp() {
     jdbc.update("DELETE FROM team WHERE slug LIKE 'clash-co%' OR slug LIKE 'collide%'");
     jdbc.update("DELETE FROM qnop_user WHERE slug LIKE 'clash-co%' OR slug LIKE 'collide%'");
+    // Each user deletion writes a user.erased audit event (issue #952): leave the trail empty.
+    jdbc.execute("TRUNCATE TABLE audit_event");
+    jdbc.update("UPDATE audit_chain_head SET last_seq = 0, last_hash = repeat('0', 64)");
   }
 
   @Test
