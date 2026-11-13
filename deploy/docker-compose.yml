@@ -56,7 +56,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:18@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42
+    image: postgres:18@sha256:b9f6b8ff03b62f3cfd9d9ba3fe56226a9991c79d3fb46fd46536263bf02be553
     environment:
       POSTGRES_USER: ${QNOP_DB_USERNAME:-qnop}
       POSTGRES_PASSWORD: ${QNOP_DB_PASSWORD:?set a real database password}
@@ -73,7 +73,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: cgr.dev/chainguard/minio:latest@sha256:db3f583fa49121942168bd6383a773b2cde3384c9a99bf7193560b9a0f3a28fd
+    image: cgr.dev/chainguard/minio:latest@sha256:96b6cf3e14084d3427ec46de10c2873af61b945ad9272eec266cfc8df551cba5
     user: '0:0' # keep volumes from the former root-run MinIO image writable
     command: server /data
     environment:
