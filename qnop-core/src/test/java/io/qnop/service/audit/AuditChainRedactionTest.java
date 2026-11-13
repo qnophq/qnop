@@ -23,17 +23,37 @@ package io.qnop.service.audit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.qnop.repository.AuditChainTombstoneRow;
-import java.util.Map;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.NullSource;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class AuditChainRedactionTest {
 
   private static final String ID = "0190a1b2-c3d4-7e5f-8a9b-0000000000aa";
+  private static final String ROW_A = "0190a1b2-c3d4-7e5f-8a9b-00000000000a";
+  private static final String ROW_B = "0190a1b2-c3d4-7e5f-8a9b-00000000000b";
+
+  private static String sealedEntry(String id) {
+    return "{\"id\": \"" + id + "\", \"seq\": 2, \"rowHash\": \"aa\", \"contentHash\": \"cc\"}";
+  }
+
+  private static String pendingEntry(String id) {
+    return "{\"id\": \"" + id + "\", \"seq\": null, \"rowHash\": null, \"contentHash\": \"dd\"}";
+  }
+
+  private static String payload(String rows, Object pending) {
+    return "{\"rows\": ["
+        + rows
+        + "], \"pendingRows\": "
+        + pending
+        + ", \"redactionId\": \""
+        + ID
+        + "\"}";
+  }
 
   @Test
   @DisplayName("parses the payload the redaction function writes")
@@ -41,40 +61,38 @@ class AuditChainRedactionTest {
     AuditChainRedaction redaction =
         AuditChainRedaction.parse(
             new AuditChainTombstoneRow(
-                9L,
-                "{\"rows\": [{\"seq\": 2, \"rowHash\": \"aa\"}, {\"seq\": 5, \"rowHash\": \"bb\"}],"
-                    + " \"pendingRows\": 1, \"redactionId\": \""
-                    + ID
-                    + "\"}"));
+                9L, payload(sealedEntry(ROW_A) + ", " + pendingEntry(ROW_B), 1)));
 
     assertThat(redaction.malformed()).isFalse();
     assertThat(redaction.recordedSeq()).isEqualTo(9L);
     assertThat(redaction.redactionId()).isEqualTo(UUID.fromString(ID));
-    assertThat(redaction.rows()).isEqualTo(Map.of(2L, "aa", 5L, "bb"));
-    assertThat(redaction.pendingRows()).isEqualTo(1);
+    assertThat(redaction.rows())
+        .containsEntry(UUID.fromString(ROW_A), new AuditChainRedaction.Listing(2L, "aa", "cc"))
+        .containsEntry(UUID.fromString(ROW_B), new AuditChainRedaction.Listing(null, null, "dd"));
   }
 
-  @ParameterizedTest
-  @NullSource
-  @ValueSource(
-      strings = {
+  static List<String> malformed() {
+    return Arrays.asList(
+        null,
         "not json",
         "[]",
         "{}",
-        "{\"redactionId\": \"nope\", \"rows\": [], \"pendingRows\": 1}",
-        "{\"redactionId\": \"" + ID + "\", \"rows\": [], \"pendingRows\": 0}",
-        "{\"redactionId\": \"" + ID + "\", \"rows\": [], \"pendingRows\": -1}",
-        "{\"redactionId\": \"" + ID + "\", \"rows\": {}, \"pendingRows\": 1}",
-        "{\"redactionId\": \""
-            + ID
-            + "\", \"rows\": [{\"seq\": \"2\", \"rowHash\": \"a\"}],"
-            + " \"pendingRows\": 0}",
-        "{\"redactionId\": \""
-            + ID
-            + "\", \"rows\": [{\"seq\": 2, \"rowHash\": \"a\"},"
-            + " {\"seq\": 2, \"rowHash\": \"b\"}], \"pendingRows\": 0}",
-        "{\"redactionId\": \"" + ID + "\", \"rows\": [{\"seq\": 2, \"rowHash\": \"a\"}]}"
-      })
+        payload("", 0),
+        payload(sealedEntry(ROW_A), 1),
+        payload(pendingEntry(ROW_B), 0),
+        payload(sealedEntry(ROW_A), -1),
+        payload(sealedEntry(ROW_A), "\"0\""),
+        payload(sealedEntry(ROW_A) + ", " + sealedEntry(ROW_A), 0),
+        payload("{\"id\": \"nope\", \"seq\": 2, \"rowHash\": \"a\", \"contentHash\": \"c\"}", 0),
+        payload(
+            "{\"id\": \"" + ROW_A + "\", \"seq\": 2, \"rowHash\": null, \"contentHash\": \"c\"}",
+            0),
+        payload("{\"id\": \"" + ROW_A + "\", \"seq\": 2, \"rowHash\": \"a\"}", 0),
+        "{\"rows\": [" + sealedEntry(ROW_A) + "], \"pendingRows\": 0, \"redactionId\": \"x\"}");
+  }
+
+  @ParameterizedTest
+  @MethodSource("malformed")
   @DisplayName("anything else is malformed, never an exception")
   void malformedPayloads(String detail) {
     AuditChainRedaction redaction =

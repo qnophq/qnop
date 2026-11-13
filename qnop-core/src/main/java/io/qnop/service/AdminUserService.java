@@ -225,9 +225,10 @@ public class AdminUserService {
    * <p>A user the audit trail names is erased from it, not kept (issue #952, ADR-0043): deleting
    * the row fires the database's redaction, which — in this same transaction, before the actor
    * foreign key is checked — replaces the user's id and names in every audit row that references
-   * them with a fresh pseudonym and records an {@code audit.chain.redacted} event. The hash chain
-   * keeps verifying. Nothing else is audited here: a second event would only carry the personal
-   * data the erasure removes.
+   * them with a fresh pseudonym and records an {@code audit.chain.redacted} event; the hash chain
+   * keeps verifying. It also writes a {@code user.erased} event attributed to {@code actingUserId}
+   * (announced to the database just before the delete) whose only reference is the redaction id —
+   * nothing that identifies the erased user.
    */
   @Transactional
   public void delete(UUID id, UUID actingUserId) {
@@ -241,6 +242,8 @@ public class AdminUserService {
     // revocation also ends a session that a rotation in flight just extended.
     users.lockById(id);
     refreshTokens.revokeAllForUser(id);
+    // The database writes a user.erased audit event attributed to whoever is announced here.
+    users.announceErasingActor(actingUserId == null ? "" : actingUserId.toString());
     users.deleteById(id);
     // Flushed here so the DELETE — and with it the audit redaction its trigger runs — happens
     // inside this method rather than at commit.

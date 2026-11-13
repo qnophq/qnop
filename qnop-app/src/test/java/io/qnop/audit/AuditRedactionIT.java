@@ -35,6 +35,8 @@ import io.qnop.service.audit.AuditChainVerificationService;
 import io.qnop.service.audit.AuditChainVerifier.Problem;
 import io.qnop.service.audit.AuditChainVerifier.ProblemKind;
 import io.qnop.service.audit.AuditChainVerifier.Report;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +46,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -51,10 +54,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * User erasure in the audit trail against a real PostgreSQL (issue #952, ADR-0043): deleting a user
  * pseudonymises every row naming them through the one sanctioned redaction path, keeps the hash
- * chain linked and verifying, and records the redaction — while every other way of changing a row
- * stays refused. Requires Docker.
+ * chain linked and verifying, records the redaction and who asked for it — while every other way of
+ * changing a row, or of writing the reserved events, stays refused. Requires Docker.
  */
 class AuditRedactionIT extends AbstractIntegrationTest {
+
+  private static final String RESTRICTED_ROLE = "qnop_restricted_it";
+  private static final String ERASED_EVENT = "user.erased";
 
   @Autowired AuditEventRepository auditEvents;
   @Autowired AuditChainVerificationService verification;
@@ -78,6 +84,7 @@ class AuditRedactionIT extends AbstractIntegrationTest {
     createdUsers.forEach(id -> jdbc.update("DELETE FROM document WHERE owner_id = ?", id));
     wipeChain();
     createdUsers.forEach(id -> jdbc.update("DELETE FROM qnop_user WHERE id = ?", id));
+    wipeChain();
   }
 
   private void wipeChain() {
@@ -85,16 +92,11 @@ class AuditRedactionIT extends AbstractIntegrationTest {
     jdbc.update("UPDATE audit_chain_head SET last_seq = 0, last_hash = repeat('0', 64)");
   }
 
-  private User newUser(String displayName, String username) {
+  private User newUser(String displayName) {
     return tx.execute(
         status -> {
-          User user =
-              users.save(
-                  User.internal(
-                      displayName,
-                      username + "-" + UUID.randomUUID() + "@Example.com",
-                      username,
-                      "h"));
+          String handle = "u-" + UUID.randomUUID();
+          User user = users.save(User.internal(displayName, handle + "@Example.com", handle, "h"));
           createdUsers.add(user.getId());
           return user;
         });
@@ -104,19 +106,20 @@ class AuditRedactionIT extends AbstractIntegrationTest {
     return tx.execute(status -> auditEvents.save(AuditEvent.system(type, actorId, detail)));
   }
 
-  private AuditEvent saveForDocument(UUID documentId, UUID actorId) {
-    return tx.execute(
-        status ->
-            auditEvents.save(
-                new AuditEvent(documentId, "annotation.created", actorId, "{\"k\":\"v\"}")));
-  }
-
   private Document newDocument(UUID ownerId) {
     return tx.execute(status -> documents.save(new Document(ownerId, "Redacted")));
   }
 
-  private void deleteUser(UUID id) {
-    jdbc.update("DELETE FROM qnop_user WHERE id = ?", id);
+  /** Deletes the user the way the service does: announce the acting admin, then delete. */
+  private void deleteUser(UUID id, UUID actingAdmin) {
+    tx.executeWithoutResult(
+        status -> {
+          jdbc.queryForObject(
+              "SELECT set_config('qnop.erasing_actor', ?, true)",
+              String.class,
+              actingAdmin == null ? "" : actingAdmin.toString());
+          jdbc.update("DELETE FROM qnop_user WHERE id = ?", id);
+        });
   }
 
   private Map<String, Object> row(UUID id) {
@@ -126,16 +129,21 @@ class AuditRedactionIT extends AbstractIntegrationTest {
         id);
   }
 
-  private List<String> redactionEvents() {
+  private List<Map<String, Object>> events(String type) {
     return jdbc.queryForList(
-        "SELECT detail::text FROM audit_event WHERE event_type = ? ORDER BY chain_seq",
-        String.class,
-        AuditChainRepository.REDACTED_EVENT_TYPE);
+        "SELECT actor_id, detail::text AS detail FROM audit_event WHERE event_type = ?"
+            + " ORDER BY chain_seq",
+        type);
   }
 
-  private static String memberDetail(User subject) {
+  private String allDetail() {
+    return jdbc.queryForObject(
+        "SELECT coalesce(string_agg(detail::text, ' '), '') FROM audit_event", String.class);
+  }
+
+  private static String memberDetail(UUID subject) {
     return "{\"teamId\":\"t-1\",\"teamName\":\"Alpha\",\"userId\":\""
-        + subject.getId()
+        + subject
         + "\",\"userName\":\"Old Snapshot Name\",\"role\":\"MEMBER\"}";
   }
 
@@ -148,24 +156,38 @@ class AuditRedactionIT extends AbstractIntegrationTest {
     assertThat(now.get("redaction_id")).isNotNull();
   }
 
+  private static void assertRejected(Runnable statement, String message) {
+    assertThatThrownBy(statement::run).rootCause().hasMessageContaining(message);
+  }
+
   @Test
   @DisplayName(
-      "deleting a user pseudonymises their rows, keeps the hashes and records the redaction")
-  void redactionKeepsHashesAndWritesTheEvent() {
-    User admin = newUser("Ada Admin", "admin-" + UUID.randomUUID());
-    User erased = newUser("Erin Erased", "member");
-    User owner = newUser("Owen Owner", "owner-" + UUID.randomUUID());
+      "deleting a user pseudonymises their rows in place and records redaction and erasure")
+  void redactionKeepsHashesAndWritesTheEvents() {
+    User admin = newUser("Ada Admin");
+    User erased = newUser("Erin Erased");
+    User owner = newUser("Owen Owner");
     Document doc = newDocument(owner.getId());
     AuditEvent before = saveSystem("test.before", admin.getId(), "{\"n\":1}");
-    AuditEvent added = saveSystem("team.member.added", admin.getId(), memberDetail(erased));
-    AuditEvent acted = saveSystem("team.invitation.declined", erased.getId(), memberDetail(erased));
-    AuditEvent onDocument = saveForDocument(doc.getId(), erased.getId());
+    AuditEvent added = saveSystem("team.member.added", admin.getId(), memberDetail(erased.getId()));
+    AuditEvent acted =
+        saveSystem("team.invitation.declined", erased.getId(), memberDetail(erased.getId()));
+    // A string that merely equals the user's name, outside the subject object, is not touched.
+    AuditEvent onDocument =
+        tx.execute(
+            status ->
+                auditEvents.save(
+                    new AuditEvent(
+                        doc.getId(),
+                        "annotation.created",
+                        erased.getId(),
+                        "{\"note\":\"Erin Erased\"}")));
     AuditEvent after = saveSystem("test.after", null, "{\"n\":2}");
     Map<String, Object> addedBefore = row(added.getId());
     Map<String, Object> actedBefore = row(acted.getId());
     Map<String, Object> documentBefore = row(onDocument.getId());
 
-    deleteUser(erased.getId());
+    deleteUser(erased.getId(), admin.getId());
 
     Map<String, Object> addedNow = row(added.getId());
     Map<String, Object> actedNow = row(acted.getId());
@@ -173,7 +195,6 @@ class AuditRedactionIT extends AbstractIntegrationTest {
     assertRedactedInPlace(addedBefore, addedNow);
     assertRedactedInPlace(actedBefore, actedNow);
     assertRedactedInPlace(documentBefore, documentNow);
-    // The admin stays the actor of the add; only the subject is pseudonymised.
     assertThat(addedNow.get("actor_id")).isEqualTo(admin.getId());
     assertThat(actedNow.get("actor_id")).isNull();
     assertThat(documentNow.get("actor_id")).isNull();
@@ -184,24 +205,28 @@ class AuditRedactionIT extends AbstractIntegrationTest {
         .contains("\"userName\": \"" + pseudonym + "\"")
         .contains("\"role\": \"MEMBER\"")
         .contains("\"teamName\": \"Alpha\"");
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT string_agg(detail::text, ' ') FROM audit_event", String.class))
+    assertThat((String) documentNow.get("detail")).isEqualTo("{\"note\": \"Erin Erased\"}");
+    assertThat(allDetail())
         .doesNotContain(erased.getId().toString())
-        .doesNotContain("Old Snapshot Name")
-        .doesNotContain("Erin Erased");
+        .doesNotContain("Old Snapshot Name");
     assertThat(row(before.getId()).get("redacted_at")).isNull();
     assertThat(row(after.getId()).get("redacted_at")).isNull();
 
-    List<String> events = redactionEvents();
-    assertThat(events).hasSize(1);
-    assertThat(events.getFirst())
-        .contains(addedNow.get("redaction_id").toString())
-        .contains((String) addedNow.get("row_hash"))
+    List<Map<String, Object>> redactions = events(AuditChainRepository.REDACTED_EVENT_TYPE);
+    assertThat(redactions).hasSize(1);
+    String redaction = (String) redactions.getFirst().get("detail");
+    String redactionId = addedNow.get("redaction_id").toString();
+    assertThat(redaction)
+        .contains(redactionId)
+        .contains("contentHash")
         .contains((String) actedNow.get("row_hash"))
-        .contains((String) documentNow.get("row_hash"))
         .doesNotContain(erased.getId().toString())
         .doesNotContain(pseudonym);
+    List<Map<String, Object>> erasures = events(ERASED_EVENT);
+    assertThat(erasures).hasSize(1);
+    assertThat(erasures.getFirst().get("actor_id")).isEqualTo(admin.getId());
+    assertThat((String) erasures.getFirst().get("detail"))
+        .isEqualTo("{\"redactionId\": \"" + redactionId + "\"}");
 
     Report report = verification.verify();
     assertThat(report.problems()).isEmpty();
@@ -209,21 +234,42 @@ class AuditRedactionIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("a user nobody's audit row names is deleted without a redaction event")
-  void unreferencedUserLeavesNoEvent() {
-    User bystander = newUser("Bea Bystander", "bea-" + UUID.randomUUID());
+  @DisplayName("a user no audit row names still leaves an attributed user.erased event")
+  void unreferencedUserLeavesOnlyTheErasure() {
+    User admin = newUser("Ada Admin");
+    User bystander = newUser("Bea Bystander");
     saveSystem("test.only", null, "{\"n\":1}");
 
-    deleteUser(bystander.getId());
+    deleteUser(bystander.getId(), admin.getId());
 
-    assertThat(redactionEvents()).isEmpty();
+    assertThat(events(AuditChainRepository.REDACTED_EVENT_TYPE)).isEmpty();
+    List<Map<String, Object>> erasures = events(ERASED_EVENT);
+    assertThat(erasures)
+        .singleElement()
+        .satisfies(
+            e -> {
+              assertThat(e.get("actor_id")).isEqualTo(admin.getId());
+              assertThat(e.get("detail")).isEqualTo("{\"redactionId\": null}");
+            });
     assertThat(verification.verify().intact()).isTrue();
+  }
+
+  @Test
+  @DisplayName("an unannounced or self-referencing erasing actor is recorded as no actor")
+  void unknownErasingActorIsNull() {
+    User bystander = newUser("Bea Bystander");
+
+    deleteUser(bystander.getId(), bystander.getId());
+
+    assertThat(events(ERASED_EVENT))
+        .singleElement()
+        .satisfies(e -> assertThat(e.get("actor_id")).isNull());
   }
 
   @Test
   @DisplayName("rows written and redacted in one transaction are sealed over the redacted content")
   void unsealedRowsRedactedBeforeTheSeal() {
-    User erased = newUser("Una Unsealed", "una-" + UUID.randomUUID());
+    User erased = newUser("Una Unsealed");
     saveSystem("test.before", null, "{\"n\":1}");
 
     UUID written =
@@ -239,88 +285,137 @@ class AuditRedactionIT extends AbstractIntegrationTest {
     Map<String, Object> now = row(written);
     assertThat(now.get("chain_seq")).isNotNull();
     assertThat(now.get("actor_id")).isNull();
-    assertThat(redactionEvents()).singleElement().asString().contains("\"pendingRows\": 1");
-    Report report = verification.verify();
-    assertThat(report.problems()).isEmpty();
+    assertThat((String) events(AuditChainRepository.REDACTED_EVENT_TYPE).getFirst().get("detail"))
+        .contains("\"pendingRows\": 1")
+        .contains(written.toString());
+    assertThat(verification.verify().problems()).isEmpty();
   }
 
   @Test
-  @DisplayName("a direct UPDATE of the redaction columns is rejected, marker or not")
-  void redactionWithoutTheSanctionedPathIsRejected() {
-    User actor = newUser("Rex Rejected", "rex-" + UUID.randomUUID());
+  @DisplayName("a row naming two erased users is redacted twice and still verifies")
+  void rowNamingTwoErasedUsers() {
+    User first = newUser("Fay First");
+    User second = newUser("Sid Second");
+    AuditEvent both = saveSystem("team.member.added", first.getId(), memberDetail(second.getId()));
+
+    deleteUser(first.getId(), null);
+    UUID firstRedaction = (UUID) row(both.getId()).get("redaction_id");
+    deleteUser(second.getId(), null);
+
+    Map<String, Object> now = row(both.getId());
+    assertThat(now.get("redaction_id")).isNotEqualTo(firstRedaction);
+    assertThat(now.get("actor_id")).isNull();
+    assertThat((String) now.get("actor_pseudonym")).startsWith("erased-user:");
+    assertThat((String) now.get("detail"))
+        .doesNotContain(first.getId().toString())
+        .doesNotContain(second.getId().toString())
+        .doesNotContain("Old Snapshot Name");
+    assertThat(events(AuditChainRepository.REDACTED_EVENT_TYPE)).hasSize(2);
+    assertThat(verification.verify().problems()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("updates outside the erasure trigger are rejected, even with a self-made context")
+  void redactionOutsideTheSanctionedPathIsRejected() {
+    User actor = newUser("Rex Rejected");
     AuditEvent event = saveSystem("test.update", actor.getId(), "{\"v\":1}");
 
-    assertThatThrownBy(
-            () ->
-                jdbc.update(
-                    "UPDATE audit_event SET actor_id = NULL, redacted_at = now(),"
-                        + " redaction_id = gen_random_uuid() WHERE id = ?",
-                    event.getId()))
-        .rootCause()
-        .hasMessageContaining("append-only");
-    // A marker for a different redaction does not sanction this one.
-    assertThatThrownBy(
-            () ->
-                tx.executeWithoutResult(
-                    status -> {
-                      jdbc.queryForObject(
-                          "SELECT set_config('qnop.audit_redaction', ?, true)",
-                          String.class,
-                          UUID.randomUUID().toString());
-                      jdbc.update(
-                          "UPDATE audit_event SET actor_id = NULL, redacted_at = now(),"
-                              + " redaction_id = gen_random_uuid() WHERE id = ?",
-                          event.getId());
-                    }))
-        .rootCause()
-        .hasMessageContaining("append-only");
-    // Under a matching marker the chain columns still cannot change.
+    assertRejected(
+        () ->
+            jdbc.update(
+                "UPDATE audit_event SET actor_id = NULL, redacted_at = now(),"
+                    + " redaction_id = gen_random_uuid() WHERE id = ?",
+                event.getId()),
+        "append-only");
+    // A session that writes its own context (only the schema owner can) and a GUC of its choosing
+    // still issues the update outside a trigger, with values that need not be the redacted form.
     UUID redaction = UUID.randomUUID();
-    assertThatThrownBy(
-            () ->
-                tx.executeWithoutResult(
-                    status -> {
-                      jdbc.queryForObject(
-                          "SELECT set_config('qnop.audit_redaction', ?, true)",
-                          String.class,
-                          redaction.toString());
-                      jdbc.update(
-                          "UPDATE audit_event SET redacted_at = now(), redaction_id = ?,"
-                              + " row_hash = repeat('0', 64) WHERE id = ?",
-                          redaction,
-                          event.getId());
-                    }))
-        .rootCause()
-        .hasMessageContaining("append-only");
+    assertRejected(
+        () ->
+            tx.executeWithoutResult(
+                status -> {
+                  jdbc.update(
+                      "INSERT INTO audit_redaction_context (txid, user_id, redaction_id,"
+                          + " pseudonym, redacted_at, phase) VALUES (txid_current(), ?, ?,"
+                          + " 'erased-user:mine', now(), 'redact')",
+                      actor.getId(),
+                      redaction);
+                  jdbc.queryForObject(
+                      "SELECT set_config('qnop.audit_redaction', ?, true)",
+                      String.class,
+                      redaction.toString());
+                  jdbc.update(
+                      "UPDATE audit_event SET actor_id = NULL, actor_pseudonym = 'erased-user:mine',"
+                          + " redacted_at = (SELECT redacted_at FROM audit_redaction_context),"
+                          + " redaction_id = ? WHERE id = ?",
+                      redaction,
+                      event.getId());
+                }),
+        "append-only");
     assertThat(row(event.getId()).get("redacted_at")).isNull();
     assertThat(row(event.getId()).get("actor_id")).isEqualTo(actor.getId());
   }
 
   @Test
-  @DisplayName("a forged audit.chain.redacted event or a pre-redacted row cannot be inserted")
-  void forgedRedactionInsertsAreRejected() {
-    assertThatThrownBy(
-            () ->
-                saveSystem(
-                    AuditChainRepository.REDACTED_EVENT_TYPE,
-                    null,
-                    "{\"redactionId\":\""
-                        + UUID.randomUUID()
-                        + "\",\"rows\":[],\"pendingRows\":1}"))
-        .rootCause()
-        .hasMessageContaining("written only by the database");
-    assertThatThrownBy(
-            () ->
-                jdbc.update(
-                    "INSERT INTO audit_event (id, scope, event_type, created_at, redacted_at,"
-                        + " redaction_id) VALUES (gen_random_uuid(), 'SYSTEM', 'test.x', now(),"
-                        + " now(), gen_random_uuid())"))
-        .rootCause()
-        .hasMessageContaining("redaction columns");
+  @DisplayName("the reserved erasure events cannot be inserted, even with a self-made context")
+  void forgedReservedEventsAreRejected() {
+    String forged = "{\"redactionId\":\"" + UUID.randomUUID() + "\",\"rows\":[],\"pendingRows\":0}";
+    assertRejected(
+        () -> saveSystem(AuditChainRepository.REDACTED_EVENT_TYPE, null, forged),
+        "written only by the database");
+    assertRejected(
+        () -> saveSystem(ERASED_EVENT, null, "{\"redactionId\":null}"),
+        "written only by the database");
+    assertRejected(
+        () ->
+            tx.executeWithoutResult(
+                status -> {
+                  jdbc.update(
+                      "INSERT INTO audit_redaction_context (txid, user_id, redaction_id,"
+                          + " pseudonym, redacted_at, phase, event_type, event_detail) VALUES"
+                          + " (txid_current(), gen_random_uuid(), gen_random_uuid(), 'x', now(),"
+                          + " 'record', 'user.erased', '{\"redactionId\":null}'::jsonb)");
+                  jdbc.update(
+                      "INSERT INTO audit_event (id, scope, event_type, detail, created_at) VALUES"
+                          + " (gen_random_uuid(), 'SYSTEM', 'user.erased',"
+                          + " '{\"redactionId\":null}'::jsonb, now())");
+                }),
+        "written only by the database");
+    assertRejected(
+        () ->
+            jdbc.update(
+                "INSERT INTO audit_event (id, scope, event_type, created_at, redacted_at,"
+                    + " redaction_id) VALUES (gen_random_uuid(), 'SYSTEM', 'test.x', now(),"
+                    + " now(), gen_random_uuid())"),
+        "redaction columns");
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_event", Long.class)).isZero();
   }
 
   @Test
-  @DisplayName("a row changed under a forged redaction id is reported by the verifier")
+  @DisplayName("a redacted row edited afterwards fails verification")
+  void contentChangedAfterRedactionIsDetected() {
+    User erased = newUser("Eve Edited");
+    saveSystem("test.a", null, "{\"v\":1}");
+    AuditEvent victim = saveSystem("team.member.added", null, memberDetail(erased.getId()));
+    deleteUser(erased.getId(), null);
+    long seq = (Long) row(victim.getId()).get("chain_seq");
+    assertThat(verification.verify().intact()).isTrue();
+
+    jdbc.execute("ALTER TABLE audit_event DISABLE TRIGGER trg_audit_event_no_update");
+    try {
+      jdbc.update(
+          "UPDATE audit_event SET detail = jsonb_set(detail, '{role}', '\"LEAD\"') WHERE id = ?",
+          victim.getId());
+    } finally {
+      jdbc.execute("ALTER TABLE audit_event ENABLE TRIGGER trg_audit_event_no_update");
+    }
+
+    assertThat(verification.verify().problems())
+        .containsExactly(new Problem(ProblemKind.BAD_REDACTION, seq, seq));
+  }
+
+  @Test
+  @DisplayName("a row marked redacted without a redaction event is reported")
   void redactionWithoutAnEventIsDetected() {
     saveSystem("test.a", null, "{\"v\":1}");
     AuditEvent victim = saveSystem("test.b", null, "{\"v\":1}");
@@ -336,7 +431,119 @@ class AuditRedactionIT extends AbstractIntegrationTest {
       jdbc.execute("ALTER TABLE audit_event ENABLE TRIGGER trg_audit_event_no_update");
     }
 
-    Report report = verification.verify();
-    assertThat(report.problems()).containsExactly(new Problem(ProblemKind.BAD_REDACTION, 2, 2));
+    assertThat(verification.verify().problems())
+        .containsExactly(new Problem(ProblemKind.BAD_REDACTION, 2, 2));
+  }
+
+  @Test
+  @DisplayName("the restricted application role erases a user, but cannot touch the context")
+  void restrictedRoleErasesThroughTheTrigger() {
+    User admin = newUser("Ada Admin");
+    User erased = newUser("Rita Restricted");
+    saveSystem("team.member.added", admin.getId(), memberDetail(erased.getId()));
+    String schema = jdbc.queryForObject("SELECT current_schema()", String.class);
+    jdbc.execute("DROP ROLE IF EXISTS " + RESTRICTED_ROLE);
+    jdbc.execute("CREATE ROLE " + RESTRICTED_ROLE + " NOLOGIN");
+    try {
+      // The grants docs/DEPLOYMENT.md prescribes for the restricted application role.
+      jdbc.execute("GRANT USAGE ON SCHEMA " + schema + " TO " + RESTRICTED_ROLE);
+      jdbc.execute(
+          "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "
+              + schema
+              + " TO "
+              + RESTRICTED_ROLE);
+      jdbc.execute(
+          "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA " + schema + " TO " + RESTRICTED_ROLE);
+      jdbc.execute("REVOKE UPDATE, DELETE, TRUNCATE ON audit_event FROM " + RESTRICTED_ROLE);
+      jdbc.execute(
+          "REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON audit_chain_head FROM " + RESTRICTED_ROLE);
+      jdbc.execute("REVOKE ALL ON audit_redaction_context FROM " + RESTRICTED_ROLE);
+
+      tx.executeWithoutResult(
+          status -> {
+            jdbc.execute("SET LOCAL ROLE " + RESTRICTED_ROLE);
+            jdbc.queryForObject(
+                "SELECT set_config('qnop.erasing_actor', ?, true)",
+                String.class,
+                admin.getId().toString());
+            jdbc.update("DELETE FROM qnop_user WHERE id = ?", erased.getId());
+          });
+      assertRejected(
+          () ->
+              tx.executeWithoutResult(
+                  status -> {
+                    jdbc.execute("SET LOCAL ROLE " + RESTRICTED_ROLE);
+                    jdbc.update(
+                        "INSERT INTO audit_redaction_context (txid, user_id, redaction_id,"
+                            + " pseudonym, redacted_at, phase) VALUES (txid_current(),"
+                            + " gen_random_uuid(), gen_random_uuid(), 'x', now(), 'redact')");
+                  }),
+          "permission denied");
+      assertRejected(
+          () ->
+              tx.executeWithoutResult(
+                  status -> {
+                    jdbc.execute("SET LOCAL ROLE " + RESTRICTED_ROLE);
+                    jdbc.execute(
+                        "SELECT audit_event_redact_user(gen_random_uuid(), gen_random_uuid())");
+                  }),
+          "permission denied");
+    } finally {
+      jdbc.execute("DROP OWNED BY " + RESTRICTED_ROLE);
+      jdbc.execute("DROP ROLE " + RESTRICTED_ROLE);
+    }
+
+    assertThat(allDetail()).doesNotContain(erased.getId().toString());
+    assertThat(events(ERASED_EVENT))
+        .singleElement()
+        .satisfies(e -> assertThat(e.get("actor_id")).isEqualTo(admin.getId()));
+    assertThat(verification.verify().problems()).isEmpty();
+  }
+
+  @Test
+  @DisplayName(
+      "the changeset rollback runs on a trail with redactions and keeps the types reserved")
+  void rollbackKeepsTheReservedTypesGuarded() throws IOException {
+    User erased = newUser("Rob Rollback");
+    saveSystem("team.member.added", null, memberDetail(erased.getId()));
+    deleteUser(erased.getId(), null);
+    String rollback =
+        new ClassPathResource("db/changelog/migrations/0042-audit-redaction-rollback.sql")
+            .getContentAsString(StandardCharsets.UTF_8);
+
+    // DDL is transactional in PostgreSQL: apply the rollback, check it, and undo it again.
+    assertRejected(
+        () ->
+            tx.executeWithoutResult(
+                status -> {
+                  jdbc.execute(rollback);
+                  assertThat(
+                          jdbc.queryForObject(
+                              "SELECT count(*) FROM information_schema.columns"
+                                  + " WHERE table_name = 'audit_event'"
+                                  + " AND column_name IN ('redaction_id', 'redacted_at',"
+                                  + " 'actor_pseudonym')",
+                              Long.class))
+                      .isZero();
+                  assertThat(
+                          jdbc.queryForObject(
+                              "SELECT to_regclass('audit_redaction_context') IS NULL",
+                              Boolean.class))
+                      .isTrue();
+                  jdbc.update(
+                      "INSERT INTO audit_event (id, scope, event_type, detail, created_at) VALUES"
+                          + " (gen_random_uuid(), 'SYSTEM', 'audit.chain.redacted', '{}'::jsonb,"
+                          + " now())");
+                }),
+        "written only by the database");
+
+    // Rolled back with the transaction: the redaction path is in place again.
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM information_schema.columns WHERE table_name = 'audit_event'"
+                    + " AND column_name = 'redaction_id'",
+                Long.class))
+        .isEqualTo(1L);
+    assertThat(verification.verify().problems()).isEmpty();
   }
 }

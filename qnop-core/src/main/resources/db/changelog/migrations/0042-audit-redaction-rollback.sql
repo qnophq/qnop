@@ -18,14 +18,18 @@
 -- SPDX-License-Identifier: AGPL-3.0-only
 
 -- Rollback of 0042-audit-redaction (issue #952): removes the user-erasure path
--- and restores the 0040 versions of the seal and the guards. Rows already
--- redacted keep their pseudonymised content; their chain columns never
--- changed, but a verifier without the redaction logic reports them.
+-- and restores the 0040 seal and update guard; the insert guard keeps
+-- `audit.chain.redacted` and `user.erased` reserved (no writer remains).
+--
+-- Rows already redacted keep their pseudonymised content: it cannot be
+-- restored. Their chain columns never changed, but a 0040-era verifier
+-- recomputes them from that content and reports every one of them as a
+-- CONTENT_MISMATCH from then on.
 
 DROP TRIGGER IF EXISTS trg_qnop_user_redact_audit ON qnop_user;
 DROP FUNCTION IF EXISTS qnop_user_redact_audit();
-DROP FUNCTION IF EXISTS audit_event_redact_user(uuid, text[]);
-DROP FUNCTION IF EXISTS audit_event_redact_detail(jsonb, text, text[], text);
+DROP FUNCTION IF EXISTS audit_event_redact_user(uuid, uuid);
+DROP FUNCTION IF EXISTS audit_event_redact_detail(jsonb, text, text);
 
 CREATE OR REPLACE FUNCTION audit_event_seal()
 RETURNS TRIGGER
@@ -100,6 +104,12 @@ BEGIN
     RAISE EXCEPTION 'audit_event chain columns are assigned by the database at commit'
       USING ERRCODE = 'insufficient_privilege';
   END IF;
+  -- Kept reserved after the rollback (issue #952): nothing may write these
+  -- types once their only legitimate writer is gone.
+  IF NEW.event_type IN ('audit.chain.redacted', 'user.erased') THEN
+    RAISE EXCEPTION '% events are written only by the database', NEW.event_type
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
   IF NEW.event_type = 'audit.chain.pruned'
      AND (pg_trigger_depth() < 2
           OR coalesce(current_setting('qnop.audit_writing_tombstone', true), '') <> 'on') THEN
@@ -109,6 +119,10 @@ BEGIN
   RETURN NEW;
 END;
 $fn$;
+
+DROP FUNCTION IF EXISTS audit_event_redaction_canonical(text, uuid, timestamptz);
+DROP FUNCTION IF EXISTS audit_redaction_context_current();
+DROP TABLE IF EXISTS audit_redaction_context;
 
 DO $$
 DECLARE

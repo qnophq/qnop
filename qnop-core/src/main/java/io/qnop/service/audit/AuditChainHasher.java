@@ -48,6 +48,9 @@ public final class AuditChainHasher {
 
   static final String FORMAT_VERSION = "1";
 
+  /** Version tag of the redaction fields ({@code audit_event_redaction_canonical}, issue #952). */
+  static final String REDACTION_FORMAT_VERSION = "r1";
+
   private AuditChainHasher() {}
 
   /** The canonical encoding of a row's content (chain columns excluded). */
@@ -69,6 +72,38 @@ public final class AuditChainHasher {
             text(actorId),
             detail,
             Long.toString(createdAtMicros));
+    return encode(fields);
+  }
+
+  /**
+   * The canonical encoding of a redaction's own fields (issue #952) — the Java twin of {@code
+   * audit_event_redaction_canonical} in {@code 0042-audit-redaction.sql}: version tag {@code "r1"},
+   * actor pseudonym, redaction id, redacted-at (epoch microseconds), length-prefixed like {@link
+   * #canonical}.
+   */
+  public static String redactionCanonical(
+      String actorPseudonym, UUID redactionId, Long redactedAtMicros) {
+    return encode(
+        Arrays.asList(
+            REDACTION_FORMAT_VERSION,
+            actorPseudonym,
+            text(redactionId),
+            redactedAtMicros == null ? null : Long.toString(redactedAtMicros)));
+  }
+
+  /**
+   * The hash a redaction records over a redacted row's content (issue #952): {@code linkHash(prev,
+   * canonical(row) + redactionCanonical(row))}, where {@code prev} is the row's {@code prevHash},
+   * or {@code ""} for a row that was not sealed yet when it was redacted.
+   */
+  public static String contentHash(String prev, AuditChainRow row) {
+    return linkHash(
+        prev,
+        canonical(row)
+            + redactionCanonical(row.actorPseudonym(), row.redactionId(), row.redactedAtMicros()));
+  }
+
+  private static String encode(List<String> fields) {
     StringBuilder out = new StringBuilder();
     for (String field : fields) {
       if (field == null) {

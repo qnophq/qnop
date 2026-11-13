@@ -391,17 +391,21 @@ class AdminUserServiceTest {
   }
 
   @Test
-  @DisplayName("delete no longer refuses an audit actor: the user is deleted and flushed (#952)")
+  @DisplayName(
+      "delete no longer refuses an audit actor: announces the admin, deletes and flushes (#952)")
   void deleteRemovesAnAuditActor() {
     UUID memberId = UUID.randomUUID();
     User member = User.internal("Member", "member@example.com", "member", "h");
     when(users.findById(memberId)).thenReturn(Optional.of(member));
 
-    service.delete(memberId, UUID.randomUUID());
+    UUID adminId = UUID.randomUUID();
+    service.delete(memberId, adminId);
 
     org.mockito.InOrder order = org.mockito.Mockito.inOrder(users, refreshTokens);
     order.verify(users).lockById(memberId);
     order.verify(refreshTokens).revokeAllForUser(memberId);
+    // The database attributes its user.erased event to the announced admin.
+    order.verify(users).announceErasingActor(adminId.toString());
     order.verify(users).deleteById(memberId);
     order.verify(users).flush();
   }

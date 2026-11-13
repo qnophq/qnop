@@ -1117,8 +1117,9 @@ paths:
         name the user — as actor or in their details — are pseudonymised in the
         same transaction (issue #952, ADR-0043): the user's id and names are
         replaced by an `erased-user:<uuid>` pseudonym, and an
-        `audit.chain.redacted` event records which chain positions changed, so
-        the audit chain keeps verifying.
+        `audit.chain.redacted` event records which rows changed, so the audit
+        chain keeps verifying. A `user.erased` event attributed to the calling
+        admin records the deletion without identifying the erased user.
       operationId: deleteUser
       security:
         - bearerAuth: []
@@ -6247,7 +6248,7 @@ components:
             document.due_date.changed, or the SYSTEM-scoped
             scheduler.job.enabled / scheduler.job.dry_run / scheduler.job.run_now
             and the audit-chain events audit.chain.pruned /
-            audit.chain.redacted / audit.chain.broken.
+            audit.chain.redacted / audit.chain.broken, and user.erased.
         documentId:
           type: string
           format: uuid

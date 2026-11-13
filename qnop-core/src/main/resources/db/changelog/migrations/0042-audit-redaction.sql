@@ -21,29 +21,31 @@
 --
 -- Deleting a user pseudonymises every audit row that references them — as
 -- actor, or by id inside the detail — instead of being blocked by the actor
--- foreign key. The redaction is the ONE sanctioned way the content of an audit
--- row may change:
+-- foreign key. This redaction is the ONE sanctioned way the content of an
+-- audit row may change:
 --
 --   * a BEFORE DELETE trigger on qnop_user runs audit_event_redact_user for
---     the user being deleted, so a user can only be erased from the trail by
---     deleting the account, and every account deletion erases;
---   * the function arms a transaction-local marker holding a fresh redaction
---     id; the update guard lets content change only under that marker, only
---     to that redaction id, and never touches the chain columns, the event
---     type, scope, document or time;
---   * actor_id becomes NULL (the pseudonym goes to actor_pseudonym), and the
---     user's id, username, display name and e-mail inside the detail become
---     the pseudonym 'erased-user:<random uuid>' — one per erasure, not
---     derivable from the user;
+--     the user being deleted: a user leaves the trail exactly when the account
+--     is deleted, by whatever path;
+--   * the function writes its parameters (user, redaction id, pseudonym,
+--     time) into audit_redaction_context, a table no role but the schema owner
+--     can touch, keyed by the current transaction. The update and insert
+--     guards authorise a redaction only against that row, only from inside a
+--     trigger (pg_trigger_depth() > 1), and only for the exact pseudonymised
+--     form of the old row — a session cannot arm the guard with values of its
+--     own choosing;
 --   * chain_seq, prev_hash and row_hash stay as they were, so the chain still
---     links; the content of a redacted row is no longer verifiable, only its
---     existence and position. A DB-authored `audit.chain.redacted` SYSTEM event
---     lists every redacted position with its row_hash (and nothing personal),
---     and the verifier accepts a redacted row only against that listing.
+--     links. A DB-authored `audit.chain.redacted` event, sealed after the rows,
+--     lists every redacted row with its original row_hash AND a hash of its
+--     redacted content: the verifier recomputes the latter, so the redacted
+--     content stays tamper-evident;
+--   * a DB-authored `user.erased` event records that an erasure happened and
+--     who asked for it (the acting user the application announces), with the
+--     redaction id as its only reference — it names no erased person.
 --
--- fk_audit_event_actor stays ON DELETE RESTRICT: the trigger nulls the actor
--- before the foreign key is checked, and SET NULL would be a second, silent
--- write path that the update guard would (rightly) reject anyway.
+-- fk_audit_event_actor stays ON DELETE RESTRICT: the trigger clears the actor
+-- before the foreign key is checked, and SET NULL would be a second write path
+-- outside the redaction context, which the update guard rejects.
 
 -- --- schema ---------------------------------------------------------------
 
@@ -56,11 +58,80 @@ ALTER TABLE audit_event ADD CONSTRAINT ck_audit_event_redaction
   CHECK ((redacted_at IS NULL) = (redaction_id IS NULL)
          AND (actor_pseudonym IS NULL OR (redaction_id IS NOT NULL AND actor_id IS NULL)));
 
+-- The redaction in progress in a transaction. Written and cleared only by
+-- audit_event_redact_user (SECURITY DEFINER); every privilege is revoked below,
+-- including any a default-privileges rule granted to the application role.
+CREATE TABLE audit_redaction_context (
+  txid BIGINT PRIMARY KEY,
+  user_id UUID NOT NULL,
+  redaction_id UUID NOT NULL,
+  pseudonym TEXT NOT NULL,
+  redacted_at TIMESTAMPTZ NOT NULL,
+  -- 'redact' while rows are rewritten, 'record' while the events are written
+  phase TEXT NOT NULL CHECK (phase IN ('redact', 'record')),
+  -- the one event the insert guard currently admits
+  event_type TEXT,
+  event_actor UUID,
+  event_detail JSONB
+);
+
+DO $$
+DECLARE
+  g TEXT;
+BEGIN
+  REVOKE ALL ON audit_redaction_context FROM PUBLIC;
+  FOR g IN
+    SELECT DISTINCT grantee FROM information_schema.role_table_grants
+     WHERE table_schema = current_schema()
+       AND table_name = 'audit_redaction_context'
+       AND grantee <> current_user
+  LOOP
+    EXECUTE format('REVOKE ALL ON audit_redaction_context FROM %I', g);
+  END LOOP;
+END;
+$$;
+
+-- The current transaction's redaction context (all-NULL when there is none).
+-- SECURITY DEFINER so the guards can read it whoever runs the statement; it
+-- only reads, so it stays executable by everyone.
+CREATE FUNCTION audit_redaction_context_current()
+RETURNS audit_redaction_context
+LANGUAGE sql
+VOLATILE
+SECURITY DEFINER
+AS $fn$
+  SELECT * FROM audit_redaction_context WHERE txid = txid_current()
+$fn$;
+
+-- --- content hash of a redacted row ----------------------------------------
+
+-- The redaction fields, length-prefixed like audit_event_canonical behind
+-- their own version tag. A redacted row's content hash is
+--   hex(sha256(utf8(prev || audit_event_canonical(row) || this)))
+-- with prev = the row's prev_hash, or '' for a row not yet sealed. Mirrored in
+-- Java by AuditChainHasher.redactionCanonical / contentHash.
+CREATE FUNCTION audit_event_redaction_canonical(
+  p_pseudonym TEXT, p_redaction_id UUID, p_redacted_at TIMESTAMPTZ)
+RETURNS TEXT
+LANGUAGE sql
+IMMUTABLE
+AS $fn$
+  SELECT string_agg(
+           CASE WHEN f IS NULL THEN '~' ELSE octet_length(convert_to(f, 'UTF8')) || ':' || f END,
+           '' ORDER BY ord)
+  FROM unnest(ARRAY[
+         'r1',
+         p_pseudonym,
+         p_redaction_id::text,
+         (extract(epoch FROM p_redacted_at) * 1000000)::bigint::text
+       ]) WITH ORDINALITY AS t(f, ord)
+$fn$;
+
 -- --- seal: hash what is stored at commit -----------------------------------
 
 -- Re-created so the seal hashes the row as it is at COMMIT rather than as it
 -- was inserted: a row redacted in the transaction that wrote it is sealed with
--- its redacted content (and verifies normally). Identical for every other row.
+-- its redacted content. Identical for every other row.
 CREATE OR REPLACE FUNCTION audit_event_seal()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -102,30 +173,90 @@ BEGIN
 END;
 $fn$;
 
+-- --- detail pseudonymisation ----------------------------------------------
+
+-- Returns p_detail with the references to the user replaced by p_pseudonym,
+-- and nothing else touched:
+--   * every string value that IS the user's id (case-insensitive);
+--   * inside an object whose "userId" is the user, the values of its name
+--     keys (userName, username, name, displayName, userDisplayName, email,
+--     userEmail) — the snapshot written next to the id.
+-- Strings that merely equal a name elsewhere are left alone: names are chosen
+-- by users, so matching them anywhere would let one user's name blank out
+-- unrelated content. Free text that mentions a person is not covered.
+CREATE FUNCTION audit_event_redact_detail(p_detail JSONB, p_user_id TEXT, p_pseudonym TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+IMMUTABLE
+AS $fn$
+DECLARE
+  v_result JSONB;
+  v_subject BOOLEAN;
+BEGIN
+  CASE jsonb_typeof(p_detail)
+    WHEN 'object' THEN
+      v_subject := lower(p_detail ->> 'userId') = p_user_id;
+      SELECT coalesce(jsonb_object_agg(
+               e.key,
+               CASE
+                 WHEN v_subject
+                      AND e.key IN ('userName', 'username', 'name', 'displayName',
+                                    'userDisplayName', 'email', 'userEmail')
+                      AND jsonb_typeof(e.value) = 'string'
+                   THEN to_jsonb(p_pseudonym)
+                 ELSE audit_event_redact_detail(e.value, p_user_id, p_pseudonym)
+               END), '{}'::jsonb)
+        INTO v_result
+        FROM jsonb_each(p_detail) e;
+      RETURN v_result;
+    WHEN 'array' THEN
+      SELECT coalesce(jsonb_agg(
+               audit_event_redact_detail(a.value, p_user_id, p_pseudonym) ORDER BY a.ord),
+             '[]'::jsonb)
+        INTO v_result
+        FROM jsonb_array_elements(p_detail) WITH ORDINALITY AS a(value, ord);
+      RETURN v_result;
+    WHEN 'string' THEN
+      IF lower(p_detail #>> '{}') = p_user_id THEN
+        RETURN to_jsonb(p_pseudonym);
+      END IF;
+      RETURN p_detail;
+    ELSE
+      RETURN p_detail;
+  END CASE;
+END;
+$fn$;
+
 -- --- update guard ---------------------------------------------------------
 
 -- Two updates are permitted, nothing else:
 --   1. the seal filling in the empty chain columns of an otherwise unchanged
 --      row, from inside audit_event_seal (trigger depth > 1);
---   2. a redaction: under the marker armed by audit_event_redact_user, setting
---      the row's redaction id to exactly the marker's, with the chain columns,
---      id, scope, document, event type and time unchanged and the actor either
---      unchanged or cleared.
+--   2. a redaction, from inside a trigger (depth > 1) while the transaction's
+--      redaction context is in its 'redact' phase, producing EXACTLY the
+--      pseudonymised form of the old row for that context: the detail is
+--      audit_event_redact_detail(old detail); an actor equal to the erased
+--      user becomes NULL with the context's pseudonym, any other actor and
+--      pseudonym stay; redaction id and time are the context's; id, scope,
+--      document, type, time and the chain columns are unchanged; and the row
+--      must actually name the user. A row redacted before may be redacted
+--      again only on these terms, i.e. when it also names this user.
 CREATE OR REPLACE FUNCTION audit_event_reject_update()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $fn$
 DECLARE
-  v_marker TEXT := coalesce(current_setting('qnop.audit_redaction', true), '');
+  ctx audit_redaction_context;
+  v_detail JSONB;
 BEGIN
-  IF NEW.id = OLD.id
+  IF pg_trigger_depth() > 1
+     AND NEW.id = OLD.id
      AND NEW.scope IS NOT DISTINCT FROM OLD.scope
      AND NEW.document_id IS NOT DISTINCT FROM OLD.document_id
      AND NEW.event_type IS NOT DISTINCT FROM OLD.event_type
      AND NEW.created_at IS NOT DISTINCT FROM OLD.created_at THEN
 
-    IF pg_trigger_depth() > 1
-       AND OLD.chain_seq IS NULL AND NEW.chain_seq IS NOT NULL
+    IF OLD.chain_seq IS NULL AND NEW.chain_seq IS NOT NULL
        AND NEW.actor_id IS NOT DISTINCT FROM OLD.actor_id
        AND NEW.detail IS NOT DISTINCT FROM OLD.detail
        AND NEW.redacted_at IS NOT DISTINCT FROM OLD.redacted_at
@@ -134,15 +265,25 @@ BEGIN
       RETURN NEW;
     END IF;
 
-    IF v_marker <> ''
-       AND NEW.redaction_id IS NOT NULL
-       AND NEW.redaction_id::text = v_marker
-       AND NEW.redacted_at IS NOT NULL
+    ctx := audit_redaction_context_current();
+    IF ctx.txid IS NOT NULL AND ctx.phase = 'redact'
        AND NEW.chain_seq IS NOT DISTINCT FROM OLD.chain_seq
        AND NEW.prev_hash IS NOT DISTINCT FROM OLD.prev_hash
        AND NEW.row_hash IS NOT DISTINCT FROM OLD.row_hash
-       AND (NEW.actor_id IS NULL OR NEW.actor_id IS NOT DISTINCT FROM OLD.actor_id) THEN
-      RETURN NEW;
+       AND NEW.redaction_id = ctx.redaction_id
+       AND NEW.redacted_at = ctx.redacted_at THEN
+      v_detail := CASE WHEN OLD.detail IS NULL THEN NULL
+                       ELSE audit_event_redact_detail(OLD.detail, ctx.user_id::text, ctx.pseudonym) END;
+      IF NEW.detail IS NOT DISTINCT FROM v_detail
+         AND ((OLD.actor_id = ctx.user_id
+               AND NEW.actor_id IS NULL
+               AND NEW.actor_pseudonym = ctx.pseudonym)
+              OR (OLD.actor_id IS DISTINCT FROM ctx.user_id
+                  AND NEW.actor_id IS NOT DISTINCT FROM OLD.actor_id
+                  AND NEW.actor_pseudonym IS NOT DISTINCT FROM OLD.actor_pseudonym
+                  AND NEW.detail IS DISTINCT FROM OLD.detail)) THEN
+        RETURN NEW;
+      END IF;
     END IF;
   END IF;
   RAISE EXCEPTION 'audit_event is append-only: rows cannot be updated'
@@ -153,14 +294,16 @@ $fn$;
 -- --- insert guard ---------------------------------------------------------
 
 -- As before (unsealed rows only, tombstones only from the prune trigger), and
--- additionally: new rows arrive unredacted, and `audit.chain.redacted` events
--- are written only by audit_event_redact_user for the redaction it is running.
+-- additionally: new rows arrive unredacted, and the reserved types
+-- `audit.chain.redacted` and `user.erased` are admitted only from inside a
+-- trigger, while the redaction context is recording, and only as exactly the
+-- event the context announces.
 CREATE OR REPLACE FUNCTION audit_event_guard_insert()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $fn$
 DECLARE
-  v_writing TEXT := coalesce(current_setting('qnop.audit_writing_redaction', true), '');
+  ctx audit_redaction_context;
 BEGIN
   IF NEW.chain_seq IS NOT NULL OR NEW.prev_hash IS NOT NULL OR NEW.row_hash IS NOT NULL THEN
     RAISE EXCEPTION 'audit_event chain columns are assigned by the database at commit'
@@ -176,174 +319,142 @@ BEGIN
     RAISE EXCEPTION 'audit.chain.pruned events are written only by the database'
       USING ERRCODE = 'insufficient_privilege';
   END IF;
-  IF NEW.event_type = 'audit.chain.redacted'
-     AND (v_writing = ''
-          OR NEW.scope <> 'SYSTEM'
-          OR jsonb_typeof(NEW.detail) IS DISTINCT FROM 'object'
-          OR (NEW.detail ->> 'redactionId') IS DISTINCT FROM v_writing) THEN
-    RAISE EXCEPTION 'audit.chain.redacted events are written only by the database'
-      USING ERRCODE = 'insufficient_privilege';
+  IF NEW.event_type IN ('audit.chain.redacted', 'user.erased') THEN
+    IF pg_trigger_depth() > 1 THEN
+      ctx := audit_redaction_context_current();
+    END IF;
+    IF ctx.txid IS NULL
+       OR ctx.phase <> 'record'
+       OR NEW.event_type IS DISTINCT FROM ctx.event_type
+       OR NEW.scope <> 'SYSTEM'
+       OR NEW.document_id IS NOT NULL
+       OR NEW.actor_id IS DISTINCT FROM ctx.event_actor
+       OR NEW.detail IS DISTINCT FROM ctx.event_detail THEN
+      RAISE EXCEPTION '% events are written only by the database', NEW.event_type
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
   END IF;
   RETURN NEW;
-END;
-$fn$;
-
--- --- detail pseudonymisation ----------------------------------------------
-
--- Returns p_detail with every reference to the user replaced by p_pseudonym:
--- any string exactly equal to one of p_names (the identifying strings the
--- caller passes; case-sensitive, so a username like "member" never swallows a
--- role value "MEMBER"), any occurrence of the user id inside a string
--- (case-insensitive), and the name fields of an object whose userId is the
--- user (the snapshot a rename may have made differ from the current name).
--- Structure and keys are kept.
-CREATE FUNCTION audit_event_redact_detail(
-  p_detail JSONB, p_user_id TEXT, p_names TEXT[], p_pseudonym TEXT)
-RETURNS JSONB
-LANGUAGE plpgsql
-IMMUTABLE
-AS $fn$
-DECLARE
-  v_result JSONB;
-  v_subject BOOLEAN;
-  v_text TEXT;
-BEGIN
-  CASE jsonb_typeof(p_detail)
-    WHEN 'object' THEN
-      v_subject := (p_detail ->> 'userId') = p_user_id;
-      SELECT coalesce(jsonb_object_agg(
-               e.key,
-               CASE
-                 WHEN v_subject
-                      AND e.key IN ('userName', 'username', 'displayName', 'userDisplayName',
-                                    'email', 'userEmail')
-                      AND jsonb_typeof(e.value) = 'string'
-                   THEN to_jsonb(p_pseudonym)
-                 ELSE audit_event_redact_detail(e.value, p_user_id, p_names, p_pseudonym)
-               END), '{}'::jsonb)
-        INTO v_result
-        FROM jsonb_each(p_detail) e;
-      RETURN v_result;
-    WHEN 'array' THEN
-      SELECT coalesce(jsonb_agg(
-               audit_event_redact_detail(a.value, p_user_id, p_names, p_pseudonym)
-               ORDER BY a.ord), '[]'::jsonb)
-        INTO v_result
-        FROM jsonb_array_elements(p_detail) WITH ORDINALITY AS a(value, ord);
-      RETURN v_result;
-    WHEN 'string' THEN
-      v_text := p_detail #>> '{}';
-      IF v_text = ANY (p_names) THEN
-        RETURN to_jsonb(p_pseudonym);
-      END IF;
-      IF position(p_user_id IN lower(v_text)) > 0 THEN
-        -- A uuid's text holds no regular-expression metacharacters.
-        RETURN to_jsonb(regexp_replace(v_text, p_user_id, p_pseudonym, 'gi'));
-      END IF;
-      RETURN p_detail;
-    ELSE
-      RETURN p_detail;
-  END CASE;
 END;
 $fn$;
 
 -- --- the redaction --------------------------------------------------------
 
 -- Pseudonymises every audit row that names p_user_id (as actor, or by id in
--- the detail) and records it in one `audit.chain.redacted` event. Returns the
--- redaction id, or NULL when no row named the user. p_names are the user's
--- identifying strings (username, display name, slug, e-mail) to replace as
--- well, but only inside the rows that reference the user's id.
+-- the detail), records it, and returns the redaction id (NULL when no row
+-- named the user). Always writes one `user.erased` event attributed to
+-- p_actor_id. Only runs from the qnop_user trigger: called directly, its
+-- writes are not inside a trigger and the guards reject them.
 --
--- Sealed rows keep chain_seq/prev_hash/row_hash; the event lists them as
--- {seq, rowHash}. Rows not sealed yet (written earlier in this transaction)
--- are counted as pendingRows: they are sealed at commit over their redacted
--- content, so they verify like any other row.
-CREATE FUNCTION audit_event_redact_user(p_user_id UUID, p_names TEXT[])
+-- The `audit.chain.redacted` detail lists, per redacted row, its id, its
+-- chain position and original row_hash (null for a row not sealed yet), and
+-- contentHash over its redacted content (see audit_event_redaction_canonical).
+CREATE FUNCTION audit_event_redact_user(p_user_id UUID, p_actor_id UUID)
 RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $fn$
 DECLARE
-  v_redaction UUID := gen_random_uuid();
-  v_pseudonym TEXT := 'erased-user:' || gen_random_uuid()::text;
+  v_ctx audit_redaction_context;
   v_id TEXT := p_user_id::text;
-  v_names TEXT[];
   v_rows JSONB;
   v_pending BIGINT;
   v_total BIGINT;
+  v_redaction UUID;
 BEGIN
   IF p_user_id IS NULL THEN
     RAISE EXCEPTION 'audit_event_redact_user: user id is required';
   END IF;
-  SELECT coalesce(array_agg(DISTINCT n), '{}')
-    INTO v_names
-    FROM unnest(coalesce(p_names, '{}'::text[])) n
-   WHERE n IS NOT NULL AND n <> '';
 
-  PERFORM set_config('qnop.audit_redaction', v_redaction::text, true);
+  INSERT INTO audit_redaction_context (txid, user_id, redaction_id, pseudonym, redacted_at, phase)
+  VALUES (txid_current(), p_user_id, gen_random_uuid(),
+          'erased-user:' || gen_random_uuid()::text, clock_timestamp(), 'redact')
+  RETURNING * INTO v_ctx;
 
-  WITH targets AS (
-    SELECT id
-      FROM audit_event
-     WHERE actor_id = p_user_id
-        OR position(v_id IN lower(detail::text)) > 0
-     FOR UPDATE
-  ), changed AS (
+  WITH changed AS (
     UPDATE audit_event e
-       SET actor_pseudonym = CASE WHEN e.actor_id = p_user_id THEN v_pseudonym
+       SET actor_pseudonym = CASE WHEN e.actor_id = p_user_id THEN v_ctx.pseudonym
                                   ELSE e.actor_pseudonym END,
            actor_id = CASE WHEN e.actor_id = p_user_id THEN NULL ELSE e.actor_id END,
            detail = CASE WHEN e.detail IS NULL THEN NULL
-                         ELSE audit_event_redact_detail(e.detail, v_id, v_names, v_pseudonym) END,
-           redacted_at = clock_timestamp(),
-           redaction_id = v_redaction
-      FROM targets t
-     WHERE e.id = t.id
-    RETURNING e.chain_seq, e.row_hash
+                         ELSE audit_event_redact_detail(e.detail, v_id, v_ctx.pseudonym) END,
+           redacted_at = v_ctx.redacted_at,
+           redaction_id = v_ctx.redaction_id
+     WHERE e.actor_id = p_user_id
+        OR (position(v_id IN lower(e.detail::text)) > 0
+            AND audit_event_redact_detail(e.detail, v_id, v_ctx.pseudonym) IS DISTINCT FROM e.detail)
+    RETURNING e.id, e.chain_seq, e.row_hash,
+              encode(sha256(convert_to(
+                coalesce(e.prev_hash, '')
+                  || audit_event_canonical(e.id, e.scope, e.document_id, e.event_type,
+                                           e.actor_id, e.detail, e.created_at)
+                  || audit_event_redaction_canonical(e.actor_pseudonym, e.redaction_id,
+                                                     e.redacted_at),
+                'UTF8')), 'hex') AS content_hash
   )
-  SELECT jsonb_agg(jsonb_build_object('seq', chain_seq, 'rowHash', row_hash) ORDER BY chain_seq)
-           FILTER (WHERE chain_seq IS NOT NULL),
+  SELECT jsonb_agg(jsonb_build_object('id', id, 'seq', chain_seq, 'rowHash', row_hash,
+                                      'contentHash', content_hash)
+                   ORDER BY chain_seq NULLS LAST, id),
          count(*) FILTER (WHERE chain_seq IS NULL),
          count(*)
     INTO v_rows, v_pending, v_total
     FROM changed;
 
-  PERFORM set_config('qnop.audit_redaction', '', true);
-  IF v_total = 0 THEN
-    RETURN NULL;
+  IF v_total > 0 THEN
+    v_redaction := v_ctx.redaction_id;
+    UPDATE audit_redaction_context
+       SET phase = 'record', event_type = 'audit.chain.redacted', event_actor = NULL,
+           event_detail = jsonb_build_object('redactionId', v_redaction, 'rows', v_rows,
+                                             'pendingRows', v_pending)
+     WHERE txid = v_ctx.txid
+     RETURNING * INTO v_ctx;
+    INSERT INTO audit_event (id, scope, document_id, event_type, actor_id, detail, created_at)
+    VALUES (gen_random_uuid(), 'SYSTEM', NULL, v_ctx.event_type, NULL, v_ctx.event_detail,
+            clock_timestamp());
   END IF;
 
-  PERFORM set_config('qnop.audit_writing_redaction', v_redaction::text, true);
+  UPDATE audit_redaction_context
+     SET phase = 'record', event_type = 'user.erased', event_actor = p_actor_id,
+         event_detail = jsonb_build_object('redactionId', v_redaction)
+   WHERE txid = v_ctx.txid
+   RETURNING * INTO v_ctx;
   INSERT INTO audit_event (id, scope, document_id, event_type, actor_id, detail, created_at)
-  VALUES (gen_random_uuid(), 'SYSTEM', NULL, 'audit.chain.redacted', NULL,
-          jsonb_build_object(
-            'redactionId', v_redaction,
-            'rows', coalesce(v_rows, '[]'::jsonb),
-            'pendingRows', v_pending),
-          clock_timestamp());
-  PERFORM set_config('qnop.audit_writing_redaction', '', true);
+  VALUES (gen_random_uuid(), 'SYSTEM', NULL, v_ctx.event_type, v_ctx.event_actor,
+          v_ctx.event_detail, clock_timestamp());
+
+  DELETE FROM audit_redaction_context WHERE txid = v_ctx.txid;
   RETURN v_redaction;
 END;
 $fn$;
 
 -- BEFORE DELETE on qnop_user: erase the user from the audit trail before the
--- actor foreign key is checked.
+-- actor foreign key is checked. The acting user is whatever the application
+-- announced in qnop.erasing_actor for this deletion (attribution only — it
+-- authorises nothing); unknown, unparsable or the erased user itself → NULL.
 CREATE FUNCTION qnop_user_redact_audit()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $fn$
+DECLARE
+  v_actor UUID;
 BEGIN
-  PERFORM audit_event_redact_user(
-    OLD.id, ARRAY[OLD.username, OLD.display_name, OLD.slug, OLD.email, lower(OLD.email)]);
+  BEGIN
+    v_actor := nullif(current_setting('qnop.erasing_actor', true), '')::uuid;
+  EXCEPTION WHEN invalid_text_representation THEN
+    v_actor := NULL;
+  END;
+  PERFORM set_config('qnop.erasing_actor', '', true);
+  IF v_actor = OLD.id OR NOT EXISTS (SELECT 1 FROM qnop_user u WHERE u.id = v_actor) THEN
+    v_actor := NULL;
+  END IF;
+  PERFORM audit_event_redact_user(OLD.id, v_actor);
   RETURN OLD;
 END;
 $fn$;
 
--- Only the trigger (running as the owner) may start a redaction: a role that
--- can merely call functions cannot pseudonymise a user who still exists.
-REVOKE EXECUTE ON FUNCTION audit_event_redact_user(uuid, text[]) FROM PUBLIC;
+-- Only the trigger (running as the owner) starts a redaction.
+REVOKE EXECUTE ON FUNCTION audit_event_redact_user(uuid, uuid) FROM PUBLIC;
 
 -- --- search_path ----------------------------------------------------------
 
@@ -352,11 +463,13 @@ DECLARE
   f TEXT;
 BEGIN
   FOREACH f IN ARRAY ARRAY[
+    'audit_redaction_context_current()',
+    'audit_event_redaction_canonical(text, uuid, timestamptz)',
     'audit_event_seal()',
+    'audit_event_redact_detail(jsonb, text, text)',
     'audit_event_reject_update()',
     'audit_event_guard_insert()',
-    'audit_event_redact_detail(jsonb, text, text[], text)',
-    'audit_event_redact_user(uuid, text[])',
+    'audit_event_redact_user(uuid, uuid)',
     'qnop_user_redact_audit()']
   LOOP
     EXECUTE format('ALTER FUNCTION %s SET search_path = %I, pg_temp', f, current_schema());

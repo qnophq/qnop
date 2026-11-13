@@ -24,6 +24,7 @@ import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Team;
 import io.qnop.entity.TeamRole;
 import io.qnop.repository.AuditEventRepository;
+import io.qnop.repository.UserRepository;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -85,9 +86,11 @@ public class TeamMembershipAudit {
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
   private final AuditEventRepository auditEvents;
+  private final UserRepository users;
 
-  public TeamMembershipAudit(AuditEventRepository auditEvents) {
+  public TeamMembershipAudit(AuditEventRepository auditEvents, UserRepository users) {
     this.auditEvents = auditEvents;
+    this.users = users;
   }
 
   public void invitationCreated(UUID actorId, Team team, Subject user) {
@@ -147,6 +150,12 @@ public class TeamMembershipAudit {
 
   private void record(
       String eventType, UUID actorId, Team team, Subject user, Consumer<ObjectNode> extra) {
+    // The detail names the user by id (issue #952): hold a key-share lock on their row until
+    // commit, so a concurrent deletion of the user waits and then erases this row too, or — if
+    // the deletion came first — this write fails instead of leaving their data behind.
+    if (users.keyShareLock(user.id()) == 0) {
+      throw new IllegalStateException("The user " + user.id() + " no longer exists");
+    }
     ObjectNode detail = MAPPER.createObjectNode();
     detail.put("teamId", team.getId() == null ? null : team.getId().toString());
     detail.put("teamName", team.getName());

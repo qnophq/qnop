@@ -42,7 +42,38 @@ import tools.jackson.databind.json.JsonMapper;
 class TeamMembershipAuditTest {
 
   private final AuditEventRepository auditEvents = mock(AuditEventRepository.class);
-  private final TeamMembershipAudit audit = new TeamMembershipAudit(auditEvents);
+  private final io.qnop.repository.UserRepository users =
+      mock(io.qnop.repository.UserRepository.class);
+  private final TeamMembershipAudit audit = new TeamMembershipAudit(auditEvents, users);
+
+  @org.junit.jupiter.api.BeforeEach
+  void subjectExists() {
+    org.mockito.Mockito.when(users.keyShareLock(org.mockito.ArgumentMatchers.any())).thenReturn(1L);
+  }
+
+  @Test
+  @DisplayName("the subject's row is key-share locked before the detail names them (#952)")
+  void locksTheSubjectBeforeWriting() {
+    audit.memberAdded(actor, team, new TeamMembershipAudit.Subject(userId, "Ann"), TeamRole.MEMBER);
+
+    org.mockito.InOrder order = org.mockito.Mockito.inOrder(users, auditEvents);
+    order.verify(users).keyShareLock(userId);
+    order.verify(auditEvents).save(org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  @DisplayName("a subject deleted meanwhile is not written into the trail (#952)")
+  void refusesAGoneSubject() {
+    org.mockito.Mockito.when(users.keyShareLock(userId)).thenReturn(0L);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                audit.memberAdded(
+                    actor, team, new TeamMembershipAudit.Subject(userId, "Ann"), TeamRole.MEMBER))
+        .isInstanceOf(IllegalStateException.class);
+    verify(auditEvents, never()).save(org.mockito.ArgumentMatchers.any());
+  }
+
   private final UUID actor = UUID.randomUUID();
   private final UUID userId = UUID.randomUUID();
   private final Team team = Team.create("Legal \"core\"", null);

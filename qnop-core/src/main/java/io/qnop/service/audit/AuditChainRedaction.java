@@ -31,21 +31,27 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * A parsed {@code audit.chain.redacted} event (issue #952, ADR-0043): the record a user erasure
- * leaves of the audit rows it pseudonymised. {@code rows} maps each redacted chain position to the
- * {@code row_hash} it carried when it was redacted; {@code pendingRows} counts rows that were
- * redacted before they were sealed (and were then sealed over their redacted content).
+ * leaves of the audit rows it pseudonymised, keyed by audit row id. Each {@link Listing} holds the
+ * row's chain position and original {@code row_hash} — both null for a row that was not sealed yet
+ * when it was redacted — and {@code contentHash}, the hash of its redacted content ({@link
+ * AuditChainHasher#contentHash}).
  *
  * <p>Parsing never throws: a payload that is not exactly what {@code audit_event_redact_user}
- * writes — an object with a uuid {@code redactionId}, a {@code rows} array of distinct {@code {seq,
- * rowHash}} and a non-negative integral {@code pendingRows}, listing at least one row — yields
- * {@code malformed = true}, which the verifier reports.
+ * writes — an object with a uuid {@code redactionId}, a non-empty {@code rows} array of distinct
+ * {@code {id, seq, rowHash, contentHash}} (seq and rowHash both set or both null) and a {@code
+ * pendingRows} equal to the number of unsealed entries — yields {@code malformed = true}.
  */
 public record AuditChainRedaction(
-    Long recordedSeq,
-    UUID redactionId,
-    Map<Long, String> rows,
-    long pendingRows,
-    boolean malformed) {
+    Long recordedSeq, UUID redactionId, Map<UUID, Listing> rows, boolean malformed) {
+
+  /** One redacted row as the event lists it. */
+  public record Listing(Long seq, String rowHash, String contentHash) {
+
+    /** Whether the row had not been sealed yet when it was redacted. */
+    public boolean pending() {
+      return seq == null;
+    }
+  }
 
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
@@ -62,19 +68,22 @@ public record AuditChainRedaction(
         return malformed(seq);
       }
       UUID redactionId = uuid(root.get("redactionId"));
-      Map<Long, String> rows = rows(root.get("rows"));
+      Map<UUID, Listing> rows = rows(root.get("rows"));
       long pending = count(root.get("pendingRows"));
-      if (redactionId == null || rows == null || pending < 0 || (rows.isEmpty() && pending == 0)) {
+      if (redactionId == null
+          || rows == null
+          || rows.isEmpty()
+          || pending != rows.values().stream().filter(Listing::pending).count()) {
         return malformed(seq);
       }
-      return new AuditChainRedaction(seq, redactionId, rows, pending, false);
+      return new AuditChainRedaction(seq, redactionId, rows, false);
     } catch (JacksonException e) {
       return malformed(seq);
     }
   }
 
   private static AuditChainRedaction malformed(Long seq) {
-    return new AuditChainRedaction(seq, null, Map.of(), 0, true);
+    return new AuditChainRedaction(seq, null, Map.of(), true);
   }
 
   private static UUID uuid(JsonNode node) {
@@ -96,26 +105,42 @@ public record AuditChainRedaction(
     return node.longValue() < 0 ? -1 : node.longValue();
   }
 
-  /** The listed positions, or null when the array or any entry is malformed or repeated. */
-  private static Map<Long, String> rows(JsonNode node) {
+  /** The listed rows, or null when the array or any entry is malformed or repeated. */
+  private static Map<UUID, Listing> rows(JsonNode node) {
     if (node == null || !node.isArray()) {
       return null;
     }
-    Map<Long, String> rows = new HashMap<>();
+    Map<UUID, Listing> rows = new HashMap<>();
     for (JsonNode entry : node) {
-      JsonNode seq = entry.get("seq");
-      JsonNode hash = entry.get("rowHash");
-      boolean valid =
-          entry.isObject()
-              && seq != null
-              && seq.isIntegralNumber()
-              && seq.canConvertToLong()
-              && hash != null
-              && hash.isString();
-      if (!valid || rows.put(seq.longValue(), hash.stringValue()) != null) {
+      Listing listing = listing(entry);
+      UUID id = entry.isObject() ? uuid(entry.get("id")) : null;
+      if (listing == null || id == null || rows.put(id, listing) != null) {
         return null;
       }
     }
     return rows;
+  }
+
+  private static Listing listing(JsonNode entry) {
+    if (!entry.isObject()) {
+      return null;
+    }
+    JsonNode seq = entry.get("seq");
+    JsonNode rowHash = entry.get("rowHash");
+    JsonNode contentHash = entry.get("contentHash");
+    if (contentHash == null || !contentHash.isString()) {
+      return null;
+    }
+    boolean sealed =
+        seq != null
+            && seq.isIntegralNumber()
+            && seq.canConvertToLong()
+            && rowHash != null
+            && rowHash.isString();
+    boolean pending = (seq == null || seq.isNull()) && (rowHash == null || rowHash.isNull());
+    if (sealed) {
+      return new Listing(seq.longValue(), rowHash.stringValue(), contentHash.stringValue());
+    }
+    return pending ? new Listing(null, null, contentHash.stringValue()) : null;
   }
 }

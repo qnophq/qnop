@@ -64,7 +64,8 @@ public class AuditChainRepository {
                 """
                 SELECT chain_seq, prev_hash, row_hash, id, scope, document_id, event_type,
                        actor_id, detail::text,
-                       (extract(epoch FROM created_at) * 1000000)::bigint, redaction_id
+                       (extract(epoch FROM created_at) * 1000000)::bigint, redaction_id,
+                       actor_pseudonym, (extract(epoch FROM redacted_at) * 1000000)::bigint
                 FROM audit_event
                 WHERE chain_seq > :after
                 ORDER BY chain_seq
@@ -88,7 +89,9 @@ public class AuditChainRepository {
                     (UUID) r[7],
                     (String) r[8],
                     ((Number) r[9]).longValue(),
-                    (UUID) r[10]))
+                    (UUID) r[10],
+                    (String) r[11],
+                    r[12] == null ? null : ((Number) r[12]).longValue()))
         .toList();
   }
 

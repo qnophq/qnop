@@ -128,6 +128,9 @@ class TeamInvitationConsentIT extends AbstractIntegrationTest {
     jdbc.update("UPDATE audit_chain_head SET last_seq = 0, last_hash = repeat('0', 64)");
     createdUsers.forEach(id -> users.findById(id).ifPresent(users::delete));
     createdUsers.clear();
+    // Each user deletion writes a user.erased event (issue #952): leave the trail empty again.
+    jdbc.execute("TRUNCATE TABLE audit_event");
+    jdbc.update("UPDATE audit_chain_head SET last_seq = 0, last_hash = repeat('0', 64)");
   }
 
   @Test

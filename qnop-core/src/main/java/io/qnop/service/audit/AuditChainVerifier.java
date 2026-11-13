@@ -46,13 +46,20 @@ import java.util.UUID;
  * ranges bridge nothing), and every document it names must have its deletion explained by a {@code
  * review.deleted}/{@code review.purged} event — otherwise {@link ProblemKind#UNEXPLAINED_PRUNE}.
  *
- * <p>Redacted rows (a user erasure pseudonymised them, issue #952) are not recomputed — their
- * content changed on purpose. Such a row is accepted only when the {@code audit.chain.redacted}
- * event of its redaction, sealed after it, lists its position with exactly its stored hash; or, for
- * a row redacted before it was sealed, when that event declares pending rows and the row's content
- * reproduces its hash. Anything else — no such event, a different hash, a malformed or duplicate
- * redaction event — is a {@link ProblemKind#BAD_REDACTION}. The link check across a redacted row is
- * unchanged, so a redaction can never splice or reorder the chain.
+ * <p>Redacted rows (a user erasure pseudonymised them, issue #952) no longer reproduce their
+ * original hash — their content changed on purpose. Such a row is accepted only when the {@code
+ * audit.chain.redacted} event of its redaction id exists, was sealed after the row, is the latest
+ * redaction event listing that row, and lists it with its exact position and stored hash and a
+ * content hash that the row's current (redacted) content reproduces. A row redacted before it was
+ * sealed is listed without position; it must reproduce both its sealed hash and the content hash. A
+ * row the trail lists as redacted but that carries no redaction id is reported too. Every such
+ * failure is a {@link ProblemKind#BAD_REDACTION}; the link check across a redacted row is
+ * unchanged, so a redaction can neither splice nor reorder the chain, and an edit after the
+ * redaction is detected.
+ *
+ * <p>Redaction events can only be written by the database's erasure path. One that does not parse,
+ * or repeats an id already seen, vouches for nothing but is not itself a finding: the first valid
+ * event per id wins, so a stray event can never make the trail fail verification for good.
  *
  * <p>After a mismatch the walk continues from the stored hash, so one altered row is reported once
  * rather than as a cascade of every later link.
@@ -81,8 +88,8 @@ public final class AuditChainVerifier {
     /** A tombstone names a document whose deletion no review-deleted/purged event explains. */
     UNEXPLAINED_PRUNE,
     /**
-     * A redacted row no redaction event vouches for, or a malformed/duplicate redaction event
-     * (issue #952).
+     * A redacted row no redaction event vouches for, a redacted row edited after its redaction, or
+     * a listed row stripped of its redaction (issue #952).
      */
     BAD_REDACTION,
     /** The verification itself failed before reaching a verdict. */
@@ -114,6 +121,10 @@ public final class AuditChainVerifier {
 
   private final Map<Long, AuditChainPrunedRange> rangesByStart = new HashMap<>();
   private final Map<UUID, AuditChainRedaction> redactionsById = new HashMap<>();
+
+  /** Per audit row id: the chain position of the latest valid redaction event listing it. */
+  private final Map<UUID, Long> latestListing = new HashMap<>();
+
   private final List<Problem> problems = new ArrayList<>();
   private int problemCount;
   private long expectedSeq = 1;
@@ -141,19 +152,22 @@ public final class AuditChainVerifier {
 
   /**
    * @param redactions every parsed {@code audit.chain.redacted} event, in chain order. A malformed
-   *     one, or a second one for an already-seen redaction id, is reported and vouches for nothing.
+   *     or unsealed one, or a later one for an already-seen redaction id, vouches for nothing.
    */
   public AuditChainVerifier(
       Collection<AuditChainTombstone> tombstones,
       Set<String> explainedDocumentIds,
       Collection<AuditChainRedaction> redactions) {
     for (AuditChainRedaction redaction : redactions) {
-      long at = redaction.recordedSeq() == null ? 0 : redaction.recordedSeq();
-      if (redaction.malformed() || redactionsById.containsKey(redaction.redactionId())) {
-        report(ProblemKind.BAD_REDACTION, at, at);
+      if (redaction.malformed()
+          || redaction.recordedSeq() == null
+          || redactionsById.containsKey(redaction.redactionId())) {
         continue;
       }
       redactionsById.put(redaction.redactionId(), redaction);
+      for (UUID rowId : redaction.rows().keySet()) {
+        latestListing.merge(rowId, redaction.recordedSeq(), Math::max);
+      }
     }
     for (AuditChainTombstone tombstone : tombstones) {
       long at = tombstone.recordedSeq() == null ? 0 : tombstone.recordedSeq();
@@ -196,6 +210,9 @@ public final class AuditChainVerifier {
       if (!redactionVouchesFor(row)) {
         report(ProblemKind.BAD_REDACTION, row.seq(), row.seq());
       }
+    } else if (latestListing.containsKey(row.id())) {
+      // Listed as redacted, but its redaction columns are gone.
+      report(ProblemKind.BAD_REDACTION, row.seq(), row.seq());
     } else if (!contentMatches(row)) {
       report(ProblemKind.CONTENT_MISMATCH, row.seq(), row.seq());
     }
@@ -235,22 +252,25 @@ public final class AuditChainVerifier {
   }
 
   /**
-   * Whether the row's redaction event, sealed after the row, lists it with its exact stored hash —
-   * or, for a row redacted before it was sealed, declares pending rows and the row's (redacted)
-   * content reproduces its hash.
+   * Whether the row's redaction event — sealed after the row and the latest one listing it — lists
+   * it at its position with its stored hash and a content hash its current content reproduces. A
+   * row listed as pending (redacted before it was sealed) must reproduce its sealed hash as well.
    */
   private boolean redactionVouchesFor(AuditChainRow row) {
     AuditChainRedaction redaction = redactionsById.get(row.redactionId());
     if (redaction == null
-        || redaction.recordedSeq() == null
-        || redaction.recordedSeq() <= row.seq()) {
+        || redaction.recordedSeq() <= row.seq()
+        || !redaction.recordedSeq().equals(latestListing.get(row.id()))) {
       return false;
     }
-    String listed = redaction.rows().get(row.seq());
-    if (listed != null) {
-      return listed.equals(row.rowHash());
+    AuditChainRedaction.Listing listing = redaction.rows().get(row.id());
+    if (listing.pending()) {
+      return contentMatches(row)
+          && listing.contentHash().equals(AuditChainHasher.contentHash("", row));
     }
-    return redaction.pendingRows() > 0 && contentMatches(row);
+    return listing.seq() == row.seq()
+        && listing.rowHash().equals(row.rowHash())
+        && listing.contentHash().equals(AuditChainHasher.contentHash(row.prevHash(), row));
   }
 
   /** Advances over missing positions up to (excluding) {@code nextSeq} using tombstone ranges. */

@@ -370,6 +370,11 @@ class TeamMembershipNotificationAuditIT extends SeededIntegrationTest {
                 "SELECT count(*) FROM audit_event WHERE event_type = 'audit.chain.redacted'",
                 Long.class))
         .isEqualTo(1L);
+    // Who erased the account is on record, without naming the erased user.
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT actor_id FROM audit_event WHERE event_type = 'user.erased'", UUID.class))
+        .isEqualTo(ADMIN_ID);
     assertThat(verification.verify().problems()).isEmpty();
 
     // The compliance view shows the erased actor by pseudonym, flagged as redacted.

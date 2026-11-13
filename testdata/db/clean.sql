@@ -40,3 +40,8 @@ TRUNCATE TABLE scheduler_job RESTART IDENTITY CASCADE;
 
 DELETE FROM user_avatar;
 DELETE FROM qnop_user;
+
+-- Deleting a user writes a `user.erased` audit event (issue #952), so the
+-- trail is emptied once more after the users, and the chain head with it.
+TRUNCATE TABLE audit_event;
+UPDATE audit_chain_head SET last_seq = 0, last_hash = repeat('0', 64) WHERE id = 1;

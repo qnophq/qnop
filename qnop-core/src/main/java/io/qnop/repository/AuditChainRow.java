@@ -28,9 +28,11 @@ import java.util.UUID;
  * PostgreSQL-normalised jsonb text and {@code createdAtMicros} the timestamp in epoch microseconds
  * — the same representations the sealing trigger hashed.
  *
- * <p>{@code redactionId} is set when the row was pseudonymised by a user erasure (issue #952): its
- * content then no longer has to reproduce its hash, and the verifier checks it against the {@code
- * audit.chain.redacted} event of that redaction instead. Null for an unredacted row.
+ * <p>{@code redactionId}, {@code actorPseudonym} and {@code redactedAtMicros} are set when a user
+ * erasure pseudonymised the row (issue #952): its content then no longer reproduces its original
+ * hash, and the verifier checks it against the content hash the {@code audit.chain.redacted} event
+ * of that redaction recorded instead. All three are null for an unredacted row ({@code
+ * actorPseudonym} also for a redacted row whose actor was not the erased user).
  */
 public record AuditChainRow(
     long seq,
@@ -43,7 +45,9 @@ public record AuditChainRow(
     UUID actorId,
     String detail,
     long createdAtMicros,
-    UUID redactionId) {
+    UUID redactionId,
+    String actorPseudonym,
+    Long redactedAtMicros) {
 
   /** An unredacted row. */
   public AuditChainRow(
@@ -68,6 +72,8 @@ public record AuditChainRow(
         actorId,
         detail,
         createdAtMicros,
+        null,
+        null,
         null);
   }
 }
