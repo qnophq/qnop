@@ -4,7 +4,9 @@
 # The 12-hourly demo job (cron, see install.sh). One mechanism covers both
 # requirements of issue #710:
 #
-#   1. auto-deploy — pull the latest images before every reset
+#   1. auto-deploy — refresh the stack definition from main (the image is
+#      pinned by digest there and bumped by reviewed Renovate PRs, #925),
+#      then pull its images before every reset
 #   2. data reset  — restore the golden state captured by
 #      build-golden-state.sh (full pg_dump + object-storage bucket mirror)
 #
@@ -21,6 +23,21 @@ DB_USER="${QNOP_DB_USERNAME:-qnop}"
 BUCKET="${QNOP_S3_BUCKET:-qnop-documents}"
 
 echo "[$(date -u +%FT%TZ)] reset starting"
+# Take the compose file (and with it the pinned image digest) from main. Only
+# that file is refreshed; the scripts change when an operator re-runs install.sh.
+# A new file must validate against this host's .env first (e.g. a key it does
+# not have yet); otherwise the current one stays and the reset carries on.
+if [ -d /opt/qnop-src/.git ]; then
+  NEW_COMPOSE=/opt/qnop-src/deploy/aws-demo/docker-compose.yml
+  if ! git -C /opt/qnop-src pull --ff-only --quiet; then
+    echo "WARN: could not update /opt/qnop-src — keeping the current stack definition"
+  elif ! docker compose -f "$NEW_COMPOSE" --project-directory /opt/qnop-demo \
+      --env-file /opt/qnop-demo/.env config -q; then
+    echo "WARN: docker-compose.yml from main does not validate against .env — keeping the current one (re-run install.sh?)"
+  else
+    install -m 0644 "$NEW_COMPOSE" /opt/qnop-demo/
+  fi
+fi
 docker compose pull --quiet
 
 if [ ! -f golden/db.dump ]; then

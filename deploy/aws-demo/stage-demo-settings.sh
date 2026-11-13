@@ -2,20 +2,19 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 #
 # Turn a freshly seeded database into the demo configuration (issue #710).
-# Run AFTER loading testdata/db/seed.sql and BEFORE build-golden-state.sh.
+# Run AFTER seed-demo.sh and BEFORE build-golden-state.sh.
 # Everything secret (admin password, analytics endpoint) lives only in
 # /opt/qnop-demo/.env on the instance — this script carries no secrets.
 #
-# What it does:
-#   - deletes the seeded OIDC providers — the demo authenticates exclusively
-#     with the published local demo accounts (their seeded secret would be
-#     undecryptable on this host anyway)
-#   - rotates the seeded admin password to $DEMO_ADMIN_PASSWORD and disables
-#     the second seeded admin, so no admin credential from the public
-#     repository works on the demo
-#   - applies the demo settings: mail fully off, 5 MB / 1 MB upload limits,
-#     self-registration + password reset off, review e-mails off, sign-in
-#     banner with the public demo accounts, optional Umami usage tracking
+# seed-demo.sh already did the credential hardening in the seed transaction
+# (issue #924): the seeded admin password is rotated to $DEMO_ADMIN_PASSWORD,
+# every other seeded admin is disabled and the seeded OIDC providers are gone,
+# so no admin credential from the public repository ever works on the demo.
+#
+# What this script does: applies the demo settings — mail fully off, 5 MB /
+# 1 MB upload limits, self-registration + password reset off, review e-mails
+# off, sign-in banner with the public demo accounts, optional Umami usage
+# tracking.
 set -euo pipefail
 
 cd /opt/qnop-demo
@@ -24,6 +23,8 @@ set -a
 set +a
 
 BASE="${QNOP_DEMO_BASE_URL:-https://$QNOP_DEMO_DOMAIN}"
+# The shared password of the PUBLIC demo accounts (member, nora, …) — shown in
+# the sign-in banner. Admin accounts never accept it on the demo.
 SEED_PASSWORD='Test-Pass-1234!'
 : "${DEMO_ADMIN_PASSWORD:?add DEMO_ADMIN_PASSWORD to /opt/qnop-demo/.env}"
 
@@ -41,30 +42,12 @@ login() { # login <user> <password> → access token on stdout, fails silently
     -d "{\"usernameOrEmail\":\"$1\",\"password\":\"$2\"}" 2>/dev/null | json_field accessToken
 }
 
-echo "Removing seeded OIDC providers (demo uses local accounts only)…"
-docker compose exec -T postgres psql -U "${QNOP_DB_USERNAME:-qnop}" -d "${QNOP_DB_NAME:-qnop}" \
-  -v ON_ERROR_STOP=1 -c "DELETE FROM oidc_provider;"
-
-# Sign in as admin: prefer the rotated secret, fall back to the seed password
-# right after a fresh seed load.
-if TOKEN=$(login admin "$DEMO_ADMIN_PASSWORD"); then
-  echo "Admin password already rotated."
-else
-  TOKEN=$(login admin "$SEED_PASSWORD")
-  echo "Rotating the admin password away from the public seed value…"
-  api POST /auth/change-password "$TOKEN" \
-    "{\"currentPassword\":\"$SEED_PASSWORD\",\"newPassword\":\"$DEMO_ADMIN_PASSWORD\"}" > /dev/null
-  # Tokens minted in the same second as the password change count as revoked —
-  # step past the second boundary before signing in again.
-  sleep 2
-  TOKEN=$(login admin "$DEMO_ADMIN_PASSWORD")
+# Sign in with the rotated admin password only. The public seed password is
+# never tried: seed-demo.sh replaced it before the seed became visible.
+if ! TOKEN=$(login admin "$DEMO_ADMIN_PASSWORD"); then
+  echo "Admin sign-in with DEMO_ADMIN_PASSWORD failed — load the data with seed-demo.sh first." >&2
+  exit 1
 fi
-
-# The second seeded admin ('admin2', fixed seed id) also carries the public
-# password — a disabled account cannot be taken over.
-echo "Disabling the second seeded admin account…"
-api PATCH /admin/users/a0000000-0000-0000-0000-000000000008 "$TOKEN" \
-  '{"enabled":false}' > /dev/null
 
 echo "Applying demo settings…"
 SETTINGS=$(cat <<EOF

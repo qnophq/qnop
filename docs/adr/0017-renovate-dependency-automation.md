@@ -71,3 +71,25 @@ Renovate's `gradle-wrapper` manager bumps `distributionUrl` on a Gradle release 
 - **Scope guard:** the job refuses to push anything but a one-line change to that one file, and only on `renovate/**`. Its own push re-triggers it once; that run finds the pin correct and ends without a commit.
 
 **Consequence:** one more workflow holds the App private key and can push to Renovate branches — the trade-off issue #769 weighs. Accepted because the blast radius is bounded by the scope guard, and because the alternative was a monthly hand-edit that the guard only made faster, not unnecessary.
+
+## Amendment (2026-11, #926): the checksum fixer runs only trusted code
+
+The 2026-08-29 design ran the fixer script from the pushed `renovate/**` branch while the App token was already minted and persisted by `actions/checkout`, and the scope guard ran only after the script. Branch content could therefore execute with the App token.
+
+**Decision:** nothing from the pushed branch executes in `gradle-wrapper-checksum-fix.yml`.
+
+- The script is checked out from the **default branch** (a separate, sparse checkout); the branch itself is checked out as data and edited by that trusted script.
+- Both checkouts use `persist-credentials: false`. The App token is minted **after** the scope guard has passed, narrowed to this repository with `contents: write`, and used only for the final `git push` through a one-off auth header (never written to `.git/config`).
+- `scripts/check-gradle-wrapper-checksum.sh` accepts only a `distributionUrl` under `https://services.gradle.org/distributions/`, so the "published checksum" is always Gradle's own — in CI guard and fixer alike.
+
+Consequence: a change to the script itself takes effect in the fixer only once it is on `main`, which is the point.
+
+## Amendment (2026-11, #925): Gradle dependency verification metadata
+
+`gradle/verification-metadata.xml` (SHA-256, `verify-metadata` on, signatures off) is checked in, so every Gradle run — locally and in every CI job — verifies each resolved artifact and fails on an unknown or changed checksum. `-sources`/`-javadoc` jars are trusted so IDE downloads keep working. `scripts/update-gradle-verification-metadata.sh` regenerates it (an init script resolves every configuration; Spotless, the license report and the CycloneDX SBOM run alongside for their execution-time resolutions).
+
+Renovate can update the file only if the self-hosted admin config sets `allowedUnsafeExecutions: ["gradleWrapper"]`, which runs the branch's build logic inside the Renovate job next to the App token. **We do not enable that.** Instead `.github/workflows/gradle-verification-metadata.yml` follows the #926 pattern: an unprivileged job (read-only token, no secrets, no persisted credentials) runs the regeneration on `renovate/**` pushes and hands over the file as an artifact; a second job copies that one file onto a fresh checkout, enforces a one-file scope guard, and only then mints the App token for the push. Its commits use the author `qnop-verification-metadata[bot]`, added to `gitIgnoredAuthors`.
+
+Because the candidate file is produced by branch-controlled build code, the trusted job first runs `scripts/check-verification-metadata-diff.py` **from the default branch** against the branch's committed file and again against **main's** file (there tolerating entries a behind-main branch lacks; `--write-verification-metadata` never prunes, so against the branch's own file nothing may vanish) (stdlib XML parser; DTDs/entities refused). It accepts only *added* components, artifacts and SHA-256 entries and rejects any change to `<configuration>` (verify flags, trusted artifacts/keys, ignored keys), any changed or removed checksum, and anything malformed — so the automation can extend verification but never weaken it. Its tests run in CI (`python3 -I -m unittest discover -s scripts`). Renovate PRs are never auto-merged (`automerge: false` in the org preset); that must stay so for Gradle updates, because the checksums this bot adds are trust-on-first-use and are reviewed in the PR.
+
+**Residual risk (both privileged `renovate/**` workflows).** Being `on: push`, they run the workflow YAML and the `uses:` action refs *of the pushed branch*; only the scripts come from `main`. Whoever can push to `renovate/**` — Renovate, or any collaborator with write access while branch protection is deferred (ADR-0018) — can therefore change the job itself and reach the App key. The script-from-main split removes the accidental path (a Renovate dependency bump executing during the privileged step), not a deliberate one by a write-access collaborator. Mitigations: GitHub Actions updates are kept on their own Renovate branches, never grouped with Gradle changes (last `packageRules` in `.github/renovate.json`); the App token is narrowed to `contents: write` on this repository; restricting pushes to `renovate/**` to the Renovate App, once rulesets are available, closes the rest.

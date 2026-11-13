@@ -23,6 +23,13 @@
 # Everything wider is a privileged workflow with push access looking for a
 # way to go wrong. A push by this workflow re-triggers it once; the second run
 # finds the pin correct and ends without a commit.
+#
+# Trust boundary (issue #926): nothing from the pushed branch is ever executed.
+# The fixer script comes from the default branch (checked out separately); the
+# branch is only read as data and edited by that trusted script. Both checkouts
+# drop their credentials, the App token is minted only after the scope guard
+# has passed, and it is used for the final push alone. The script refuses any
+# distributionUrl outside https://services.gradle.org/distributions/.
 
 name: Gradle wrapper checksum fix
 
@@ -38,22 +45,28 @@ jobs:
   fix:
     name: Correct a stale distributionSha256Sum
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Mint Renovate App token
-        id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          app-id: ${{ secrets.RENOVATE_APP_ID }}
-          private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
+      # The branch under repair: data only, never executed.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
+      # The fixer, from the default branch — a branch cannot swap in its own.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: .trusted
+          persist-credentials: false
+          sparse-checkout: scripts/check-gradle-wrapper-checksum.sh
+          sparse-checkout-cone-mode: false
       - name: Correct the pin if it is stale
-        run: scripts/check-gradle-wrapper-checksum.sh --fix
-      - name: Commit and push the corrected line
+        id: fix
         run: |
+          .trusted/scripts/check-gradle-wrapper-checksum.sh --fix gradle/wrapper/gradle-wrapper.properties
+          rm -rf .trusted
           if git diff --quiet; then
             echo "pin already matches — nothing to push"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # The scope guard: exactly one file, exactly one line replaced.
@@ -67,4 +80,26 @@ jobs:
           git config user.email 'qnop-wrapper-checksum-fix[bot]@users.noreply.github.com'
           git commit -am 'chore(deps): correct the Gradle wrapper distribution checksum' \
             -m 'The wrapper bump left distributionSha256Sum on the previous release (issue #763); set it to the checksum Gradle publishes for the new distributionUrl. Automated by gradle-wrapper-checksum-fix.yml (issue #769).'
-          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+      - name: Mint Renovate App token
+        if: steps.fix.outputs.changed == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.RENOVATE_APP_ID }}
+          private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
+          # Narrowest token that can push: this repository, contents only.
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+      - name: Push the corrected line
+        if: steps.fix.outputs.changed == 'true'
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          # The token lives only in this step's environment and an ephemeral
+          # header; it is never written to .git/config.
+          auth="$(printf 'x-access-token:%s' "$APP_TOKEN" | base64 -w0)"
+          echo "::add-mask::$auth"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" \
+            push "https://github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"

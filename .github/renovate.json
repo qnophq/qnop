@@ -6,7 +6,8 @@
   "description": "Hold updates until packages clear pnpm 11's supply-chain minimum release age (~24h), plus margin, so deps PRs never fail `pnpm install --frozen-lockfile` for being too fresh. See ADR-0017 / issue #264.",
   "minimumReleaseAge": "3 days",
   "gitIgnoredAuthors": [
-    "qnop-wrapper-checksum-fix[bot]@users.noreply.github.com"
+    "qnop-wrapper-checksum-fix[bot]@users.noreply.github.com",
+    "qnop-verification-metadata[bot]@users.noreply.github.com"
   ],
   "packageRules": [
     {
@@ -126,6 +127,20 @@
       ],
       "groupName": "CodeMirror",
       "groupSlug": "codemirror"
+    },
+    {
+      "description": "KEEP LAST. GitHub Actions updates stay on their own branches and never share one with a Gradle change: the privileged renovate/** workflows (gradle-wrapper-checksum-fix.yml, gradle-verification-metadata.yml) run the workflow YAML and action refs of the pushed branch, so an action bump must not ride along on a branch that triggers them (ADR-0017, issues #925/#926). Mirrors the org preset's split; restated here so a later repo rule cannot regroup actions.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+      "groupName": "GitHub Actions",
+      "groupSlug": "github-actions"
+    },
+    {
+      "description": "KEEP LAST. GitHub Actions major updates — same isolation as above.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "GitHub Actions major updates",
+      "groupSlug": "github-actions-major"
     }
   ]
 }

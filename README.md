@@ -78,7 +78,9 @@ cp .env.example .env && docker compose up -d
 # Run the server (uses the docker-compose Postgres).
 # Unlike `docker compose`, Gradle's bootRun does NOT auto-load .env, and the server
 # fails fast unless QNOP_AUTH_JWT_SECRET / QNOP_AUTH_ENCRYPTION_KEY / QNOP_AUTH_ENCRYPTION_SALT
-# hold real values. Replace the CHANGE_ME placeholders in .env, then export it:
+# hold real values. Replace the CHANGE_ME placeholders in .env, then export it.
+# bootRun runs under the `dev` profile, the only one that accepts the local
+# DB/S3 credentials from .env.example (issue #922):
 set -a; source .env; set +a
 ./gradlew :qnop-app:bootRun
 

@@ -25,7 +25,10 @@ services:
     restart: unless-stopped
 
   qnop:
-    image: docker.io/qnophq/qnop-ce:${QNOP_VERSION:-latest}
+    # Pinned by digest (issue #925) — Renovate bumps tag + digest via PR, and
+    # reset-demo.sh rolls the reviewed pin out from main. A moving `latest`
+    # would deploy whatever the registry serves, unreviewed, within 12 h.
+    image: docker.io/qnophq/qnop-ce:1.3.0@sha256:7297f98ae36f9a9916d36a3b61ffc7a15f23bbf453843d311a48c21f7266ade4
     depends_on:
       postgres:
         condition: service_healthy

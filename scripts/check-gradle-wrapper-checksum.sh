@@ -56,6 +56,14 @@ pinned="$(read_prop distributionSha256Sum | tr '[:upper:]' '[:lower:]')"
 
 [[ -n "$url" ]] || fail "distributionUrl is missing"
 
+# Only Gradle's own distribution host is acceptable (issue #926): the published
+# checksum is fetched from next to the URL, so a URL elsewhere would let whoever
+# controls that host vouch for its own download.
+ALLOWED_PREFIX="https://services.gradle.org/distributions/"
+[[ "$url" == "$ALLOWED_PREFIX"* && "$url" != *..* && "$url" =~ ^[A-Za-z0-9:/._-]+$ ]] || fail \
+  "distributionUrl must point at ${ALLOWED_PREFIX}" \
+  "Got: ${url:0:200}"
+
 [[ -n "$pinned" ]] || fail \
   "distributionSha256Sum is missing" \
   "The pin from issue #194 is what protects a cold ./gradlew run against a" \

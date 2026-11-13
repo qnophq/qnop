@@ -137,7 +137,9 @@ public class SecurityConfiguration {
             auth ->
                 auth.requestMatchers("/actuator/health", "/actuator/health/**")
                     .permitAll()
-                    // Every other management endpoint (prometheus scrape, health details) is
+                    // Health stays reachable for probes; its details are shown to ADMIN only
+                    // (management.endpoint.health.roles, issue #923).
+                    // Every other management endpoint (prometheus scrape) is
                     // ops-only — an admin bearer token, never anonymous (issue #348).
                     .requestMatchers("/actuator/**")
                     .hasRole("ADMIN")

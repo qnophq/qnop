@@ -13,7 +13,7 @@ in minutes.
 Internet ──▶ EC2 (eu-central-1, t4g.medium, Amazon Linux 2023)
               └─ docker compose (project: qnop-demo)
                  ├─ caddy     :80/:443 — TLS via Let's Encrypt
-                 ├─ qnop      qnophq/qnop-ce:latest (not exposed)
+                 ├─ qnop      qnophq/qnop-ce, pinned by digest (not exposed)
                  ├─ postgres  :18
                  ├─ minio     object storage
                  └─ mc        (profile "tools", used by the scripts)
@@ -24,8 +24,10 @@ Internet ──▶ EC2 (eu-central-1, t4g.medium, Amazon Linux 2023)
   (seeded users, example reviews with annotations) by
   `build-golden-state.sh`.
 - **Reset + auto-deploy**: `reset-demo.sh` runs from cron at 03:00 and
-  15:00 UTC. It pulls the latest images (so releases roll out on their
-  own), drops and restores the database, mirrors the bucket back and
+  15:00 UTC. It refreshes `docker-compose.yml` from `main` — where the
+  app image is pinned by tag **and digest**, bumped by reviewed Renovate
+  PRs (issue #925) — pulls those images (so releases roll out once the
+  pin is merged), drops and restores the database, mirrors the bucket back and
   restarts the stack. The app restart also clears qnop's boot-time
   settings cache.
 
@@ -33,10 +35,11 @@ Internet ──▶ EC2 (eu-central-1, t4g.medium, Amazon Linux 2023)
 
 | File | Purpose |
 |---|---|
-| `user-data.sh` | EC2 cloud-init bootstrap: Docker + compose plugin, clones this repo, runs `install.sh` |
+| `user-data.sh` | EC2 cloud-init bootstrap: Docker + compose plugin (pinned version, SHA-256 verified), clones this repo, runs `install.sh` |
 | `install.sh` | Idempotent host setup: `/opt/qnop-demo`, secrets in `.env` (first run only), cron job, stack up |
 | `docker-compose.yml` | The demo stack (deployer stack + Caddy + `mc` tool profile) |
 | `Caddyfile` | TLS + reverse proxy for `$QNOP_DEMO_DOMAIN` |
+| `seed-demo.sh` | Load `testdata/db/clean.sql` + `seed.sql` and rotate the seeded admin credentials in the same transaction |
 | `stage-demo-settings.sh` | Apply the demo configuration (see below) to a freshly seeded database |
 | `build-golden-state.sh` | Capture the current DB + bucket as the golden state |
 | `reset-demo.sh` | The 12-hourly reset/redeploy job |
@@ -61,15 +64,19 @@ Region: `eu-central-1`. Steps in order — each is a single CLI action:
 
 ## Demo configuration
 
-The demo hardens and configures itself via `stage-demo-settings.sh`
-(admin API + one SQL cleanup). Secrets stay in `/opt/qnop-demo/.env` on
+The demo hardens itself in `seed-demo.sh` (inside the seed transaction)
+and configures itself via `stage-demo-settings.sh` (admin API). Secrets stay in `/opt/qnop-demo/.env` on
 the instance — the repository never contains a working credential:
 
 - **No outgoing mail**: `smtp.enabled=false` and the SMTP host cleared —
   the demo never sends e-mail; review notification e-mails are off too.
 - **Admin takeover hardening**: the seeded `admin` password (public in
-  `testdata/db/seed.sql`) is rotated to the random `DEMO_ADMIN_PASSWORD`
-  from `.env`; the second seeded admin (`admin2`) is disabled.
+  `testdata/db/seed.sql`) is replaced by the random `DEMO_ADMIN_PASSWORD`
+  from `.env`, and every other seeded admin (`admin2`) is disabled — in
+  the **same transaction** that loads the seed (`seed-demo.sh`, issue
+  #924). The stack serves on 80/443 throughout, so there must never be a
+  committed state in which an admin accepts the published password; do
+  not load `seed.sql` by hand.
 - **Local accounts only**: the seeded OIDC providers are deleted — the
   demo has no external identity provider, visitors sign in with the
   published demo accounts.
@@ -87,9 +94,11 @@ the instance — the repository never contains a working credential:
 ## Staging the demo content
 
 1. After first boot the stack runs with an empty database.
-2. Load `testdata/db/clean.sql` + `seed.sql` through
-   `docker compose exec -T postgres psql …`, then restart the app
-   (settings are read at boot): `docker compose restart qnop`.
+2. Load the dataset: `sudo /opt/qnop-demo/seed-demo.sh`. It loads
+   `clean.sql` + `seed.sql` (copied to `/opt/qnop-demo/seed/` by
+   `install.sh`), rotates the admin credentials and removes the seeded
+   OIDC providers in one transaction, then restarts the app (settings are
+   read at boot).
 3. Fill in `DEMO_TRACKING_HOST` / `DEMO_TRACKING_SITE_ID` in
    `/opt/qnop-demo/.env` (optional), then run
    `sudo /opt/qnop-demo/stage-demo-settings.sh`.

@@ -75,6 +75,8 @@ Significant decisions are recorded as [ADRs](docs/adr/README.md). If your change
 
 Dependencies are kept current by a self-hosted [Renovate](https://docs.renovatebot.com/) instance that opens grouped PRs (see [ADR-0017](docs/adr/0017-renovate-dependency-automation.md)). Review Renovate PRs like any other; do not bump dependencies by hand unless fixing an urgent security issue.
 
+Gradle **dependency verification** is on (`gradle/verification-metadata.xml`, issue #925): every build checks each resolved artifact against its recorded SHA-256 and fails on an unknown or changed one. On Renovate branches the file is regenerated automatically (`.github/workflows/gradle-verification-metadata.yml`); for a hand-made change to dependencies or plugins, run `scripts/update-gradle-verification-metadata.sh` and commit the result. Review that diff — new entries are expected, a *changed* checksum for an existing version is not.
+
 ## License & dependencies
 
 By contributing you agree your work is licensed under AGPL-3.0. Prefer permissive dependencies (Apache-2.0/MIT/BSD/MPL-2.0); copyleft tools may only be used out-of-process. See [ADR-0007](docs/adr/0007-spdx-dco-license-scanning.md).
