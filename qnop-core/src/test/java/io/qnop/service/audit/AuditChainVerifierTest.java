@@ -32,6 +32,7 @@ import io.qnop.service.audit.AuditChainVerifier.Report;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -359,5 +360,176 @@ class AuditChainVerifierTest {
 
     assertThat(report.problemCount()).isEqualTo(60);
     assertThat(report.problems()).hasSize(AuditChainVerifier.MAX_REPORTED_PROBLEMS);
+  }
+
+  // --- redactions (issue #952) ---------------------------------------------------------------
+
+  private static final UUID REDACTION = UUID.fromString("0190a1b2-c3d4-7e5f-8a9b-0000000000aa");
+
+  /** The row with pseudonymised content, chain columns untouched, marked with the redaction. */
+  private static AuditChainRow redacted(AuditChainRow row, UUID redactionId) {
+    return new AuditChainRow(
+        row.seq(),
+        row.prevHash(),
+        row.rowHash(),
+        row.id(),
+        row.scope(),
+        row.documentId(),
+        row.eventType(),
+        null,
+        "{\"userId\": \"erased-user:x\"}",
+        row.createdAtMicros(),
+        redactionId);
+  }
+
+  private static Report verifyRedacted(
+      List<AuditChainRow> rows, List<AuditChainRedaction> redactions) {
+    AuditChainVerifier verifier = new AuditChainVerifier(List.of(), Set.of(), redactions);
+    rows.forEach(verifier::accept);
+    return verifier.finish(headOf(rows), 0, rows.size());
+  }
+
+  /** A chain of 3 rows plus the redaction event at seq 4 listing rows 2 with the given hash. */
+  private static List<AuditChainRow> chainWithRedactionEvent() {
+    List<AuditChainRow> rows = new ArrayList<>(chain(3));
+    rows.add(sealed(4, rows.get(2).rowHash(), "audit.chain.redacted", "{}"));
+    return rows;
+  }
+
+  @Test
+  @DisplayName("a redacted row listed with its exact hash by a later redaction event passes")
+  void redactedRowWithMatchingEventPasses() {
+    List<AuditChainRow> rows = chainWithRedactionEvent();
+    AuditChainRedaction event =
+        new AuditChainRedaction(4L, REDACTION, Map.of(2L, rows.get(1).rowHash()), 0, false);
+    rows.set(1, redacted(rows.get(1), REDACTION));
+
+    Report report = verifyRedacted(rows, List.of(event));
+
+    assertThat(report.problems()).isEmpty();
+    assertThat(report.intact()).isTrue();
+  }
+
+  @Test
+  @DisplayName("a redacted row without a redaction event is reported")
+  void redactedRowWithoutEventFails() {
+    List<AuditChainRow> rows = chainWithRedactionEvent();
+    rows.set(1, redacted(rows.get(1), REDACTION));
+
+    Report report = verifyRedacted(rows, List.of());
+
+    assertThat(report.problems()).containsExactly(new Problem(ProblemKind.BAD_REDACTION, 2, 2));
+  }
+
+  @Test
+  @DisplayName("a content change without the redaction marker stays a content mismatch")
+  void unmarkedChangeIsContentMismatch() {
+    List<AuditChainRow> rows = chainWithRedactionEvent();
+    AuditChainRedaction event =
+        new AuditChainRedaction(4L, REDACTION, Map.of(2L, rows.get(1).rowHash()), 0, false);
+    rows.set(1, redacted(rows.get(1), null));
+
+    Report report = verifyRedacted(rows, List.of(event));
+
+    assertThat(report.problems()).containsExactly(new Problem(ProblemKind.CONTENT_MISMATCH, 2, 2));
+  }
+
+  @Test
+  @DisplayName("a redaction event listing a different row hash does not vouch for the row")
+  void mismatchedListedHashFails() {
+    List<AuditChainRow> rows = chainWithRedactionEvent();
+    AuditChainRedaction event =
+        new AuditChainRedaction(4L, REDACTION, Map.of(2L, "f".repeat(64)), 0, false);
+    rows.set(1, redacted(rows.get(1), REDACTION));
+
+    Report report = verifyRedacted(rows, List.of(event));
+
+    assertThat(report.problems()).containsExactly(new Problem(ProblemKind.BAD_REDACTION, 2, 2));
+  }
+
+  @Test
+  @DisplayName("a redaction event sealed before the row cannot vouch for it")
+  void redactionEventMustFollowTheRow() {
+    List<AuditChainRow> rows = chainWithRedactionEvent();
+    AuditChainRedaction event =
+        new AuditChainRedaction(1L, REDACTION, Map.of(2L, rows.get(1).rowHash()), 0, false);
+    rows.set(1, redacted(rows.get(1), REDACTION));
+
+    Report report = verifyRedacted(rows, List.of(event));
+
+    assertThat(report.problems()).containsExactly(new Problem(ProblemKind.BAD_REDACTION, 2, 2));
+  }
+
+  @Test
+  @DisplayName("linkage across a redacted row is still checked")
+  void linkageAcrossRedactedRowIsChecked() {
+    List<AuditChainRow> rows = chainWithRedactionEvent();
+    // A forged row hash, listed by the event, no longer links to the following row.
+    String forged = "e".repeat(64);
+    AuditChainRow original = rows.get(1);
+    AuditChainRow forgedRow =
+        new AuditChainRow(
+            original.seq(),
+            original.prevHash(),
+            forged,
+            original.id(),
+            original.scope(),
+            original.documentId(),
+            original.eventType(),
+            null,
+            "{}",
+            original.createdAtMicros(),
+            REDACTION);
+    AuditChainRedaction event =
+        new AuditChainRedaction(4L, REDACTION, Map.of(2L, forged), 0, false);
+    rows.set(1, forgedRow);
+
+    Report report = verifyRedacted(rows, List.of(event));
+
+    assertThat(report.problems()).containsExactly(new Problem(ProblemKind.LINK_MISMATCH, 3, 3));
+  }
+
+  @Test
+  @DisplayName("a row redacted before sealing verifies by content when the event declares it")
+  void pendingRedactedRowVerifiesByContent() {
+    List<AuditChainRow> rows = new ArrayList<>(chain(1));
+    AuditChainRow pending = sealed(2, rows.get(0).rowHash(), "event.2", "{\"userId\": \"x\"}");
+    rows.add(
+        new AuditChainRow(
+            pending.seq(),
+            pending.prevHash(),
+            pending.rowHash(),
+            pending.id(),
+            pending.scope(),
+            pending.documentId(),
+            pending.eventType(),
+            pending.actorId(),
+            pending.detail(),
+            pending.createdAtMicros(),
+            REDACTION));
+    rows.add(sealed(3, rows.get(1).rowHash(), "audit.chain.redacted", "{}"));
+    AuditChainRedaction declared = new AuditChainRedaction(3L, REDACTION, Map.of(), 1, false);
+    AuditChainRedaction undeclared =
+        new AuditChainRedaction(3L, REDACTION, Map.of(9L, "x"), 0, false);
+
+    assertThat(verifyRedacted(rows, List.of(declared)).problems()).isEmpty();
+    assertThat(verifyRedacted(rows, List.of(undeclared)).problems())
+        .containsExactly(new Problem(ProblemKind.BAD_REDACTION, 2, 2));
+  }
+
+  @Test
+  @DisplayName("malformed and duplicate redaction events are reported")
+  void malformedAndDuplicateRedactionEvents() {
+    List<AuditChainRow> rows = chainWithRedactionEvent();
+    AuditChainRedaction malformed = new AuditChainRedaction(4L, null, Map.of(), 0, true);
+    AuditChainRedaction first = new AuditChainRedaction(4L, REDACTION, Map.of(1L, "a"), 0, false);
+    AuditChainRedaction second = new AuditChainRedaction(5L, REDACTION, Map.of(1L, "a"), 0, false);
+
+    Report report = verifyRedacted(rows, List.of(malformed, first, second));
+
+    assertThat(report.problems())
+        .containsExactly(
+            new Problem(ProblemKind.BAD_REDACTION, 4, 4),
+            new Problem(ProblemKind.BAD_REDACTION, 5, 5));
   }
 }

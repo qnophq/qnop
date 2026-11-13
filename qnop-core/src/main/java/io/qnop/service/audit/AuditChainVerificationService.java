@@ -214,7 +214,8 @@ public class AuditChainVerificationService {
     AuditChainVerifier verifier =
         new AuditChainVerifier(
             chain.findTombstones().stream().map(AuditChainTombstone::parse).toList(),
-            chain.findExplainedDocumentIds());
+            chain.findExplainedDocumentIds(),
+            chain.findRedactions().stream().map(AuditChainRedaction::parse).toList());
     long after = 0;
     while (true) {
       List<AuditChainRow> batch = chain.findSealedAfter(after, BATCH_SIZE);

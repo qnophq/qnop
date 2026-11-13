@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Walks the audit hash chain in order and reports every place it does not hold (issue #928,
@@ -44,6 +45,14 @@ import java.util.Set;
  * <p>Tombstones are checked too: a malformed one is a {@link ProblemKind#BAD_PRUNE_RANGE} (its
  * ranges bridge nothing), and every document it names must have its deletion explained by a {@code
  * review.deleted}/{@code review.purged} event — otherwise {@link ProblemKind#UNEXPLAINED_PRUNE}.
+ *
+ * <p>Redacted rows (a user erasure pseudonymised them, issue #952) are not recomputed — their
+ * content changed on purpose. Such a row is accepted only when the {@code audit.chain.redacted}
+ * event of its redaction, sealed after it, lists its position with exactly its stored hash; or, for
+ * a row redacted before it was sealed, when that event declares pending rows and the row's content
+ * reproduces its hash. Anything else — no such event, a different hash, a malformed or duplicate
+ * redaction event — is a {@link ProblemKind#BAD_REDACTION}. The link check across a redacted row is
+ * unchanged, so a redaction can never splice or reorder the chain.
  *
  * <p>After a mismatch the walk continues from the stored hash, so one altered row is reported once
  * rather than as a cascade of every later link.
@@ -71,6 +80,11 @@ public final class AuditChainVerifier {
     ROW_COUNT_MISMATCH,
     /** A tombstone names a document whose deletion no review-deleted/purged event explains. */
     UNEXPLAINED_PRUNE,
+    /**
+     * A redacted row no redaction event vouches for, or a malformed/duplicate redaction event
+     * (issue #952).
+     */
+    BAD_REDACTION,
     /** The verification itself failed before reaching a verdict. */
     VERIFICATION_ERROR
   }
@@ -99,6 +113,7 @@ public final class AuditChainVerifier {
   }
 
   private final Map<Long, AuditChainPrunedRange> rangesByStart = new HashMap<>();
+  private final Map<UUID, AuditChainRedaction> redactionsById = new HashMap<>();
   private final List<Problem> problems = new ArrayList<>();
   private int problemCount;
   private long expectedSeq = 1;
@@ -121,6 +136,25 @@ public final class AuditChainVerifier {
    */
   public AuditChainVerifier(
       Collection<AuditChainTombstone> tombstones, Set<String> explainedDocumentIds) {
+    this(tombstones, explainedDocumentIds, List.of());
+  }
+
+  /**
+   * @param redactions every parsed {@code audit.chain.redacted} event, in chain order. A malformed
+   *     one, or a second one for an already-seen redaction id, is reported and vouches for nothing.
+   */
+  public AuditChainVerifier(
+      Collection<AuditChainTombstone> tombstones,
+      Set<String> explainedDocumentIds,
+      Collection<AuditChainRedaction> redactions) {
+    for (AuditChainRedaction redaction : redactions) {
+      long at = redaction.recordedSeq() == null ? 0 : redaction.recordedSeq();
+      if (redaction.malformed() || redactionsById.containsKey(redaction.redactionId())) {
+        report(ProblemKind.BAD_REDACTION, at, at);
+        continue;
+      }
+      redactionsById.put(redaction.redactionId(), redaction);
+    }
     for (AuditChainTombstone tombstone : tombstones) {
       long at = tombstone.recordedSeq() == null ? 0 : tombstone.recordedSeq();
       if (tombstone.malformed()) {
@@ -158,8 +192,11 @@ public final class AuditChainVerifier {
     if (!linkUnknown && !expectedPrev.equals(row.prevHash())) {
       report(ProblemKind.LINK_MISMATCH, row.seq(), row.seq());
     }
-    String recomputed = AuditChainHasher.linkHash(row.prevHash(), AuditChainHasher.canonical(row));
-    if (!recomputed.equals(row.rowHash())) {
+    if (row.redactionId() != null) {
+      if (!redactionVouchesFor(row)) {
+        report(ProblemKind.BAD_REDACTION, row.seq(), row.seq());
+      }
+    } else if (!contentMatches(row)) {
       report(ProblemKind.CONTENT_MISMATCH, row.seq(), row.seq());
     }
     expectedPrev = row.rowHash();
@@ -190,6 +227,30 @@ public final class AuditChainVerifier {
     }
     return new Report(
         problemCount == 0, rowsChecked, head.lastSeq(), head.lastHash(), problems, problemCount);
+  }
+
+  private static boolean contentMatches(AuditChainRow row) {
+    String recomputed = AuditChainHasher.linkHash(row.prevHash(), AuditChainHasher.canonical(row));
+    return recomputed.equals(row.rowHash());
+  }
+
+  /**
+   * Whether the row's redaction event, sealed after the row, lists it with its exact stored hash —
+   * or, for a row redacted before it was sealed, declares pending rows and the row's (redacted)
+   * content reproduces its hash.
+   */
+  private boolean redactionVouchesFor(AuditChainRow row) {
+    AuditChainRedaction redaction = redactionsById.get(row.redactionId());
+    if (redaction == null
+        || redaction.recordedSeq() == null
+        || redaction.recordedSeq() <= row.seq()) {
+      return false;
+    }
+    String listed = redaction.rows().get(row.seq());
+    if (listed != null) {
+      return listed.equals(row.rowHash());
+    }
+    return redaction.pendingRows() > 0 && contentMatches(row);
   }
 
   /** Advances over missing positions up to (excluding) {@code nextSeq} using tombstone ranges. */

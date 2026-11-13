@@ -43,6 +43,12 @@ public class AuditChainRepository {
   /** The tombstone event type the prune trigger writes (keep in sync with 0040-audit-chain.sql). */
   public static final String PRUNED_EVENT_TYPE = "audit.chain.pruned";
 
+  /**
+   * The event type a user erasure records its redaction under (keep in sync with
+   * 0042-audit-redaction.sql, issue #952).
+   */
+  public static final String REDACTED_EVENT_TYPE = "audit.chain.redacted";
+
   /** Event types that explain a document deletion (ReviewDeletionService, ReviewPurgeService). */
   static final String REVIEW_DELETED_EVENT_TYPE = "review.deleted";
 
@@ -58,7 +64,7 @@ public class AuditChainRepository {
                 """
                 SELECT chain_seq, prev_hash, row_hash, id, scope, document_id, event_type,
                        actor_id, detail::text,
-                       (extract(epoch FROM created_at) * 1000000)::bigint
+                       (extract(epoch FROM created_at) * 1000000)::bigint, redaction_id
                 FROM audit_event
                 WHERE chain_seq > :after
                 ORDER BY chain_seq
@@ -81,7 +87,8 @@ public class AuditChainRepository {
                     (String) r[6],
                     (UUID) r[7],
                     (String) r[8],
-                    ((Number) r[9]).longValue()))
+                    ((Number) r[9]).longValue(),
+                    (UUID) r[10]))
         .toList();
   }
 
@@ -90,6 +97,18 @@ public class AuditChainRepository {
    * tombstone is reported rather than aborting the walk.
    */
   public List<AuditChainTombstoneRow> findTombstones() {
+    return findSystemEvents(PRUNED_EVENT_TYPE);
+  }
+
+  /**
+   * Every {@code audit.chain.redacted} event (issue #952) as raw detail text, in chain order —
+   * parsed defensively by the verifier like the tombstones.
+   */
+  public List<AuditChainTombstoneRow> findRedactions() {
+    return findSystemEvents(REDACTED_EVENT_TYPE);
+  }
+
+  private List<AuditChainTombstoneRow> findSystemEvents(String eventType) {
     List<?> raw =
         entityManager
             .createNativeQuery(
@@ -99,7 +118,7 @@ public class AuditChainRepository {
                 WHERE scope = 'SYSTEM' AND event_type = :type
                 ORDER BY chain_seq
                 """)
-            .setParameter("type", PRUNED_EVENT_TYPE)
+            .setParameter("type", eventType)
             .getResultList();
     return raw.stream()
         .map(Object[].class::cast)
