@@ -71,7 +71,6 @@ public class ConfigController implements ServerConfigApi {
   /** Static Community fallback until the upload limit is operator-configurable (#16). */
   private static final int DEFAULT_MAX_DOCUMENT_SIZE_MB = 50;
 
-  /** Reported when no build manifest is available (e.g. when running from exploded classes). */
   private final OidcProviderService oidcProviders;
 
   private final ApplicationSettingsService settings;

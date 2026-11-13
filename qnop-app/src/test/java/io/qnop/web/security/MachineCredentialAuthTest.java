@@ -34,6 +34,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -46,13 +47,17 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
  */
 class MachineCredentialAuthTest {
 
+  private static final String SCRAPE_TOKEN = "scrape-token-0123456789-0123456789-abcdef";
+  private static final MetricsScrapeAccess NO_SCRAPE_TOKEN =
+      new MetricsScrapeAccess(new MetricsScrapeProperties(null), new MockEnvironment());
+
   private final JwtDecoder local = mock(JwtDecoder.class);
   private final TokenRevocationService revocation = mock(TokenRevocationService.class);
   private final RoleJwtAuthenticationConverter converter = new RoleJwtAuthenticationConverter();
 
   private DelegatingJwtDecoder decoder(BearerCredentialAuthenticator... authenticators) {
     when(local.decode("svc-key")).thenThrow(new BadJwtException("not a qnop token"));
-    return new DelegatingJwtDecoder(local, revocation, List.of(authenticators));
+    return new DelegatingJwtDecoder(local, revocation, List.of(authenticators), NO_SCRAPE_TOKEN);
   }
 
   /** The test-only fake contributor. */
@@ -131,7 +136,7 @@ class MachineCredentialAuthTest {
 
     assertThatThrownBy(
             () ->
-                new DelegatingJwtDecoder(local, revocation, List.of(authenticator))
+                new DelegatingJwtDecoder(local, revocation, List.of(authenticator), NO_SCRAPE_TOKEN)
                     .decode("expired-user-token"))
         .isInstanceOf(org.springframework.security.oauth2.jwt.JwtValidationException.class);
     verifyNoInteractions(authenticator);
@@ -150,8 +155,26 @@ class MachineCredentialAuthTest {
     when(revocation.isRevoked("j1", user.getSubject(), user.getIssuedAt())).thenReturn(false);
     BearerCredentialAuthenticator authenticator = mock(BearerCredentialAuthenticator.class);
 
-    new DelegatingJwtDecoder(local, revocation, List.of(authenticator)).decode("user-token");
+    new DelegatingJwtDecoder(local, revocation, List.of(authenticator), NO_SCRAPE_TOKEN)
+        .decode("user-token");
 
+    verifyNoInteractions(authenticator);
+  }
+
+  @Test
+  void theScrapeTokenNeverReachesTheAuthenticators() {
+    // Sent to anything but the scrape itself (a HEAD, a mistyped path), the scrape token lands
+    // here as an unknown bearer credential. It is ours; add-on code must not see it (issue #962).
+    when(local.decode(SCRAPE_TOKEN)).thenThrow(new BadJwtException("not a qnop token"));
+    BearerCredentialAuthenticator authenticator = mock(BearerCredentialAuthenticator.class);
+    MetricsScrapeAccess scrapeAccess =
+        new MetricsScrapeAccess(new MetricsScrapeProperties(SCRAPE_TOKEN), new MockEnvironment());
+
+    assertThatThrownBy(
+            () ->
+                new DelegatingJwtDecoder(local, revocation, List.of(authenticator), scrapeAccess)
+                    .decode(SCRAPE_TOKEN))
+        .isInstanceOf(BadJwtException.class);
     verifyNoInteractions(authenticator);
   }
 }

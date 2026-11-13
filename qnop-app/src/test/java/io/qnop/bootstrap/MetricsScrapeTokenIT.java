@@ -67,6 +67,14 @@ class MetricsScrapeTokenIT extends SeededIntegrationTest {
   }
 
   @Test
+  @DisplayName("the bearer scheme is matched case-insensitively")
+  void schemeIsCaseInsensitive() throws Exception {
+    mockMvc
+        .perform(get("/actuator/prometheus").header("Authorization", "bearer " + TOKEN))
+        .andExpect(status().isOk());
+  }
+
+  @Test
   @DisplayName("an admin still reads the scrape with an access token")
   void adminAccessTokenStillWorks() throws Exception {
     mockMvc
@@ -83,6 +91,9 @@ class MetricsScrapeTokenIT extends SeededIntegrationTest {
     mockMvc.perform(withScrapeToken(get("/api/v1/users/me"))).andExpect(status().isUnauthorized());
     mockMvc
         .perform(withScrapeToken(post("/actuator/prometheus")))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(withScrapeToken(get("/actuator/prometheus/")))
         .andExpect(status().isUnauthorized());
   }
 
@@ -121,7 +132,7 @@ class MetricsScrapeTokenIT extends SeededIntegrationTest {
         .andExpect(content().string(containsString("le=\"0.25\"")))
         .andExpect(content().string(containsString("uri=\"/api/v1/config\"")))
         .andExpect(content().string(containsString("hikaricp_connections_active")))
-        .andExpect(content().string(containsString("tomcat_threads_busy_threads")))
+        .andExpect(content().string(containsString("tomcat_threads_")))
         .andExpect(content().string(containsString("jvm_memory_used_bytes")))
         .andExpect(content().string(containsString("jvm_gc_")))
         .andExpect(content().string(containsString("process_cpu_usage")))

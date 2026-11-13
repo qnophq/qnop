@@ -60,8 +60,27 @@ class CachedSnapshotTest {
   }
 
   @Test
-  @DisplayName("does not cache a failed load: the next read tries again")
-  void retriesAfterAFailedLoad() {
+  @DisplayName("remembers a failed load: every reader fails, the loader runs once")
+  void sharesAFailedLoad() {
+    CachedSnapshot<Integer> snapshot =
+        new CachedSnapshot<>(
+            () -> {
+              loads.incrementAndGet();
+              throw new IllegalStateException("database unavailable");
+            },
+            MAX_AGE,
+            clock);
+
+    for (int reader = 0; reader < 4; reader++) {
+      assertThatThrownBy(snapshot::get).isInstanceOf(IllegalStateException.class);
+    }
+
+    assertThat(loads).hasValue(1);
+  }
+
+  @Test
+  @DisplayName("tries again once a remembered failure has expired, and recovers")
+  void recoversAfterAFailedLoad() {
     CachedSnapshot<Integer> snapshot =
         new CachedSnapshot<>(
             () -> {
@@ -72,8 +91,9 @@ class CachedSnapshotTest {
             },
             MAX_AGE,
             clock);
-
     assertThatThrownBy(snapshot::get).isInstanceOf(IllegalStateException.class);
+
+    clock.advance(MAX_AGE);
 
     assertThat(snapshot.get()).isEqualTo(2);
   }

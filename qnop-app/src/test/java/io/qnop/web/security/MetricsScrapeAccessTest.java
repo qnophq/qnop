@@ -88,6 +88,15 @@ class MetricsScrapeAccessTest {
     }
 
     @Test
+    @DisplayName("recognises its own token, for callers that must keep it away from add-ons")
+    void recognisesItsToken() {
+      assertThat(access.isScrapeToken(TOKEN)).isTrue();
+      assertThat(access.isScrapeToken(TOKEN + "x")).isFalse();
+      assertThat(access.isScrapeToken(null)).isFalse();
+      assertThat(access(null, new MockEnvironment()).isScrapeToken(TOKEN)).isFalse();
+    }
+
+    @Test
     @DisplayName("refuses the token under another scheme")
     void refusesOtherSchemes() {
       MockHttpServletRequest request = scrape(APP_PORT);

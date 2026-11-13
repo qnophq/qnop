@@ -21,36 +21,84 @@
 package io.qnop.web.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Configuration;
 
-/** The scrape-token setting (issue #962). */
+/**
+ * The scrape-token setting (issue #962). The start-up cases bind through Spring, because "refuses
+ * to start" is a claim about the application, not about the record.
+ */
 class MetricsScrapePropertiesTest {
 
-  private static boolean isValid(MetricsScrapeProperties properties) {
-    try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
-      Validator validator = factory.getValidator();
-      return validator.validate(properties).isEmpty();
-    }
-  }
+  private static final String SHORT = "a".repeat(31);
+  private static final String LONG_ENOUGH = "a".repeat(32);
+
+  private final ApplicationContextRunner runner =
+      new ApplicationContextRunner().withUserConfiguration(TestConfig.class);
+
+  @Configuration
+  @EnableConfigurationProperties(MetricsScrapeProperties.class)
+  static class TestConfig {}
 
   @Test
-  @DisplayName("treats a blank token as unset, the way an empty environment variable binds")
+  @DisplayName("starts with the token unset or blank, and treats both as off")
   void blankMeansOff() {
-    assertThat(new MetricsScrapeProperties("").scrapeToken()).isNull();
-    assertThat(new MetricsScrapeProperties("   ").scrapeToken()).isNull();
-    assertThat(isValid(new MetricsScrapeProperties(""))).isTrue();
-    assertThat(isValid(new MetricsScrapeProperties(null))).isTrue();
+    runner.run(
+        context ->
+            assertThat(context.getBean(MetricsScrapeProperties.class).scrapeToken()).isNull());
+    runner
+        .withPropertyValues("qnop.metrics.scrape-token=")
+        .run(
+            context ->
+                assertThat(context.getBean(MetricsScrapeProperties.class).scrapeToken()).isNull());
   }
 
   @Test
-  @DisplayName("rejects a token shorter than 32 characters")
-  void rejectsAShortToken() {
-    assertThat(isValid(new MetricsScrapeProperties("a".repeat(31)))).isFalse();
-    assertThat(isValid(new MetricsScrapeProperties("a".repeat(32)))).isTrue();
+  @DisplayName("starts with a token of 32 characters")
+  void acceptsALongEnoughToken() {
+    runner
+        .withPropertyValues("qnop.metrics.scrape-token=" + LONG_ENOUGH)
+        .run(
+            context ->
+                assertThat(context.getBean(MetricsScrapeProperties.class).scrapeToken())
+                    .isEqualTo(LONG_ENOUGH));
+  }
+
+  @Test
+  @DisplayName("refuses to start with a token shorter than 32 characters")
+  void refusesAShortToken() {
+    runner
+        .withPropertyValues("qnop.metrics.scrape-token=" + SHORT)
+        .run(
+            context -> {
+              assertThat(context).hasFailed();
+              // Boot's failure report prints what the exception chain carries; the token must
+              // not be in it.
+              for (Throwable t = context.getStartupFailure(); t != null; t = t.getCause()) {
+                assertThat(String.valueOf(t.getMessage())).doesNotContain(SHORT);
+              }
+            });
+  }
+
+  @Test
+  @DisplayName("refuses a token containing whitespace, which could never match a request")
+  void refusesWhitespace() {
+    assertThatThrownBy(() -> new MetricsScrapeProperties(LONG_ENOUGH + "\n"))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> new MetricsScrapeProperties("a".repeat(20) + " " + "a".repeat(20)))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  @DisplayName("never repeats the rejected token in its error message")
+  void errorDoesNotRevealTheToken() {
+    assertThatThrownBy(() -> new MetricsScrapeProperties(SHORT))
+        .hasMessageNotContaining(SHORT)
+        .hasMessageContaining("qnop.metrics.scrape-token");
   }
 }

@@ -34,8 +34,10 @@ import java.util.function.Supplier;
  * sixteen. Reading through this class costs one load per {@code maxAge}, however many gauges share
  * it and however often they are scraped.
  *
- * <p>A load that throws is not cached: the exception reaches the gauge, which reports {@code NaN},
- * and the next read tries again.
+ * <p>A failed load is remembered for the same time and rethrown to every reader, who reports {@code
+ * NaN}. Without that, each gauge would retry on its own: with the database down, every one of them
+ * would wait out the connection timeout in turn, and a single scrape would hold a request thread
+ * for minutes.
  *
  * @param <T> the snapshot type
  */
@@ -46,6 +48,7 @@ final class CachedSnapshot<T> {
   private final Clock clock;
 
   private T value;
+  private RuntimeException failure;
   private Instant loadedAt;
 
   CachedSnapshot(Supplier<T> loader, Duration maxAge, Clock clock) {
@@ -57,9 +60,23 @@ final class CachedSnapshot<T> {
   synchronized T get() {
     Instant now = clock.instant();
     if (loadedAt == null || !now.isBefore(loadedAt.plus(maxAge))) {
-      value = loader.get();
-      loadedAt = now;
+      load();
+      // Stamped after the load: a slow failure must not have expired by the time it returns.
+      loadedAt = clock.instant();
+    }
+    if (failure != null) {
+      throw failure;
     }
     return value;
+  }
+
+  private void load() {
+    try {
+      value = loader.get();
+      failure = null;
+    } catch (RuntimeException e) {
+      value = null;
+      failure = e;
+    }
   }
 }

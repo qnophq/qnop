@@ -80,6 +80,18 @@ class JobQueueMetricsTest {
     assertThat(gauge("pending")).isEqualTo(9.0);
   }
 
+  @Test
+  @DisplayName("reports NaN, not a stale or zero count, when the queue cannot be read")
+  void unreadableQueueIsNotANumber() {
+    when(jobs.queueStats()).thenThrow(new IllegalStateException("database unavailable"));
+
+    new JobQueueMetrics(jobs, clock).bindTo(registry);
+
+    assertThat(gauge("pending")).isNaN();
+    assertThat(gauge("failed")).isNaN();
+    verify(jobs, times(1)).queueStats();
+  }
+
   private double gauge(String state) {
     Gauge gauge = registry.find("qnop.jobs").tag("state", state).gauge();
     assertThat(gauge).as("gauge qnop.jobs{state=%s}", state).isNotNull();

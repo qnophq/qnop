@@ -50,13 +50,15 @@ scrape of an idle instance had 587 series, 92 of them timing every Spring Securi
 
 Gauges derived from the database read a **snapshot that is loaded once and shared**, at most
 fifteen seconds old (`CachedSnapshot`). A scrape therefore issues a bounded number of statements
-however many gauges exist. A failed load is not cached; the gauge reports `NaN` and the next read
-tries again. The health indicator keeps reading live: a probe wants the truth now, not fifteen
+however many gauges exist. A failed load is remembered for the same fifteen seconds and every
+gauge reports `NaN`: without that, each gauge would retry on its own and, with the database down,
+wait out the connection timeout in turn, holding a request thread for minutes per scrape. The health indicator keeps reading live: a probe wants the truth now, not fifteen
 seconds ago.
 
 Such gauges are **the same on every instance**, because they describe the database, not the pod.
 Dashboards and alerts aggregate them with `max`, and per-instance counters and timers with `sum`.
-The catalogue in the docs states which is which for every meter.
+The metric catalogue (`docs/OBSERVABILITY.md`, which arrives with the dashboard in a later part of
+issue #962) states which is which for every meter.
 
 ### Framework meters that are switched off
 
@@ -77,8 +79,9 @@ Unchanged by default: `ROLE_ADMIN`. Two opt-in ways for a machine, both off unle
   there needs no credential. The port must not be published through the ingress: reaching it is the
   access control. This is what a Kubernetes `ServiceMonitor` or a Prometheus on the same compose
   network expects, and it keeps probe and scrape traffic off the public listener.
-- **A scrape token** (`QNOP_METRICS_SCRAPE_TOKEN`, at least 32 characters, or the instance refuses
-  to start). A static bearer token for deployments that can only reach the application port.
+- **A scrape token** (`QNOP_METRICS_SCRAPE_TOKEN`, at least 32 characters and no whitespace, or
+  the instance refuses to start). A static bearer token for deployments that can only reach the
+  application port. The start-up error names the rule and never repeats the value.
 
 Both are implemented as one request matcher, `MetricsScrapeAccess`, on a security chain of its own
 ahead of the API chain. It matches `GET /actuator/prometheus` exactly. Three properties make it
@@ -88,6 +91,9 @@ safe to reason about:
   rule anywhere opens with it; health details stay hidden from the token.
 - **It fails closed.** Anything the matcher does not claim falls through to the existing chain,
   where the scrape needs `ROLE_ADMIN`. A wrong token is rejected there as an invalid bearer token.
+  The right token sent to the wrong place (a `HEAD`, a trailing slash, a mistyped metrics path)
+  is rejected the same way, and before the machine-credential authenticators of ADR-0060 are
+  consulted: add-on code never sees it.
 - **The port is the socket's.** The management port is compared with the local port the connection
   arrived on, never with the `Host` header or a forwarded port, which the caller chooses. The token
   is compared as SHA-256 digests in constant time.

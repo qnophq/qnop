@@ -67,11 +67,14 @@ public class DelegatingJwtDecoder implements JwtDecoder {
   private final JwtDecoder localDecoder;
   private final TokenRevocationService tokenRevocationService;
   private final List<BearerCredentialAuthenticator> machineAuthenticators;
+  private final MetricsScrapeAccess scrapeAccess;
 
   public DelegatingJwtDecoder(
       @Qualifier("localJwtDecoder") JwtDecoder localDecoder,
       TokenRevocationService tokenRevocationService,
-      List<BearerCredentialAuthenticator> machineAuthenticators) {
+      List<BearerCredentialAuthenticator> machineAuthenticators,
+      MetricsScrapeAccess scrapeAccess) {
+    this.scrapeAccess = scrapeAccess;
     this.localDecoder = localDecoder;
     this.tokenRevocationService = tokenRevocationService;
     this.machineAuthenticators = List.copyOf(machineAuthenticators);
@@ -88,6 +91,12 @@ public class DelegatingJwtDecoder implements JwtDecoder {
       // an expired token still carries subject, role and a valid HMAC).
       throw oursButInvalid;
     } catch (JwtException notAUserToken) {
+      // The scrape token arrives here whenever it is sent to anything but the scrape itself: a
+      // HEAD, a trailing slash, a mistyped metrics path. It is ours, it authenticates nobody,
+      // and add-on code has no business seeing it (issue #962).
+      if (scrapeAccess.isScrapeToken(token)) {
+        throw notAUserToken;
+      }
       // Not one of ours — offer it to the contributed machine authenticators (#686). Anything
       // unclaimed keeps the original rejection, so the failure shape never changes.
       Jwt machine = authenticateMachine(token);

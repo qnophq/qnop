@@ -20,9 +20,7 @@
  */
 package io.qnop.web.security;
 
-import jakarta.validation.constraints.Size;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.validation.annotation.Validated;
 
 /**
  * How an unattended Prometheus may read {@code /actuator/prometheus} (issue #962), bound from
@@ -30,23 +28,35 @@ import org.springframework.validation.annotation.Validated;
  *
  * <p>An admin access token is short-lived and rotates, so it cannot drive a scrape job. This token
  * is the long-lived alternative: a static bearer credential that opens the scrape endpoint and
- * nothing else. It is off unless set; a value shorter than {@value #MIN_TOKEN_LENGTH} characters
- * refuses to start rather than run with a guessable credential.
+ * nothing else. It is off unless set. A value that is shorter than {@value #MIN_TOKEN_LENGTH}
+ * characters or contains whitespace refuses to start: the first is guessable, the second (a
+ * trailing newline from a secrets file, say) could never match what a scraper sends.
+ *
+ * <p>The checks live in the constructor rather than in bean-validation annotations on purpose.
+ * Boot's failure report for a rejected constraint prints the rejected value, which here would be
+ * most of a credential; these messages name the rule and nothing else.
  *
  * @param scrapeToken the bearer token a scraper presents; blank means the feature is off
  */
-@Validated
 @ConfigurationProperties(prefix = "qnop.metrics")
-public record MetricsScrapeProperties(
-    @Size(
-            min = MetricsScrapeProperties.MIN_TOKEN_LENGTH,
-            message = "qnop.metrics.scrape-token must be at least 32 characters when set")
-        String scrapeToken) {
+public record MetricsScrapeProperties(String scrapeToken) {
 
   static final int MIN_TOKEN_LENGTH = 32;
 
   public MetricsScrapeProperties {
     // Blank and absent mean the same thing: an unset environment variable binds as "".
     scrapeToken = scrapeToken == null || scrapeToken.isBlank() ? null : scrapeToken;
+    if (scrapeToken != null) {
+      if (scrapeToken.chars().anyMatch(Character::isWhitespace)) {
+        throw new IllegalArgumentException(
+            "qnop.metrics.scrape-token must not contain whitespace (check for a trailing newline)");
+      }
+      if (scrapeToken.length() < MIN_TOKEN_LENGTH) {
+        throw new IllegalArgumentException(
+            "qnop.metrics.scrape-token must be at least "
+                + MIN_TOKEN_LENGTH
+                + " characters when set");
+      }
+    }
   }
 }

@@ -68,8 +68,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * are public; refresh/logout are public but ride on the HttpOnly refresh cookie, so they are
  * CSRF-protected via a double-submit cookie token (the rest of the API is token-based and exempt).
  * Everything else requires authentication. Security headers (a strict CSP for a JSON API,
- * frame-deny, referrer policy, HSTS) are applied to every response. CORS is driven by {@link
- * QnopProperties} so the SPA origin is configurable per environment.
+ * frame-deny, referrer policy, HSTS) are applied to every response of this chain; the scrape chain
+ * ({@link #metricsScrapeSecurityChain}) serves plain-text metrics to a machine and keeps Spring
+ * Security's default headers. CORS is driven by {@link QnopProperties} so the SPA origin is
+ * configurable per environment.
  */
 @Configuration
 @EnableWebSecurity

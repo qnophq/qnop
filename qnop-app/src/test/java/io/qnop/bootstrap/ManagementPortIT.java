@@ -80,7 +80,25 @@ class ManagementPortIT extends AbstractIntegrationTest {
   void applicationPortStaysClosed() throws Exception {
     HttpResponse<String> response = get(port("local.server.port"), "/actuator/prometheus");
 
-    assertThat(response.statusCode()).isNotEqualTo(200);
+    // Actuator has left this port, but the answer is still decided by security first: an
+    // anonymous caller is told to authenticate, not which paths exist.
+    assertThat(response.statusCode()).isEqualTo(401);
     assertThat(response.body()).doesNotContain("qnop_jobs");
+  }
+
+  @Test
+  @DisplayName("the management port opens the scrape only: nothing else is served without a login")
+  void managementPortOpensNothingElse() throws Exception {
+    int management = port("local.management.port");
+
+    assertThat(get(management, "/actuator/prometheus/").statusCode()).isEqualTo(401);
+    assertThat(get(management, "/actuator/env").statusCode()).isEqualTo(401);
+    assertThat(get(management, "/api/v1/admin/users").statusCode()).isEqualTo(401);
+    HttpRequest post =
+        HttpRequest.newBuilder(
+                URI.create("http://localhost:" + management + "/actuator/prometheus"))
+            .POST(HttpRequest.BodyPublishers.noBody())
+            .build();
+    assertThat(http.send(post, HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(401);
   }
 }

@@ -126,7 +126,9 @@ docker compose exec qnop sh -c 'cat /tmp/qnop-bootstrap-*/admin-password.txt'
 
 By default the scrape needs an ADMIN access token, which is short-lived and so of little use to an unattended Prometheus. Choose one of two ways to let a scraper in — both are off until you set them:
 
-**A management port (preferred).** Set `QNOP_MANAGEMENT_PORT` (for example `9090`). Actuator then listens on that port instead of the application port, and a scrape arriving there needs no credential. **Do not publish this port**: keep it on the internal network, reachable by Prometheus and your orchestrator's probes only. Point the probes at the new port too, because `/actuator/health` moves with it.
+**A management port (preferred).** Set `QNOP_MANAGEMENT_PORT` (for example `8081`). Actuator then listens on that port instead of the application port, and a scrape arriving there needs no credential. **Do not publish this port**: keep it on the internal network, reachable by Prometheus and your orchestrator's probes only.
+
+`/actuator/health` moves with it, so **every health check must follow**, or the instance is reported unhealthy. `deploy/docker-compose.yml` does this by itself. The other templates (`deploy/aws-demo`, `deploy/coolify`, `deploy/portainer-templates.json`) and your own load-balancer or Kubernetes probes hard-code port 8080 and need the new port.
 
 ```yaml
 # prometheus.yml
@@ -134,10 +136,12 @@ scrape_configs:
   - job_name: qnop
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ['qnop:9090']
+      - targets: ['qnop:8081']
 ```
 
-**A scrape token.** Where Prometheus can only reach the application port, set `QNOP_METRICS_SCRAPE_TOKEN` to a random value of at least 32 characters (`openssl rand -hex 32`); a shorter one stops the instance from starting. The token opens `GET /actuator/prometheus` and nothing else, and it is not an admin: health details stay hidden from it.
+**A scrape token.** Where Prometheus can only reach the application port, set `QNOP_METRICS_SCRAPE_TOKEN` to a random value of at least 32 characters without whitespace (`openssl rand -hex 32`); anything else stops the instance from starting. The token opens `GET /actuator/prometheus` and nothing else, and it is not an admin: health details stay hidden from it. To rotate it, replace the value and restart.
+
+Use one or the other. With a management port set, the scrape is no longer served on the application port at all, so a token sent there gets a 404.
 
 ```yaml
 scrape_configs:

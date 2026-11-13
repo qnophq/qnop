@@ -102,12 +102,24 @@ public class MetricsScrapeAccess implements RequestMatcher {
       return false;
     }
     String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-    if (header == null || !header.startsWith(BEARER_PREFIX)) {
+    // The scheme is case-insensitive (RFC 9110), and the resource server reads it that way too.
+    if (header == null
+        || !header.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
       return false;
     }
-    // Compare digests, in constant time: neither the length nor a matching prefix of the
-    // configured token can be learned from how long the comparison takes.
-    return MessageDigest.isEqual(tokenDigest, sha256(header.substring(BEARER_PREFIX.length())));
+    return isScrapeToken(header.substring(BEARER_PREFIX.length()));
+  }
+
+  /**
+   * Whether {@code credential} is the configured scrape token; false when none is configured.
+   *
+   * <p>Digests are compared, in constant time: neither the length nor a matching prefix of the
+   * configured token can be learned from how long the comparison takes.
+   */
+  public boolean isScrapeToken(String credential) {
+    return tokenDigest != null
+        && credential != null
+        && MessageDigest.isEqual(tokenDigest, sha256(credential));
   }
 
   private static byte[] sha256(String value) {
