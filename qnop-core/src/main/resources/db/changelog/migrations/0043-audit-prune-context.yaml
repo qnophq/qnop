@@ -1,0 +1,26 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Owner-only authorisation for the document cascade and its prune tombstones
+# (issue #959, ADR-0043 amendment): the cascade marker and the tombstone the
+# insert guard admits move from transaction-local session settings into tables
+# only the schema owner can write. A NEW changeset — shipped changesets are
+# immutable. The body lives in a sqlFile (PL/pgSQL needs splitStatements: false).
+databaseChangeLog:
+  - changeSet:
+      id: 0043-audit-prune-context
+      author: qnop
+      comment: >-
+        audit_cascade_context / audit_prune_context owner-only state, definer
+        cascade marker and its cleanup, tombstone guard by announced event
+        (issue #959).
+      changes:
+        - sqlFile:
+            path: 0043-audit-prune-context.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+      rollback:
+        - sqlFile:
+            path: 0043-audit-prune-context-rollback.sql
+            relativeToChangelogFile: true
+            splitStatements: false
