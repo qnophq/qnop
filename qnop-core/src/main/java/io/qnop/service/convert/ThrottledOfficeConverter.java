@@ -20,6 +20,7 @@
  */
 package io.qnop.service.convert;
 
+import io.qnop.observability.metrics.ConversionMeters;
 import java.time.Duration;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -72,9 +73,12 @@ public class ThrottledOfficeConverter implements OfficeConverter {
   private final Semaphore slots;
 
   private final AtomicInteger waiting = new AtomicInteger();
+  private final ConversionMeters meters;
 
-  public ThrottledOfficeConverter(OfficeConverter delegate, OfficeConverterProperties properties) {
+  public ThrottledOfficeConverter(
+      OfficeConverter delegate, OfficeConverterProperties properties, ConversionMeters meters) {
     this.delegate = delegate;
+    this.meters = meters;
     this.limit = properties.maxConcurrent();
     this.maxWait = properties.maxWait();
     this.slots = new Semaphore(limit, true);
@@ -94,21 +98,42 @@ public class ThrottledOfficeConverter implements OfficeConverter {
           limit,
           maxWait,
           waiting.get());
+      meters.refused(Duration.ofNanos(System.nanoTime() - startedWaiting));
       throw new OfficeConverterBusyException(limit, maxWait);
     }
     try {
-      long waited = (System.nanoTime() - startedWaiting) / 1_000_000;
-      if (waited >= NOTEWORTHY_WAIT.toMillis()) {
+      Duration waited = Duration.ofNanos(System.nanoTime() - startedWaiting);
+      meters.waitedForSlot(waited);
+      if (waited.compareTo(NOTEWORTHY_WAIT) >= 0) {
         // Not a failure, but the shape of one to come: if this appears often, the
         // instance is running at its conversion limit and wants a bigger one.
-        log.info("Waited {} ms for one of {} conversion slots", waited, limit);
+        log.info("Waited {} ms for one of {} conversion slots", waited.toMillis(), limit);
       }
-      return delegate.toPdf(source, sourceExtension);
+      return convert(source, sourceExtension);
     } finally {
       // In a finally and not after the call: a permit lost to a failed conversion
       // would shrink the limit silently and only surface hours later, as exports
       // that queue for no visible reason.
       slots.release();
+    }
+  }
+
+  /** Runs the conversion and times it; the wait for a slot is measured separately. */
+  private byte[] convert(byte[] source, String sourceExtension) {
+    long startedAt = System.nanoTime();
+    try {
+      byte[] pdf = delegate.toPdf(source, sourceExtension);
+      meters.converted(
+          ConversionMeters.Outcome.SUCCESS, Duration.ofNanos(System.nanoTime() - startedAt));
+      return pdf;
+    } catch (RuntimeException e) {
+      // A document the converter can never read is the upload's fault, not the converter's:
+      // counted apart, so a run of corrupt files does not look like a broken LibreOffice.
+      boolean unreadable = e instanceof OfficeConversionException failed && failed.isPermanent();
+      meters.converted(
+          unreadable ? ConversionMeters.Outcome.REJECTED : ConversionMeters.Outcome.FAILURE,
+          Duration.ofNanos(System.nanoTime() - startedAt));
+      throw e;
     }
   }
 

@@ -20,6 +20,7 @@
  */
 package io.qnop.service.convert;
 
+import io.qnop.observability.metrics.ConversionMeters;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -45,7 +46,9 @@ public class OfficeConverterConfiguration {
   @Bean
   @Primary
   ThrottledOfficeConverter throttledOfficeConverter(
-      LibreOfficeConverter delegate, OfficeConverterProperties properties) {
-    return new ThrottledOfficeConverter(delegate, properties);
+      LibreOfficeConverter delegate,
+      OfficeConverterProperties properties,
+      ConversionMeters meters) {
+    return new ThrottledOfficeConverter(delegate, properties, meters);
   }
 }

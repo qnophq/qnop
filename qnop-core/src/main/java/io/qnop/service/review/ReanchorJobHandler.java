@@ -25,6 +25,8 @@ import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ExtractionStatus;
 import io.qnop.entity.PlacementStatus;
 import io.qnop.observability.LogContext;
+import io.qnop.observability.metrics.AfterCommit;
+import io.qnop.observability.metrics.ReanchorMeters;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.job.JobHandler;
@@ -64,12 +66,15 @@ public class ReanchorJobHandler implements JobHandler {
   private final DocumentVersionRepository versions;
   private final AnnotationPlacementRepository placements;
   private final AnchorResolver resolver;
+  private final ReanchorMeters meters;
 
   public ReanchorJobHandler(
       DocumentVersionRepository versions,
       AnnotationPlacementRepository placements,
-      ReanchoringProperties reanchoringProperties) {
+      ReanchoringProperties reanchoringProperties,
+      ReanchorMeters meters) {
     this.versions = versions;
+    this.meters = meters;
     this.placements = placements;
     this.resolver = new AnchorResolver(reanchoringProperties);
   }
@@ -139,6 +144,12 @@ public class ReanchorJobHandler implements JobHandler {
           versionId,
           moved,
           orphaned);
+      // Once committed, not now: an attempt that rolls back is retried by the queue and
+      // would count the same annotations twice.
+      int placed = pending.size() - moved - orphaned;
+      int movedCount = moved;
+      int orphanedCount = orphaned;
+      AfterCommit.run(() -> meters.reanchored(placed, movedCount, orphanedCount));
     }
   }
 
