@@ -25,6 +25,10 @@ import io.qnop.api.v1.model.ChangePasswordRequest;
 import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.LoginRequest;
 import io.qnop.api.v1.model.TokenResponse;
+import io.qnop.observability.metrics.AuthMeters;
+import io.qnop.observability.metrics.AuthMeters.LoginOutcome;
+import io.qnop.observability.metrics.AuthMeters.Method;
+import io.qnop.observability.metrics.AuthMeters.RefreshOutcome;
 import io.qnop.security.QnopProperties;
 import io.qnop.service.AuthService;
 import io.qnop.service.AuthService.ChangePasswordOutcome;
@@ -37,9 +41,11 @@ import io.qnop.web.security.RefreshTokenCookieFactory;
 import io.qnop.web.security.ratelimit.AuthIdentifierRateLimiter;
 import io.qnop.web.security.ratelimit.AuthIdentifierRateLimiter.LoginAttempt;
 import io.qnop.web.security.ratelimit.LoginDeviceCookies;
+import io.qnop.web.security.ratelimit.RateLimitExceededException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
@@ -78,6 +84,7 @@ public class AuthController implements AuthApi {
   private final AuthIdentifierRateLimiter identifierRateLimiter;
   private final HttpServletRequest httpRequest;
   private final LoginDeviceCookies deviceCookies;
+  private final AuthMeters meters;
 
   public AuthController(
       AuthService authService,
@@ -88,7 +95,8 @@ public class AuthController implements AuthApi {
       QnopProperties properties,
       AuthIdentifierRateLimiter identifierRateLimiter,
       HttpServletRequest httpRequest,
-      LoginDeviceCookies deviceCookies) {
+      LoginDeviceCookies deviceCookies,
+      AuthMeters meters) {
     this.authService = authService;
     this.jwtTokenService = jwtTokenService;
     this.refreshTokenService = refreshTokenService;
@@ -99,6 +107,7 @@ public class AuthController implements AuthApi {
     // A request-scoped proxy: resolves to the request being served on each call.
     this.httpRequest = httpRequest;
     this.deviceCookies = deviceCookies;
+    this.meters = meters;
   }
 
   @Override
@@ -111,24 +120,32 @@ public class AuthController implements AuthApi {
     // identifiers alike, and only failures count against it. The credentials are checked even when
     // the account's ceiling refused the attempt, so a silent refusal takes as long as a real one.
     AtomicReference<LoginAttempt> attempt = new AtomicReference<>();
-    UUID userId =
-        authService
-            .authenticate(
-                request.getUsernameOrEmail(),
-                request.getPassword(),
-                account -> {
-                  attempt.set(
-                      identifierRateLimiter.beginLogin(
-                          request.getUsernameOrEmail(), account, httpRequest));
-                  return !attempt.get().refused();
-                })
-            .orElseThrow(
-                () -> {
-                  log.info("Login rejected: invalid credentials");
-                  return new ResponseStatusException(
-                      HttpStatus.UNAUTHORIZED, "Invalid credentials");
-                });
+    Optional<UUID> authenticated;
+    try {
+      authenticated =
+          authService.authenticate(
+              request.getUsernameOrEmail(),
+              request.getPassword(),
+              account -> {
+                attempt.set(
+                    identifierRateLimiter.beginLogin(
+                        request.getUsernameOrEmail(), account, httpRequest));
+                return !attempt.get().refused();
+              });
+    } catch (RateLimitExceededException throttled) {
+      meters.login(Method.LOCAL, LoginOutcome.THROTTLED);
+      throw throttled;
+    }
+    if (authenticated.isEmpty()) {
+      // The client is told the same either way; the meter tells the operator which it was.
+      boolean refused = attempt.get() != null && attempt.get().refused();
+      meters.login(Method.LOCAL, refused ? LoginOutcome.THROTTLED : LoginOutcome.REJECTED);
+      log.info("Login rejected: invalid credentials");
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+    }
+    UUID userId = authenticated.get();
     identifierRateLimiter.loginSucceeded(attempt.get());
+    meters.login(Method.LOCAL, LoginOutcome.SUCCESS);
     log.info("Login succeeded for {}", userId);
     ResponseEntity<TokenResponse> session = issueSession(userId);
     // Recognise this device on the next attempt (issue #899, LoginDeviceCookies).
@@ -141,9 +158,16 @@ public class AuthController implements AuthApi {
   @Override
   public ResponseEntity<TokenResponse> refresh(String refreshCookie) {
     if (refreshCookie == null || refreshCookie.isBlank()) {
+      meters.refresh(RefreshOutcome.MISSING);
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing refresh token");
     }
     RotationResult result = refreshTokenService.rotate(refreshCookie);
+    meters.refresh(
+        switch (result) {
+          case RotationResult.Success rotated -> RefreshOutcome.SUCCESS;
+          case RotationResult.Reused reused -> RefreshOutcome.REUSED;
+          case RotationResult.Unknown unknown -> RefreshOutcome.UNKNOWN;
+        });
     if (result instanceof RotationResult.Success success) {
       log.debug("Refresh token rotated for {}", success.userId());
       return issueSession(success.userId(), success.token());

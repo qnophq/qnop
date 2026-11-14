@@ -52,18 +52,27 @@ scrape of an idle instance had 587 series, 92 of them timing every Spring Securi
 application's choice. This is the seam ADR-0037 deferred. The meters live in
 `io.qnop.observability.metrics`, one small class per area that owns its meter names and takes its
 tag values as enums, so for those the closed-set rule is enforced by the type system rather than
-by review. Two tags are strings because their sets live elsewhere: the job `type` (the type of a
-registered handler) and the scheduler `job` (an id from the scheduler catalogue). Both are bounded
-by their call sites, which return before metering when no handler or no work is registered; a new
-caller must keep that.
+by review. Three tags are strings because their sets live elsewhere: the job `type` (the type of a
+registered handler), the scheduler `job` (an id from the scheduler catalogue) and the rate-limit
+`scope` (the name a limit declares in code, never the key it limits). The first two are bounded by
+their call sites, which return before metering when no handler or no work is registered; a new
+caller must keep that. An enum that is open by design is closed before it becomes a tag: a workflow
+state an add-on introduces (ADR-0011) is counted under `other`.
 
 Services record at their edges (a job attempt, a conversion, a scheduler run), not inside the
 anchoring or diff algorithms, which stay free of both the database and metrics. `qnop-spi` and
 `qnop-api` gain no dependency: an enterprise `StorageProvider` or extractor is measured by the core
-code that calls it.
+code that calls it. For the object store that is literal: whichever `StorageProvider` bean the
+context holds is wrapped in a measuring decorator, so no caller and no provider has to take part.
+
+What is deliberately not measured: the HTTP calls of the OIDC login flow. They run through the
+SSRF-guarded transport (issue #904), inside Spring Security's own clients; timing them
+would mean wrapping that transport, and the login outcome counter already says whether sign-in
+through a provider works. A login that fails before qnop's success handler runs (a forged `state`,
+an error returned by the provider) is likewise not counted.
 
 A counter that describes committed work is incremented after the commit (`AfterCommit`).
-Re-anchoring results, accepted uploads and reaped jobs are counted that way, because the queue
+Re-anchoring results, accepted uploads, reaped jobs and reaped storage orphans are counted that way, because the queue
 retries a rolled-back attempt and a request that loses a uniqueness race rolls back, and either
 would otherwise be counted without having happened. Timers measure attempts, whatever their fate.
 
@@ -74,7 +83,8 @@ as gauges from the database instead (see below).
 ### What a scrape may cost
 
 Gauges derived from the database read a **snapshot that is loaded once and shared**, at most
-fifteen seconds old (`CachedSnapshot`). A scrape therefore issues a bounded number of statements
+fifteen seconds old (`CachedSnapshot`); the product counts (reviews, annotations, accounts, stored
+objects), which move slowly and read whole tables, at most a minute old. A scrape therefore issues a bounded number of statements
 however many gauges exist. A failed load is remembered for the same fifteen seconds and every
 gauge reports `NaN`: without that, each gauge would retry on its own and, with the database down,
 wait out the connection timeout in turn, holding a request thread for minutes per scrape. The health indicator keeps reading live: a probe wants the truth now, not fifteen

@@ -22,6 +22,8 @@ package io.qnop.service.storage;
 
 import io.qnop.entity.StorageObject;
 import io.qnop.entity.StorageObjectStatus;
+import io.qnop.observability.metrics.AfterCommit;
+import io.qnop.observability.metrics.StorageMeters;
 import io.qnop.repository.StorageObjectRepository;
 import io.qnop.service.scheduler.SchedulerJobCatalog;
 import io.qnop.service.scheduler.SchedulerService;
@@ -66,16 +68,19 @@ public class StorageService {
   private final StorageObjectRepository repository;
   private final S3Properties properties;
   private final SchedulerService scheduler;
+  private final StorageMeters meters;
 
   public StorageService(
       StorageProvider provider,
       StorageObjectRepository repository,
       S3Properties properties,
-      SchedulerService scheduler) {
+      SchedulerService scheduler,
+      StorageMeters meters) {
     this.provider = provider;
     this.repository = repository;
     this.properties = properties;
     this.scheduler = scheduler;
+    this.meters = meters;
   }
 
   /**
@@ -210,6 +215,9 @@ public class StorageService {
       provider.delete(orphan.getObjectKey());
       repository.delete(orphan);
     }
+    // The rows go with the gate's transaction; count them only once that has committed.
+    int reaped = orphans.size();
+    AfterCommit.run(() -> meters.orphansReaped(reaped));
     log.info("Storage orphan reaper deleted {} uncommitted object(s).", orphans.size());
     return "Deleted " + orphans.size() + " uncommitted object(s)";
   }

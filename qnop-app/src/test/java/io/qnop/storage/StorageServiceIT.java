@@ -23,8 +23,10 @@ package io.qnop.storage;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import io.qnop.bootstrap.AbstractIntegrationTest;
 import io.qnop.entity.StorageObjectStatus;
+import io.qnop.observability.metrics.StorageMeters;
 import io.qnop.repository.StorageObjectRepository;
 import io.qnop.service.storage.StagedObject;
 import io.qnop.service.storage.StorageService;
@@ -50,9 +52,20 @@ class StorageServiceIT extends AbstractIntegrationTest {
   @Autowired private StorageObjectRepository repository;
   @Autowired private StorageProvider provider;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private MeterRegistry meterRegistry;
 
   private static byte[] uniqueContent() {
     return ("qnop-doc-" + UUID.randomUUID()).getBytes(UTF_8);
+  }
+
+  private double providerCalls(String operation) {
+    var timer =
+        meterRegistry
+            .find(StorageMeters.OPERATION)
+            .tag("operation", operation)
+            .tag("outcome", "success")
+            .timer();
+    return timer == null ? 0 : timer.count();
   }
 
   private StagedObject stage(byte[] content, String contentType) {
@@ -178,8 +191,16 @@ class StorageServiceIT extends AbstractIntegrationTest {
             + "WHERE object_key IN (?, ?)",
         orphan.key(),
         committed.key());
+    double reapedBefore = meterRegistry.counter(StorageMeters.ORPHANS_REAPED).count();
+    double deletesBefore = providerCalls("delete");
 
     storage.reapOrphans();
+
+    // Other tests' leftovers may be reaped in the same pass, so: at least this one (issue #962).
+    assertThat(meterRegistry.counter(StorageMeters.ORPHANS_REAPED).count())
+        .isGreaterThanOrEqualTo(reapedBefore + 1);
+    // The provider the context hands out is the measured one, whichever implementation it is.
+    assertThat(providerCalls("delete")).isGreaterThanOrEqualTo(deletesBefore + 1);
 
     assertThat(repository.findByObjectKey(orphan.key())).isEmpty();
     assertThat(storage.get(orphan.key())).isEmpty();

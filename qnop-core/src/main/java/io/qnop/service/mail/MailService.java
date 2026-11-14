@@ -20,9 +20,13 @@
  */
 package io.qnop.service.mail;
 
+import io.qnop.observability.metrics.MailMeters;
+import io.qnop.observability.metrics.MailMeters.Outcome;
 import io.qnop.service.ControlCharacters;
 import jakarta.mail.internet.MimeMessage;
+import java.time.Duration;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -45,18 +49,25 @@ public class MailService {
   private final MailSenderProvider senderProvider;
   private final MailTemplateService templates;
   private final ApplicationEventPublisher events;
+  private final MailMeters meters;
 
   public MailService(
       MailSenderProvider senderProvider,
       MailTemplateService templates,
-      ApplicationEventPublisher events) {
+      ApplicationEventPublisher events,
+      MailMeters meters) {
     this.senderProvider = senderProvider;
     this.templates = templates;
     this.events = events;
+    this.meters = meters;
   }
 
   /** Sends a message; returns the outcome without throwing. */
   public SendResult sendMail(String to, String subject, String bodyPlain, String bodyHtml) {
+    return measured(null, () -> deliver(to, subject, bodyPlain, bodyHtml));
+  }
+
+  private SendResult deliver(String to, String subject, String bodyPlain, String bodyHtml) {
     JavaMailSender sender = senderProvider.current();
     if (sender == null) {
       return new SendResult.Skipped("SMTP is not configured");
@@ -97,14 +108,35 @@ public class MailService {
   /** Renders {@code key} for {@code locale} with {@code vars}, then sends. Never throws. */
   public SendResult sendMailFromTemplate(
       MailTemplateKey key, String to, Map<String, Object> vars, String locale) {
-    RenderedMail mail;
-    try {
-      mail = templates.render(key, vars, locale);
-    } catch (RuntimeException e) {
-      log.warn("Failed to render mail template {}: {}", key, e.getMessage());
-      return new SendResult.Failed("template render failed: " + e.getMessage());
-    }
-    return sendMail(to, mail.subject(), mail.bodyPlain(), mail.bodyHtml());
+    return measured(
+        key,
+        () -> {
+          RenderedMail mail;
+          try {
+            mail = templates.render(key, vars, locale);
+          } catch (RuntimeException e) {
+            log.warn("Failed to render mail template {}: {}", key, e.getMessage());
+            return new SendResult.Failed("template render failed: " + e.getMessage());
+          }
+          return deliver(to, mail.subject(), mail.bodyPlain(), mail.bodyHtml());
+        });
+  }
+
+  /**
+   * Times one attempt and records how it ended (issue #962), tagged with the template and nothing
+   * about the recipient.
+   */
+  private SendResult measured(MailTemplateKey template, Supplier<SendResult> attempt) {
+    long started = System.nanoTime();
+    SendResult result = attempt.get();
+    Outcome outcome =
+        switch (result) {
+          case SendResult.Sent sent -> Outcome.SENT;
+          case SendResult.Skipped skipped -> Outcome.SKIPPED;
+          case SendResult.Failed failed -> Outcome.FAILED;
+        };
+    meters.sent(template, outcome, Duration.ofNanos(System.nanoTime() - started));
+    return result;
   }
 
   /**

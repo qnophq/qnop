@@ -181,4 +181,12 @@ public interface DocumentRepository
    * it says "finished" without having to know their names.
    */
   long countByArchivedAtIsNullAndClosedAtIsNull();
+
+  /**
+   * How many reviews there are per workflow state (issue #962), as {@code [state, count]} rows —
+   * one grouped read for the product gauges, which must cost the same however many states there
+   * are.
+   */
+  @Query("SELECT d.workflowState, COUNT(d) FROM Document d GROUP BY d.workflowState")
+  List<Object[]> countGroupedByWorkflowState();
 }

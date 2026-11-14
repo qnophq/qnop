@@ -30,7 +30,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qnop.entity.StorageObject;
+import io.qnop.observability.metrics.StorageMeters;
 import io.qnop.repository.StorageObjectRepository;
 import io.qnop.service.scheduler.SchedulerService;
 import io.qnop.spi.storage.StorageProvider;
@@ -56,7 +58,11 @@ class StorageServiceTest {
   private final StorageObjectRepository repository = mock(StorageObjectRepository.class);
   private final StorageService storage =
       new StorageService(
-          provider, repository, mock(S3Properties.class), mock(SchedulerService.class));
+          provider,
+          repository,
+          mock(S3Properties.class),
+          mock(SchedulerService.class),
+          new StorageMeters(new SimpleMeterRegistry()));
 
   private static InputStream content() {
     return new ByteArrayInputStream("some qnop document bytes".getBytes());
