@@ -31,6 +31,7 @@ import io.qnop.service.job.JobHandler;
 import io.qnop.service.job.JobQueuePoller;
 import io.qnop.service.job.JobService;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -63,6 +64,26 @@ class JobQueueIT extends AbstractIntegrationTest {
   void clean() {
     jdbc.update("DELETE FROM job");
     handler.reset();
+  }
+
+  @Test
+  @DisplayName("the oldest pending age counts due jobs only, and is zero for an idle queue (#962)")
+  void oldestPendingAgeCountsDueJobsOnly() {
+    assertThat(jobService.oldestPendingAge()).isEqualTo(Duration.ZERO);
+
+    UUID retryLater = jobService.enqueue(TYPE, "{}");
+    jdbc.update("UPDATE job SET run_after = now() + interval '1 hour' WHERE id = ?", retryLater);
+    // A retry scheduled for later is not waiting yet.
+    assertThat(jobService.oldestPendingAge()).isEqualTo(Duration.ZERO);
+
+    UUID overdue = jobService.enqueue(TYPE, "{}");
+    jdbc.update("UPDATE job SET run_after = now() - interval '10 minutes' WHERE id = ?", overdue);
+    UUID lessOverdue = jobService.enqueue(TYPE, "{}");
+    jdbc.update(
+        "UPDATE job SET run_after = now() - interval '2 minutes' WHERE id = ?", lessOverdue);
+
+    assertThat(jobService.oldestPendingAge())
+        .isBetween(Duration.ofMinutes(10), Duration.ofMinutes(11));
   }
 
   @Test

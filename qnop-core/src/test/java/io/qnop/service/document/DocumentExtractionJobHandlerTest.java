@@ -27,8 +27,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ExtractionStatus;
+import io.qnop.observability.metrics.IngestMeters;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentVersionRepository;
@@ -56,6 +59,7 @@ import org.junit.jupiter.api.Test;
 /** Unit tests for {@link DocumentExtractionJobHandler}'s failure policy and idempotency (#245). */
 class DocumentExtractionJobHandlerTest {
 
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
   private final DocumentVersionRepository versions = mock(DocumentVersionRepository.class);
   private final StorageService storage = mock(StorageService.class);
   private final AnnotationPlacementRepository placements =
@@ -84,7 +88,7 @@ class DocumentExtractionJobHandlerTest {
         new DocumentRenditionService(
             mock(OfficeConverter.class), storage, writer, java.util.List.of());
     return new DocumentExtractionJobHandler(
-        versions, storage, List.of(extractors), writer, renditions);
+        versions, storage, List.of(extractors), writer, renditions, new IngestMeters(registry));
   }
 
   private static String payload(UUID versionId) {
@@ -116,6 +120,9 @@ class DocumentExtractionJobHandlerTest {
 
     verify(versions).save(version);
     assertThat(version.getExtractionStatus()).isEqualTo(ExtractionStatus.READY);
+    assertThat(extractions("success")).isEqualTo(1);
+    assertThat(registry.find(IngestMeters.SURFACES).tag("format", "pdf").summary().totalAmount())
+        .isEqualTo(1.0);
     assertThat(version.getRenderedDocument()).contains("\"surfaces\"").contains("\"hi\"");
   }
 
@@ -132,6 +139,9 @@ class DocumentExtractionJobHandlerTest {
     assertThat(version.getRenderedDocument()).isNull();
     // The extractor's message is threaded through and persisted for operators (issue #325).
     assertThat(version.getExtractionFailureReason()).isEqualTo("corrupt");
+    // A document that cannot be processed is "rejected", not an error to page someone for.
+    assertThat(extractions("rejected")).isEqualTo(1);
+    assertThat(registry.find(IngestMeters.SURFACES).summary()).isNull();
   }
 
   @Test
@@ -156,6 +166,14 @@ class DocumentExtractionJobHandlerTest {
         .isInstanceOf(IllegalStateException.class);
     verify(versions, never()).save(version);
     assertThat(version.getExtractionStatus()).isEqualTo(ExtractionStatus.PENDING);
+    assertThat(extractions("error")).isEqualTo(1);
+  }
+
+  /** How many extractions of the PDF fixture were timed with this outcome (issue #962). */
+  private long extractions(String outcome) {
+    Timer timer =
+        registry.find(IngestMeters.EXTRACTION).tag("format", "pdf").tag("outcome", outcome).timer();
+    return timer == null ? 0 : timer.count();
   }
 
   @Test
