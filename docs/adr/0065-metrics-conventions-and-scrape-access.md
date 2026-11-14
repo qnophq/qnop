@@ -101,8 +101,17 @@ seconds ago.
 
 Such gauges are **the same on every instance**, because they describe the database, not the pod.
 Dashboards and alerts aggregate them with `max`, and per-instance counters and timers with `sum`.
-The metric catalogue (`docs/OBSERVABILITY.md`, which arrives with the dashboard in a later part of
-issue #962) states which is which for every meter.
+The metric catalogue (`docs/OBSERVABILITY.md`) states which is which for every meter.
+
+### The dashboard and the rules are held to the code
+
+`deploy/observability/` ships a Grafana dashboard, Prometheus alert rules and a compose overlay.
+A panel or a rule on a series that does not exist shows "no data", which reads as "nothing is
+wrong", so they are not left to drift: a test (`MetricCatalogueTest`) registers every meter qnop
+publishes, renders them as a scrape would, and fails when the dashboard or a rule names a `qnop_*`
+series that is not among them, when a meter has no panel, when the catalogue and the code
+disagree, or when a meter carries a tag that is not on the list of closed sets. The framework
+series the dashboard uses are checked against a running application.
 
 ### Framework meters that are switched off
 

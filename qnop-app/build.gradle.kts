@@ -165,6 +165,8 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.archunit.junit5)
     testImplementation(libs.spring.boot.starter.test)
+    // The metric catalogue test renders the meters exactly as a scrape would (issue #962).
+    testImplementation(libs.micrometer.registry.prometheus)
     testImplementation(libs.spring.boot.webmvc.test) // @WebMvcTest slice (Boot 4 module)
     testImplementation(libs.spring.security.test)
     // The fail-fast binding test (QnopPropertiesBindingTest) drives Bean Validation +

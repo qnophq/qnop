@@ -154,7 +154,9 @@ scrape_configs:
       - targets: ['qnop.example.com']
 ```
 
-With several instances, counters and timers are per instance (`sum` them); gauges that describe the database, such as `qnop_jobs` and `qnop_audit_chain_intact`, are the same on every instance (take the `max`).
+With several instances, counters and timers are per instance (`sum` them); gauges that describe the database, such as `qnop_jobs`, are the same on every instance (take the `max`).
+
+What each series means, a ready-made Grafana dashboard, alert rules and a compose overlay that adds Prometheus and Grafana to this stack are in [OBSERVABILITY.md](OBSERVABILITY.md).
 
 ## Audit-trail integrity
 

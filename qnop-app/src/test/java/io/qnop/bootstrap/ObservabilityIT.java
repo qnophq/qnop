@@ -20,6 +20,7 @@
  */
 package io.qnop.bootstrap;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -27,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.qnop.testsupport.SeededIntegrationTest;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -92,5 +94,25 @@ class ObservabilityIT extends SeededIntegrationTest {
         .perform(asUser(get("/actuator/prometheus"), token(ADMIN_ID)))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("qnop_jobs")));
+  }
+
+  @Test
+  @DisplayName("the framework series the dashboard and alert rules use exist in a real scrape")
+  void scrapeHasTheFrameworkSeriesTheDashboardUses() throws Exception {
+    String scrape =
+        mockMvc
+            .perform(asUser(get("/actuator/prometheus"), token(ADMIN_ID)))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // A framework upgrade that renames one of these would otherwise empty a panel silently.
+    assertThat(MetricCatalogueTest.FRAMEWORK_SERIES)
+        .allSatisfy(
+            series ->
+                assertThat(scrape.lines().anyMatch(line -> line.startsWith(series)))
+                    .as("the scrape has %s", series)
+                    .isTrue());
   }
 }
