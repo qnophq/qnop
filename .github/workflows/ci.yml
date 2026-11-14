@@ -31,6 +31,18 @@ jobs:
       # verification-metadata gate (issue #925).
       - name: Script tests
         run: python3 -I -m unittest discover -s scripts -p 'test_*.py' -v
+      # The alert rules and the scrape configuration operators copy (issue #962): a rule file
+      # that does not parse is found here, not on the first deployment that loads it. That every
+      # series they name exists is MetricCatalogueTest's job, in the build above.
+      # With the Prometheus image of the overlay itself, so the tool that checks the rules is the
+      # server that will load them and Renovate keeps both current in one place.
+      - name: Check the Prometheus rules
+        run: |
+          image="$(sed -n 's/^ *image: *\(prom\/prometheus:.*\)$/\1/p' deploy/observability/docker-compose.observability.yml)"
+          test -n "$image"
+          docker run --rm --entrypoint promtool \
+            -v "$PWD/deploy/observability:/etc/prometheus:ro" \
+            "$image" check config /etc/prometheus/prometheus.yml
 
   # The backend CVE gate is now the Trivy SBOM scan in security.yml (issue #496):
   # it scans a CycloneDX SBOM of qnop-app's runtime classpath with Trivy's own

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Loads the dashboards in /var/lib/grafana/dashboards (issue #962).
+apiVersion: 1
+providers:
+  - name: qnop
+    folder: qnop
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

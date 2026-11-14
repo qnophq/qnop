@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Prometheus configuration for a qnop deployment (issue #962, docs/OBSERVABILITY.md).
+#
+# qnop is scraped on its management port, which docker-compose.observability.yml opens inside the
+# compose network only. No credentials travel: the port is the access control (ADR-0065).
+# To scrape over the application port instead, drop QNOP_MANAGEMENT_PORT, set
+# QNOP_METRICS_SCRAPE_TOKEN and give this job
+#   authorization: { type: Bearer, credentials_file: /run/secrets/qnop_scrape_token }
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: qnop
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['qnop:8081']
