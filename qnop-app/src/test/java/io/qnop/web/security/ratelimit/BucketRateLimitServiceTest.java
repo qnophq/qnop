@@ -22,13 +22,16 @@ package io.qnop.web.security.ratelimit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.qnop.observability.metrics.AuthMeters;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests for the shared Bucket4j limiter — no Spring context, no Docker. */
 class BucketRateLimitServiceTest {
 
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
   private final BucketRateLimitService service =
-      new BucketRateLimitService(RateLimitPropertiesFixture.defaults());
+      new BucketRateLimitService(RateLimitPropertiesFixture.defaults(), new AuthMeters(registry));
 
   @Test
   void allowsUpToCapacityThenRejects() {
@@ -41,6 +44,11 @@ class BucketRateLimitServiceTest {
 
     assertThat(result).isInstanceOf(RateLimitResult.Rejected.class);
     assertThat(((RateLimitResult.Rejected) result).retryAfterSeconds()).isPositive();
+    // Only the refusal is counted, under the limit's name and never its key (issue #962).
+    assertThat(registry.find(AuthMeters.RATE_LIMITED).counters()).hasSize(1);
+    assertThat(registry.find(AuthMeters.RATE_LIMITED).tag("scope", "login").counter().count())
+        .isEqualTo(1.0);
+    assertThat(registry.find(AuthMeters.RATE_LIMITED).counter().getId().getTags()).hasSize(1);
   }
 
   @Test

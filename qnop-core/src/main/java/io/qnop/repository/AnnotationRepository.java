@@ -92,4 +92,11 @@ public interface AnnotationRepository extends JpaRepository<Annotation, UUID> {
           + " WHERE d.id = a.documentId AND a.authorId = :authorId AND d.anonymous = false"
           + " AND a.status = io.qnop.entity.AnnotationStatus.RESOLVED")
   long countPublicResolvedByAuthor(@Param("authorId") UUID authorId);
+
+  /**
+   * How many annotations there are per status (issue #962), as {@code [status, count]} rows — one
+   * grouped read for the product gauges, which must cost the same however many states there are.
+   */
+  @Query("SELECT a.status, COUNT(a) FROM Annotation a GROUP BY a.status")
+  List<Object[]> countGroupedByStatus();
 }

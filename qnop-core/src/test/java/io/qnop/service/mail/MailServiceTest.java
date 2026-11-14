@@ -21,12 +21,15 @@
 package io.qnop.service.mail;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.qnop.observability.metrics.MailMeters;
 import io.qnop.service.mail.MailService.SendResult;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
@@ -49,11 +52,12 @@ class MailServiceTest {
   @Mock private JavaMailSender sender;
   @Mock private ApplicationEventPublisher events;
 
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
   private MailService service;
 
   @BeforeEach
   void setUp() {
-    service = new MailService(senderProvider, templates, events);
+    service = new MailService(senderProvider, templates, events, new MailMeters(registry));
   }
 
   @Test
@@ -64,6 +68,7 @@ class MailServiceTest {
     SendResult result = service.sendMail("to@example.com", "s", "p", null);
 
     assertThat(result).isInstanceOf(SendResult.Skipped.class);
+    assertThat(sends(MailMeters.ADHOC, "skipped")).isEqualTo(1);
   }
 
   @Test
@@ -77,6 +82,15 @@ class MailServiceTest {
 
     assertThat(result).isInstanceOf(SendResult.Sent.class);
     verify(sender).send(any(MimeMessage.class));
+    // A message without a template is tagged as such, never with anything about its recipient.
+    assertThat(sends(MailMeters.ADHOC, "sent")).isEqualTo(1);
+    assertThat(registry.find(MailMeters.SEND).timers())
+        .isNotEmpty()
+        .allSatisfy(
+            meter ->
+                assertThat(meter.getId().getTags())
+                    .extracting(tag -> tag.getKey())
+                    .containsExactlyInAnyOrder("template", "outcome"));
   }
 
   @Test
@@ -122,6 +136,7 @@ class MailServiceTest {
     SendResult result = service.sendMail("to@example.com", "Subject", "Body", null);
 
     assertThat(result).isInstanceOf(SendResult.Failed.class);
+    assertThat(sends(MailMeters.ADHOC, "failed")).isEqualTo(1);
   }
 
   @Test
@@ -134,6 +149,42 @@ class MailServiceTest {
             MailTemplateKey.PASSWORD_RESET, "to@example.com", Map.of(), "en");
 
     assertThat(result).isInstanceOf(SendResult.Failed.class);
+    // One sample per attempt, under the template's name: a render failure is not also an
+    // ad-hoc send.
+    assertThat(sends("password_reset", "failed")).isEqualTo(1);
+    assertThat(registry.find(MailMeters.SEND).timers()).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("a template mail is measured once, under its template (issue #962)")
+  void templateMailIsMeasuredUnderItsTemplate() {
+    when(templates.render(any(), any(), any()))
+        .thenReturn(new RenderedMail("Subject", "Body", null));
+    when(senderProvider.current()).thenReturn(sender);
+    when(sender.createMimeMessage()).thenReturn(new MimeMessage((Session) null));
+
+    service.sendMailFromTemplate(MailTemplateKey.TEAM_INVITATION, "to@example.com", Map.of(), "en");
+
+    assertThat(sends("team_invitation", "sent")).isEqualTo(1);
+    assertThat(registry.find(MailMeters.SEND).timers()).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("an attempt that throws before delivery is still measured, as failed")
+  void throwingAttemptIsMeasured() {
+    when(senderProvider.current()).thenThrow(new IllegalStateException("settings unreadable"));
+
+    assertThatThrownBy(() -> service.sendMail("to@example.com", "s", "p", null))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(sends(MailMeters.ADHOC, "failed")).isEqualTo(1);
+  }
+
+  /** How many send attempts were measured for this template and outcome (issue #962). */
+  private long sends(String template, String outcome) {
+    var timer =
+        registry.find(MailMeters.SEND).tag("template", template).tag("outcome", outcome).timer();
+    return timer == null ? 0 : timer.count();
   }
 
   @Test
