@@ -9,3 +9,6 @@ datasources:
     url: http://prometheus:9090
     isDefault: true
     editable: false
+    jsonData:
+      # The scrape interval of prometheus.yml: Grafana sizes $__rate_interval from it.
+      timeInterval: 30s

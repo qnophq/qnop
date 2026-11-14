@@ -99,6 +99,8 @@ class ObservabilityIT extends SeededIntegrationTest {
   @Test
   @DisplayName("the framework series the dashboard and alert rules use exist in a real scrape")
   void scrapeHasTheFrameworkSeriesTheDashboardUses() throws Exception {
+    // A request is recorded once it is answered, so the scrape cannot count on itself.
+    mockMvc.perform(get("/api/v1/config")).andExpect(status().isOk());
     String scrape =
         mockMvc
             .perform(asUser(get("/actuator/prometheus"), token(ADMIN_ID)))
@@ -114,5 +116,25 @@ class ObservabilityIT extends SeededIntegrationTest {
                 assertThat(scrape.lines().anyMatch(line -> line.startsWith(series)))
                     .as("the scrape has %s", series)
                     .isTrue());
+  }
+
+  @Test
+  @DisplayName("every qnop series of a real scrape is one the catalogue test knows")
+  void noMeterEscapesTheCatalogueTest() throws Exception {
+    String scrape =
+        mockMvc
+            .perform(asUser(get("/actuator/prometheus"), token(ADMIN_ID)))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // PublishedMeters is a list kept by hand. A gauge binder or meter that is missing from it
+    // would escape the dashboard, catalogue and tag checks; here it shows up in the scrape.
+    assertThat(
+            MetricCatalogueTest.seriesNamesOf(
+                scrape.lines().filter(line -> line.startsWith("qnop_")).toList()))
+        .isNotEmpty()
+        .isSubsetOf(MetricCatalogueTest.publishableSeries());
   }
 }

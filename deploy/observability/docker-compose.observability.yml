@@ -7,7 +7,8 @@
 #   docker compose -f docker-compose.yml -f observability/docker-compose.observability.yml up -d
 #
 # It gives qnop a management port (8081) that is reachable inside the compose network only, and
-# has Prometheus scrape it there. Nothing of this is published to the host except Grafana.
+# has Prometheus scrape it there. Nothing of this is published to the host except Grafana, on
+# loopback. /actuator/health moves to that port too: a probe of your own on 8080 must follow.
 #
 # Set GRAFANA_ADMIN_PASSWORD before the first start; there is no default.
 
@@ -17,7 +18,7 @@ services:
       QNOP_MANAGEMENT_PORT: '8081'
 
   prometheus:
-    image: prom/prometheus:v3.7.3
+    image: prom/prometheus:v3.7.3@sha256:49214755b6153f90a597adcbff0252cc61069f8ab69ce8411285cd4a560e8038
     restart: unless-stopped
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -30,7 +31,7 @@ services:
       - qnop
 
   grafana:
-    image: grafana/grafana:12.2.1
+    image: grafana/grafana:12.2.1@sha256:35c41e0fd0295f5d0ee5db7e780cf33506abfaf47686196f825364889dee878b
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
@@ -39,7 +40,9 @@ services:
       GF_ANALYTICS_REPORTING_ENABLED: 'false'
       GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
     ports:
-      - '${GRAFANA_PORT:-3000}:3000'
+      # Loopback by default: Grafana speaks plain HTTP. Put it behind the TLS proxy, or set
+      # GRAFANA_BIND=0.0.0.0 on a network you trust.
+      - '${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000'
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro

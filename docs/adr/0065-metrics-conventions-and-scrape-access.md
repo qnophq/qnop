@@ -109,8 +109,11 @@ The metric catalogue (`docs/OBSERVABILITY.md`) states which is which for every m
 A panel or a rule on a series that does not exist shows "no data", which reads as "nothing is
 wrong", so they are not left to drift: a test (`MetricCatalogueTest`) registers every meter qnop
 publishes, renders them as a scrape would, and fails when the dashboard or a rule names a `qnop_*`
-series that is not among them, when a meter has no panel, when the catalogue and the code
-disagree, or when a meter carries a tag that is not on the list of closed sets. The framework
+series, a label or a label value that is not among them, when a meter has no panel, when the
+catalogue and the code disagree, or when a meter carries a tag key that is not on the list of
+allowed ones. (That the values behind a string tag stay a closed set rests on its call sites;
+the test sees the keys.) The guarded files are declared inputs of the test task, so a change to
+the dashboard alone runs it. The framework
 series the dashboard uses are checked against a running application.
 
 ### Framework meters that are switched off

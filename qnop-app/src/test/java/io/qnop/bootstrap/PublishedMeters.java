@@ -46,8 +46,9 @@ import io.qnop.web.RunningVersion;
 import java.time.Duration;
 
 /**
- * Registers every meter qnop publishes on a registry, each with one sample (issue #962), so a test
- * can look at the whole catalogue the way a scrape would without booting the application.
+ * Registers every meter qnop publishes on a registry, with one sample for every value of every enum
+ * tag (issue #962), so a test can look at the whole catalogue, labels included, the way a scrape
+ * would without booting the application.
  *
  * <p>Most timers and counters only exist once something has happened; a scrape of an idle
  * application does not show them. This is the one place that knows them all: a new meter class or
@@ -62,48 +63,79 @@ final class PublishedMeters {
 
   static void registerAllOn(MeterRegistry registry) {
     JobMeters jobs = new JobMeters(registry);
-    jobs.executed("document.extract", JobMeters.Outcome.SUCCESS, ONCE);
+    for (JobMeters.Outcome outcome : JobMeters.Outcome.values()) {
+      jobs.executed("document.extract", outcome, ONCE);
+    }
     jobs.waited("document.extract", ONCE);
     jobs.reaped(1);
 
     IngestMeters ingest = new IngestMeters(registry);
-    ingest.extracted(IngestMeters.Format.PDF, IngestMeters.Outcome.SUCCESS, ONCE);
-    ingest.uploaded(IngestMeters.Format.PDF, 1);
-    ingest.surfaces(IngestMeters.Format.PDF, 1);
+    for (IngestMeters.Format format : IngestMeters.Format.values()) {
+      for (IngestMeters.Outcome outcome : IngestMeters.Outcome.values()) {
+        ingest.extracted(format, outcome, ONCE);
+      }
+      ingest.uploaded(format, 1);
+      ingest.surfaces(format, 1);
+    }
 
     ConversionMeters conversion = new ConversionMeters(registry);
-    conversion.converted(ConversionMeters.Outcome.SUCCESS, ONCE);
+    for (ConversionMeters.Outcome outcome : ConversionMeters.Outcome.values()) {
+      conversion.converted(outcome, ONCE);
+    }
     conversion.refused(ONCE);
 
     new ReanchorMeters(registry).reanchored(1, 1, 1);
 
-    new SchedulerMeters(registry)
-        .ran(
-            SchedulerJobCatalog.jobIds().iterator().next(),
-            SchedulerMeters.Outcome.SUCCESS,
-            SchedulerMeters.Trigger.SCHEDULED,
-            false,
-            ONCE);
+    SchedulerMeters scheduler = new SchedulerMeters(registry);
+    String job = SchedulerJobCatalog.jobIds().iterator().next();
+    for (SchedulerMeters.Outcome outcome : SchedulerMeters.Outcome.values()) {
+      for (SchedulerMeters.Trigger trigger : SchedulerMeters.Trigger.values()) {
+        scheduler.ran(job, outcome, trigger, false, ONCE);
+        scheduler.ran(job, outcome, trigger, true, ONCE);
+      }
+    }
 
     StorageMeters storage = new StorageMeters(registry);
-    storage.called(StorageMeters.Operation.PUT, StorageMeters.Outcome.SUCCESS, ONCE);
-    storage.transferred(StorageMeters.Direction.UPLOAD, 1);
+    for (StorageMeters.Operation operation : StorageMeters.Operation.values()) {
+      for (StorageMeters.Outcome outcome : StorageMeters.Outcome.values()) {
+        storage.called(operation, outcome, ONCE);
+      }
+    }
+    for (StorageMeters.Direction direction : StorageMeters.Direction.values()) {
+      storage.transferred(direction, 1);
+    }
     storage.orphansReaped(1);
 
-    new MailMeters(registry).sent(MailTemplateKey.PASSWORD_RESET, MailMeters.Outcome.SENT, ONCE);
+    MailMeters mail = new MailMeters(registry);
+    for (MailMeters.Outcome outcome : MailMeters.Outcome.values()) {
+      mail.sent(MailTemplateKey.PASSWORD_RESET, outcome, ONCE);
+      mail.sent(null, outcome, ONCE);
+    }
 
     AuthMeters auth = new AuthMeters(registry);
-    auth.login(AuthMeters.Method.LOCAL, AuthMeters.LoginOutcome.SUCCESS);
-    auth.refresh(AuthMeters.RefreshOutcome.SUCCESS);
+    for (AuthMeters.Method method : AuthMeters.Method.values()) {
+      for (AuthMeters.LoginOutcome outcome : AuthMeters.LoginOutcome.values()) {
+        auth.login(method, outcome);
+      }
+    }
+    for (AuthMeters.RefreshOutcome outcome : AuthMeters.RefreshOutcome.values()) {
+      auth.refresh(outcome);
+    }
     auth.rateLimited("login");
 
     ReviewEventMeters events = new ReviewEventMeters(registry);
-    events.committed(ReviewEventMeters.Type.COMMENT_ADDED);
-    events.listenerFailed(ReviewEventMeters.Type.COMMENT_ADDED);
+    for (ReviewEventMeters.Type type : ReviewEventMeters.Type.values()) {
+      events.committed(type);
+      events.listenerFailed(type);
+    }
     events.dropped();
 
-    new TrackingMeters(registry)
-        .forwarded(TrackingProvider.MATOMO, TrackingMeters.Outcome.SUCCESS, ONCE);
+    TrackingMeters tracking = new TrackingMeters(registry);
+    for (TrackingProvider provider : TrackingProvider.values()) {
+      for (TrackingMeters.Outcome outcome : TrackingMeters.Outcome.values()) {
+        tracking.forwarded(provider, outcome, ONCE);
+      }
+    }
 
     new JobQueueMetrics(mock(JobService.class)).bindTo(registry);
     new SchedulerRunMetrics(mock(SchedulerService.class)).bindTo(registry);

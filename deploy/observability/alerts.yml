@@ -4,6 +4,9 @@
 # deployment. Every qnop_* series named here is published by the application; a test in the
 # repository fails when a rule names one that is not (MetricCatalogueTest).
 #
+# A counter that is created by its first event (mail failures, reused refresh tokens) cannot show
+# that first event to increase(); the rules on such counters fire from the second one on.
+#
 # Aggregation: series read from the database are the same on every instance and are aggregated
 # with max/min; per-instance counters and timers with sum (docs/OBSERVABILITY.md).
 
@@ -21,8 +24,8 @@ groups:
 
       - alert: QnopHighServerErrorRate
         expr: |
-          sum(rate(http_server_requests_seconds_count{application="qnop", outcome="SERVER_ERROR"}[5m]))
-            / sum(rate(http_server_requests_seconds_count{application="qnop"}[5m])) > 0.05
+          sum(rate(http_server_requests_seconds_count{application="qnop", uri!~"/actuator.*", outcome="SERVER_ERROR"}[5m]))
+            / sum(rate(http_server_requests_seconds_count{application="qnop", uri!~"/actuator.*"}[5m])) > 0.05
         for: 10m
         labels:
           severity: critical
@@ -32,7 +35,7 @@ groups:
 
       - alert: QnopSlowRequests
         expr: |
-          histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application="qnop"}[5m]))) > 2.5
+          histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application="qnop", uri!~"/actuator.*"}[5m]))) > 2.5
         for: 10m
         labels:
           severity: warning
@@ -48,7 +51,7 @@ groups:
           severity: critical
         annotations:
           summary: A due job has been waiting for more than ten minutes
-          description: Uploads are not being extracted. Either no worker is polling the queue or every worker is busy.
+          description: Uploads are not being extracted and annotations not re-anchored. Either no worker is polling the queue or every worker is busy.
 
       - alert: QnopJobsStale
         expr: max(qnop_jobs{application="qnop", state="stale"}) > 0
@@ -59,8 +62,10 @@ groups:
           summary: Jobs are marked running but have not moved
           description: A worker died mid-job and the reaper has not put its jobs back. Check that the reaper runs.
 
+      # On the queue's own count, not on the execution counter: that counter is created by the
+      # first failure, so its first failure after every restart is invisible to increase().
       - alert: QnopJobsFailing
-        expr: sum(increase(qnop_job_execution_seconds_count{application="qnop", outcome="failed"}[30m])) > 0
+        expr: max(delta(qnop_jobs{application="qnop", state="failed"}[30m])) > 0
         labels:
           severity: warning
         annotations:
@@ -97,6 +102,19 @@ groups:
         annotations:
           summary: Scheduled job {{ $labels.job }} is enabled but has not run for two days
 
+      # A job that has never run reports no timestamp (NaN), and NaN equals nothing, itself
+      # included: "unless x == x" keeps exactly the enabled jobs without one.
+      - alert: QnopScheduledJobNeverRan
+        expr: |
+          max by (job) (qnop_scheduler_job_enabled{application="qnop"}) == 1
+            unless max by (job) (qnop_scheduler_last_run_timestamp_seconds{application="qnop"})
+              == max by (job) (qnop_scheduler_last_run_timestamp_seconds{application="qnop"})
+        for: 2d
+        labels:
+          severity: warning
+        annotations:
+          summary: Scheduled job {{ $labels.job }} is enabled but has never run
+
   - name: qnop-integrity
     rules:
       - alert: QnopAuditChainBroken
@@ -104,8 +122,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: The audit trail failed its integrity check
-          description: The last verification found a break in the audit chain. See "Audit-trail integrity" in docs/DEPLOYMENT.md.
+          summary: The audit trail did not pass its integrity check
+          description: The last verification found a break in the audit chain, or could not finish. qnop_audit_chain_problems and the run's message on the scheduler page say which. See "Audit-trail integrity" in docs/DEPLOYMENT.md.
 
       - alert: QnopRefreshTokenReuse
         expr: sum(increase(qnop_auth_refresh_total{application="qnop", outcome="reused"}[15m])) > 5
@@ -137,12 +155,12 @@ groups:
           description: Verification and password-reset mails are not arriving. Check the SMTP settings and the server.
 
       - alert: QnopDatabasePoolExhausted
-        expr: max(hikaricp_connections_pending{application="qnop"}) > 0
+        expr: max by (instance) (hikaricp_connections_pending{application="qnop"}) > 0
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: Requests are waiting for a database connection
+          summary: Requests on {{ $labels.instance }} are waiting for a database connection
 
       - alert: QnopHeapNearlyFull
         expr: |

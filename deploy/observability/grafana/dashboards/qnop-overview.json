@@ -204,7 +204,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(http_server_requests_seconds_count{application=\"qnop\", instance=~\"$instance\"}[$__rate_interval]))",
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"qnop\", instance=~\"$instance\", uri!~\"/actuator.*\"}[$__rate_interval]))",
           "refId": "A",
           "editorMode": "code",
           "range": true
@@ -261,7 +261,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(http_server_requests_seconds_count{application=\"qnop\", instance=~\"$instance\", outcome=\"SERVER_ERROR\"}[$__rate_interval])) / sum(rate(http_server_requests_seconds_count{application=\"qnop\", instance=~\"$instance\"}[$__rate_interval]))",
+          "expr": "(sum(rate(http_server_requests_seconds_count{application=\"qnop\", instance=~\"$instance\", uri!~\"/actuator.*\", outcome=\"SERVER_ERROR\"}[$__rate_interval])) or vector(0)) / sum(rate(http_server_requests_seconds_count{application=\"qnop\", instance=~\"$instance\", uri!~\"/actuator.*\"}[$__rate_interval]))",
           "refId": "A",
           "editorMode": "code",
           "range": true
@@ -326,7 +326,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application=\"qnop\", instance=~\"$instance\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application=\"qnop\", instance=~\"$instance\", uri!~\"/actuator.*\"}[$__rate_interval])))",
           "refId": "A",
           "editorMode": "code",
           "range": true
@@ -438,7 +438,7 @@
       "type": "stat",
       "id": 8,
       "title": "Audit chain",
-      "description": "1 when the last audit-chain verification passed, 0 when it found a break. Empty until one has run.",
+      "description": "1 when the last audit-chain verification passed, 0 when it found a break or could not finish. Empty until one has run.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1208,7 +1208,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(qnop_jobs_reaped_total{application=\"qnop\", instance=~\"$instance\"}[$__interval]))",
+          "expr": "sum(increase(qnop_jobs_reaped_total{application=\"qnop\", instance=~\"$instance\"}[$__rate_interval]))",
           "refId": "A",
           "editorMode": "code",
           "range": true,
@@ -1902,7 +1902,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (type) (increase(qnop_review_events_total{application=\"qnop\", instance=~\"$instance\"}[$__interval]))",
+          "expr": "sum by (type) (increase(qnop_review_events_total{application=\"qnop\", instance=~\"$instance\"}[$__rate_interval]))",
           "refId": "A",
           "editorMode": "code",
           "range": true,
@@ -2020,7 +2020,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (type) (increase(qnop_review_events_listener_failures_total{application=\"qnop\", instance=~\"$instance\"}[$__interval]))",
+          "expr": "sum by (type) (increase(qnop_review_events_listener_failures_total{application=\"qnop\", instance=~\"$instance\"}[$__rate_interval]))",
           "refId": "A",
           "editorMode": "code",
           "range": true,
@@ -2031,7 +2031,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(qnop_review_events_dropped_total{application=\"qnop\", instance=~\"$instance\"}[$__interval]))",
+          "expr": "sum(increase(qnop_review_events_dropped_total{application=\"qnop\", instance=~\"$instance\"}[$__rate_interval]))",
           "refId": "B",
           "editorMode": "code",
           "range": true,
@@ -2311,7 +2311,7 @@
     {
       "type": "timeseries",
       "id": 43,
-      "title": "Mail by template",
+      "title": "Mail sent by template",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -2329,7 +2329,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (template) (increase(qnop_mail_send_seconds_count{application=\"qnop\", instance=~\"$instance\"}[$__interval]))",
+          "expr": "sum by (template) (increase(qnop_mail_send_seconds_count{application=\"qnop\", instance=~\"$instance\", outcome=\"sent\"}[$__rate_interval]))",
           "refId": "A",
           "editorMode": "code",
           "range": true,
@@ -2745,7 +2745,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(qnop_storage_orphans_reaped_total{application=\"qnop\", instance=~\"$instance\"}[$__interval]))",
+          "expr": "sum(increase(qnop_storage_orphans_reaped_total{application=\"qnop\", instance=~\"$instance\"}[$__rate_interval]))",
           "refId": "A",
           "editorMode": "code",
           "range": true,
@@ -3045,7 +3045,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (job, outcome) (increase(qnop_scheduler_run_seconds_count{application=\"qnop\", instance=~\"$instance\"}[$__interval]))",
+          "expr": "sum by (job, outcome) (increase(qnop_scheduler_run_seconds_count{application=\"qnop\", instance=~\"$instance\"}[$__rate_interval]))",
           "refId": "A",
           "editorMode": "code",
           "range": true,

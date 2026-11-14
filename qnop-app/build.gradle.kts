@@ -185,3 +185,15 @@ dependencies {
     testImplementation(libs.poi.ooxml)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
+
+// MetricCatalogueTest holds the dashboard, the alert rules and the catalogue to the code (issue
+// #962). They are inputs of the test task, or a change to them alone would find the task up to
+// date (or in the build cache) and the guard would not run for the one change it exists for.
+tasks.test {
+    val observability = rootDir.resolve("deploy/observability")
+    val catalogue = rootDir.resolve("docs/OBSERVABILITY.md")
+    inputs.dir(observability).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(catalogue).withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("qnop.observability.dir", observability.absolutePath)
+    systemProperty("qnop.observability.catalogue", catalogue.absolutePath)
+}

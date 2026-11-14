@@ -29,6 +29,7 @@ import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -49,11 +50,15 @@ import org.junit.jupiter.api.Test;
  */
 class MetricCatalogueTest {
 
-  private static final Path OBSERVABILITY = Path.of("..", "deploy", "observability");
+  // Set by the build, which also declares these files as inputs of the test task: a change to
+  // the dashboard alone must run this test. The fallbacks serve an IDE started in the module.
+  private static final Path OBSERVABILITY =
+      Path.of(System.getProperty("qnop.observability.dir", "../deploy/observability"));
   private static final Path DASHBOARD =
       OBSERVABILITY.resolve(Path.of("grafana", "dashboards", "qnop-overview.json"));
   private static final Path ALERTS = OBSERVABILITY.resolve("alerts.yml");
-  private static final Path CATALOGUE = Path.of("..", "docs", "OBSERVABILITY.md");
+  private static final Path CATALOGUE =
+      Path.of(System.getProperty("qnop.observability.catalogue", "../docs/OBSERVABILITY.md"));
 
   /**
    * Series of the framework's own meters that the dashboard and the rules may use. {@code
@@ -111,6 +116,16 @@ class MetricCatalogueTest {
   /** A metric name as it appears in a PromQL expression: an identifier before a selector. */
   private static final Pattern SERIES = Pattern.compile("\\b([a-z_][a-z0-9_]*)\\{");
 
+  /** A selector: the metric name and what stands between its braces. */
+  private static final Pattern SELECTOR = Pattern.compile("\\b(qnop_[a-z0-9_]*)\\{([^}]*)}");
+
+  /** One label matcher of a selector. */
+  private static final Pattern MATCHER =
+      Pattern.compile("([a-z_]+)\\s*(=~|!~|!=|=)\\s*\"([^\"]*)\"");
+
+  /** Labels every qnop series has: the common tag, and the one Prometheus adds. */
+  private static final Set<String> UNIVERSAL_LABELS = Set.of("application", "instance");
+
   /** A qnop meter name as the catalogue lists it: the first cell of a table row. */
   private static final Pattern DOCUMENTED =
       Pattern.compile("^\\| `(qnop\\.[a-z.]+)`", Pattern.MULTILINE);
@@ -122,17 +137,55 @@ class MetricCatalogueTest {
   private static PrometheusMeterRegistry registry;
   private static Set<String> published;
 
+  /** Every sample line of the scrape, labels included, by series name. */
+  private static List<String> samples;
+
   @BeforeAll
   static void publishEverything() {
     registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
     PublishedMeters.registerAllOn(registry);
-    published =
-        registry
-            .scrape()
-            .lines()
-            .filter(line -> !line.startsWith("#") && !line.isBlank())
-            .map(line -> line.split("[{ ]", 2)[0])
-            .collect(Collectors.toCollection(TreeSet::new));
+    samples =
+        registry.scrape().lines().filter(line -> !line.startsWith("#") && !line.isBlank()).toList();
+    published = seriesNamesOf(samples);
+  }
+
+  /** The series names in the lines of a scrape. */
+  static Set<String> seriesNamesOf(List<String> scrapeLines) {
+    return scrapeLines.stream()
+        .map(line -> line.split("[{ ]", 2)[0])
+        .collect(Collectors.toCollection(TreeSet::new));
+  }
+
+  /** The qnop series this application can publish, as a scrape would show them. */
+  static Set<String> publishableSeries() {
+    PrometheusMeterRegistry all = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
+    PublishedMeters.registerAllOn(all);
+    return seriesNamesOf(
+        all.scrape().lines().filter(line -> !line.startsWith("#") && !line.isBlank()).toList());
+  }
+
+  @Test
+  @DisplayName("every label and value a panel or rule selects on exists on that series")
+  void selectorsUseOnlyPublishedLabelsAndValues() throws IOException {
+    for (Path file : List.of(DASHBOARD, ALERTS)) {
+      // The dashboard is JSON: its expressions carry their quotes escaped.
+      Matcher selector = SELECTOR.matcher(Files.readString(file).replace("\\\"", "\""));
+      while (selector.find()) {
+        String series = selector.group(1);
+        Matcher matcher = MATCHER.matcher(selector.group(2));
+        while (matcher.find()) {
+          String label = matcher.group(1);
+          if (UNIVERSAL_LABELS.contains(label)) {
+            continue;
+          }
+          boolean exact = matcher.group(2).equals("=");
+          String needle = exact ? label + "=\"" + matcher.group(3) + "\"" : label + "=\"";
+          assertThat(samples)
+              .as("%s{%s} in %s", series, matcher.group(), file.getFileName())
+              .anyMatch(line -> line.startsWith(series + "{") && line.contains(needle));
+        }
+      }
+    }
   }
 
   @Test

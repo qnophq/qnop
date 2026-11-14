@@ -20,9 +20,11 @@ export GRAFANA_ADMIN_PASSWORD="$(openssl rand -base64 24)"
 docker compose -f docker-compose.yml -f observability/docker-compose.observability.yml up -d
 ```
 
-Grafana is then on port 3000 (`GRAFANA_PORT` changes it), signed in as `admin` with the password you set, with the Prometheus data source and the dashboard already in place.
+Grafana is then on `http://127.0.0.1:3000` (`GRAFANA_PORT` changes the port), signed in as `admin` with the password you set, with the Prometheus data source and the dashboard already in place. It listens on loopback only, because it speaks plain HTTP: put it behind your TLS proxy, or set `GRAFANA_BIND=0.0.0.0` on a network you trust.
 
 The overlay gives qnop a management port, 8081, that is reachable inside the compose network only; Prometheus scrapes it there without a credential. Nothing but Grafana is published to the host. Prometheus keeps thirty days (`PROMETHEUS_RETENTION`).
+
+**`/actuator/health` moves to the management port as well.** The health check of `deploy/docker-compose.yml` follows by itself; a probe of your own that asks port 8080 (a load balancer, a reverse proxy) starts failing when you apply the overlay and has to be pointed at 8081. See [DEPLOYMENT.md](DEPLOYMENT.md#metrics).
 
 If you already run Prometheus and Grafana, take the pieces instead:
 
@@ -30,13 +32,13 @@ If you already run Prometheus and Grafana, take the pieces instead:
 |---|---|
 | `deploy/observability/prometheus.yml` | the scrape job, to copy into your configuration |
 | `deploy/observability/alerts.yml` | alert rules, to load as a rule file |
-| `deploy/observability/grafana/dashboards/qnop-overview.json` | the dashboard, to import (it asks for the data source) |
+| `deploy/observability/grafana/dashboards/qnop-overview.json` | the dashboard, to import; pick the data source with the variable at its top |
 
 The overlay does not include an Alertmanager: where alerts go is yours to decide. The rules are evaluated and visible in Prometheus either way.
 
 ## The dashboard
 
-One dashboard, "qnop — Overview" (uid `qnop-overview`), in ten rows. Read it top to bottom: the first row says whether something is wrong, the rows below say where.
+One dashboard, "qnop — Overview" (uid `qnop-overview`), 57 panels in ten rows. Read it top to bottom: the first row says whether something is wrong, the rows below say where.
 
 | Row | Answers |
 |---|---|
@@ -53,11 +55,13 @@ One dashboard, "qnop — Overview" (uid `qnop-overview`), in ten rows. Read it t
 
 The `Instance` variable narrows the per-instance panels to one or several instances. Panels built on database-derived gauges ignore it on purpose: those numbers describe the deployment, not an instance.
 
-An empty panel is not always a fault. Most counters and timers appear with the first event: a deployment that has never sent a mail has no mail series.
+An empty panel is not always a fault. Most counters and timers appear with the first event: a deployment that has never sent a mail has no mail series. For the same reason a rate misses the very first event of a series after a restart: the series is born at 1, and a rate needs a 0 to rise from.
+
+The provisioned data source tells Grafana that Prometheus scrapes every 30 seconds. If you change the scrape interval, or import the dashboard into a Grafana of your own, set the data source's scrape interval to match, or short time ranges show gaps.
 
 ## Alert rules
 
-`deploy/observability/alerts.yml` — fifteen rules. The thresholds are starting points; tune them.
+`deploy/observability/alerts.yml` — sixteen rules. The thresholds are starting points; tune them.
 
 | Alert | Severity | Fires when |
 |---|---|---|
@@ -66,18 +70,19 @@ An empty panel is not always a fault. Most counters and timers appear with the f
 | `QnopSlowRequests` | warning | the 95th-percentile response time is above 2.5 s for 10 minutes |
 | `QnopJobQueueStuck` | critical | a due job has waited more than 10 minutes, for 10 minutes |
 | `QnopJobsStale` | warning | jobs are marked running but have not moved, for 15 minutes |
-| `QnopJobsFailing` | warning | a job gave up after its last retry in the past 30 minutes |
+| `QnopJobsFailing` | warning | the number of jobs that gave up after their last retry rose in the past 30 minutes |
 | `QnopConverterSaturated` | warning | Word conversions are refused for want of a slot, for 15 minutes |
 | `QnopScheduledJobFailed` | warning | a maintenance job's last run failed |
 | `QnopScheduledJobNotRunning` | warning | an enabled maintenance job has not run for two days |
-| `QnopAuditChainBroken` | critical | the last audit-trail verification found a break |
+| `QnopScheduledJobNeverRan` | warning | an enabled maintenance job has no run on record, for two days |
+| `QnopAuditChainBroken` | critical | the last audit-trail verification did not pass: it found a break, or could not finish |
 | `QnopRefreshTokenReuse` | warning | more than five already-used refresh tokens were presented in 15 minutes |
 | `QnopStorageErrors` | critical | more than 5% of object-storage calls fail for 10 minutes |
 | `QnopMailFailing` | warning | mails fail to send, for 15 minutes |
 | `QnopDatabasePoolExhausted` | warning | requests wait for a database connection, for 5 minutes |
 | `QnopHeapNearlyFull` | warning | an instance's heap is above 90% for 15 minutes |
 
-Two things the rules cannot see. A maintenance job that is enabled but has **never** run has no timestamp, and a comparison with nothing is never true; `absent`-style rules for that depend on which jobs you expect, so add them for the ones you care about. And `QnopScheduledJobNotRunning` assumes a daily schedule: the hourly notification digest would be caught only after two days.
+Three limits worth knowing. `QnopScheduledJobNotRunning` assumes a daily schedule: the hourly notification digest would be caught only after two days. `QnopMailFailing` and `QnopRefreshTokenReuse` watch counters that are created by their first event, so they fire from the second failure after a restart on; with a persistent fault that is seconds later. And `QnopAuditChainBroken` cannot tell a broken chain from a verification that failed to run through; `qnop_audit_chain_problems` and the run's message on the scheduler page can.
 
 ## More than one instance
 
@@ -100,8 +105,8 @@ The names below are Micrometer's. Prometheus shows them with underscores and a u
 | Meter | Type | Tags | Scope | Meaning |
 |---|---|---|---|---|
 | `qnop.info` | gauge | `version`, `edition` | instance | Always 1; carries the running version and edition |
-| `qnop.audit.chain.intact` | gauge | – | instance | 1 if the last audit-chain verification this instance knows of passed, 0 if it found a break; no value until one has run |
-| `qnop.audit.chain.problems` | gauge | – | instance | Breaks found by the last verification on this instance |
+| `qnop.audit.chain.intact` | gauge | – | database (take the `min`) | 1 if the last audit-chain verification passed, 0 if it found a break or could not finish; no value until one has run. Each instance reports the newer of its own run and the recorded one |
+| `qnop.audit.chain.problems` | gauge | – | instance (take the `max`) | Breaks found by the last verification on this instance; no value on an instance that has not run one |
 
 ### Job queue
 
