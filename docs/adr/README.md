@@ -81,6 +81,7 @@ Two refinement conventions (see the 2026-07-16 amendment to [ADR-0001](0001-reco
 | [0062](0062-review-facades-and-live-channel-slot.md) | Review facades and the live-channel UI slot — the last live-feed seams | Accepted |
 | [0063](0063-frontend-i18n-runtime.md) | Frontend i18n — i18next/react-i18next, a layered language resolution, English bundled | Accepted |
 | [0064](0064-team-membership-consent.md) | Team-membership consent — leads invite, only admins grant LEAD | Accepted |
+| [0065](0065-metrics-conventions-and-scrape-access.md) | Metrics: conventions, cost of a scrape, and who may read it | Accepted |
 
 ## Template
 

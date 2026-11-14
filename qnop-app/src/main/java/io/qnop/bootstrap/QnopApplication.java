@@ -26,6 +26,7 @@ import io.qnop.service.http.HttpClientProperties;
 import io.qnop.service.limits.FeatureToggleProperties;
 import io.qnop.service.limits.InstanceLimitProperties;
 import io.qnop.service.review.ReanchoringProperties;
+import io.qnop.web.security.MetricsScrapeProperties;
 import io.qnop.web.security.ratelimit.RateLimitProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -46,6 +47,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableConfigurationProperties({
   QnopProperties.class,
   RateLimitProperties.class,
+  MetricsScrapeProperties.class,
   HttpClientProperties.class,
   ReanchoringProperties.class,
   OfficeConverterProperties.class,

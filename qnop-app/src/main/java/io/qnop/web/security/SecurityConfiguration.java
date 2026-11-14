@@ -68,8 +68,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * are public; refresh/logout are public but ride on the HttpOnly refresh cookie, so they are
  * CSRF-protected via a double-submit cookie token (the rest of the API is token-based and exempt).
  * Everything else requires authentication. Security headers (a strict CSP for a JSON API,
- * frame-deny, referrer policy, HSTS) are applied to every response. CORS is driven by {@link
- * QnopProperties} so the SPA origin is configurable per environment.
+ * frame-deny, referrer policy, HSTS) are applied to every response of this chain; the scrape chain
+ * ({@link #metricsScrapeSecurityChain}) serves plain-text metrics to a machine and keeps Spring
+ * Security's default headers. CORS is driven by {@link QnopProperties} so the SPA origin is
+ * configurable per environment.
  */
 @Configuration
 @EnableWebSecurity
@@ -84,6 +86,27 @@ public class SecurityConfiguration {
           "POST".equalsIgnoreCase(request.getMethod())
               && ("/api/v1/auth/refresh".equals(request.getRequestURI())
                   || "/api/v1/auth/logout".equals(request.getRequestURI()));
+
+  /**
+   * Lets an unattended Prometheus read the scrape (issue #962, ADR-0065). The chain claims only
+   * what {@link MetricsScrapeAccess} matches — {@code GET /actuator/prometheus} arriving on the
+   * management port or carrying the scrape token — and grants no authentication, so nothing that
+   * depends on a role opens with it. Every other request, including a scrape without either, is
+   * left to the chains below and their {@code ROLE_ADMIN} rule.
+   */
+  @Bean
+  @Order(0)
+  SecurityFilterChain metricsScrapeSecurityChain(HttpSecurity http, MetricsScrapeAccess access)
+      throws Exception {
+    http.securityMatcher(access)
+        .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+        .csrf(csrf -> csrf.disable())
+        .sessionManagement(
+            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .httpBasic(httpBasic -> httpBasic.disable())
+        .formLogin(formLogin -> formLogin.disable());
+    return http.build();
+  }
 
   @Bean
   @Order(2)
@@ -140,7 +163,9 @@ public class SecurityConfiguration {
                     // Health stays reachable for probes; its details are shown to ADMIN only
                     // (management.endpoint.health.roles, issue #923).
                     // Every other management endpoint (prometheus scrape) is
-                    // ops-only — an admin bearer token, never anonymous (issue #348).
+                    // ops-only — an admin bearer token, never anonymous (issue #348). A scrape
+                    // from the management port or with the scrape token never gets here: the
+                    // metricsScrapeSecurityChain above claims it (issue #962).
                     .requestMatchers("/actuator/**")
                     .hasRole("ADMIN")
                     .requestMatchers(

@@ -59,7 +59,12 @@ import org.springframework.test.web.servlet.MockMvc;
 // Configure the context explicitly with just the controller and the path-prefix config.
 @WebMvcTest
 @ContextConfiguration(
-    classes = {ConfigController.class, ApiPathConfig.class, ConfigControllerTest.Features.class})
+    classes = {
+      ConfigController.class,
+      RunningVersion.class,
+      ApiPathConfig.class,
+      ConfigControllerTest.Features.class
+    })
 class ConfigControllerTest {
 
   /**
