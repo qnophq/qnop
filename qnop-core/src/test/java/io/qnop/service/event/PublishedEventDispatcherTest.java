@@ -141,8 +141,27 @@ class PublishedEventDispatcherTest {
     new PublishedEventDispatcher(List.of(), repository, meters)
         .on(new ReviewEvent.AnnotationCreated(doc, actor, annotation));
     Mockito.verifyNoInteractions(repository);
-    // Counted all the same (issue #962): review activity is worth seeing where nothing listens.
+  }
+
+  @Test
+  @DisplayName("an event is counted when it commits, whether or not it is ever dispatched (#962)")
+  void countsOnCommitNotOnDispatch() {
+    PublishedEventDispatcher dispatcher =
+        new PublishedEventDispatcher(List.of(), Mockito.mock(DocumentRepository.class), meters);
+
+    // The committing thread counts; a dispatch the executor dropped never calls on().
+    dispatcher.count(new ReviewEvent.AnnotationCreated(doc, actor, annotation));
+
     assertThat(counted(ReviewEventMeters.EVENTS, "annotation_created")).isEqualTo(1.0);
+  }
+
+  @Test
+  @DisplayName("dispatching does not count the event a second time")
+  void dispatchDoesNotCountAgain() {
+    new PublishedEventDispatcher(List.of(new Recorder()), documents(false), meters)
+        .on(new ReviewEvent.AnnotationCreated(doc, actor, annotation));
+
+    assertThat(counted(ReviewEventMeters.EVENTS, "annotation_created")).isZero();
   }
 
   @Test
@@ -156,7 +175,6 @@ class PublishedEventDispatcherTest {
         .on(new ReviewEvent.CommentAdded(doc, actor, annotation, UUID.randomUUID()));
 
     assertThat(counted(ReviewEventMeters.LISTENER_FAILURES, "comment_added")).isEqualTo(1.0);
-    assertThat(counted(ReviewEventMeters.EVENTS, "comment_added")).isEqualTo(1.0);
   }
 
   private double counted(String meter, String type) {

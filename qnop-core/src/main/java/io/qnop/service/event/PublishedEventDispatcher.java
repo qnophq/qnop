@@ -88,13 +88,20 @@ public class PublishedEventDispatcher {
     return documents.findById(event.documentId()).map(Document::isAnonymous).orElse(true);
   }
 
+  /**
+   * Counts the event on the thread that committed it (issue #962). Not on the dispatch executor:
+   * that one drops when an add-on's listener is slow, which is exactly when the count is looked at,
+   * and what happened in reviews is worth seeing where nothing listens at all.
+   */
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void count(ReviewEvent event) {
+    meters.committed(typeOf(event));
+  }
+
   @Async("publishedEventExecutor")
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void on(ReviewEvent event) {
-    // Counted before the listener check (issue #962): what happened in reviews is worth seeing
-    // in a deployment where nothing listens, too.
     Type type = typeOf(event);
-    meters.committed(type);
     if (listeners.isEmpty()) {
       return;
     }

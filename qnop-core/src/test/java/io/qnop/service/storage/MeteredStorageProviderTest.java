@@ -30,6 +30,8 @@ import static org.mockito.Mockito.when;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qnop.observability.metrics.StorageMeters;
+import io.qnop.repository.StorageObjectRepository;
+import io.qnop.service.scheduler.SchedulerService;
 import io.qnop.spi.storage.StorageContent;
 import io.qnop.spi.storage.StorageException;
 import io.qnop.spi.storage.StorageProvider;
@@ -38,7 +40,6 @@ import java.io.InputStream;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
 
 /** The object store is measured around the provider, whichever provider it is (issue #962). */
 class MeteredStorageProviderTest {
@@ -46,7 +47,7 @@ class MeteredStorageProviderTest {
   private final StorageProvider delegate = mock(StorageProvider.class);
   private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
   private final StorageMeters meters = new StorageMeters(registry);
-  private final MeteredStorageProvider provider = new MeteredStorageProvider(delegate, meters);
+  private final StorageProvider provider = MeteredStorageProvider.around(delegate, meters);
 
   private static InputStream bytes(int length) {
     return new ByteArrayInputStream(new byte[length]);
@@ -114,6 +115,29 @@ class MeteredStorageProviderTest {
   }
 
   @Test
+  @DisplayName("the same exception from any other call is a defect, and measured as an error")
+  void unsupportedElsewhereIsAnError() {
+    when(delegate.exists("k")).thenThrow(new UnsupportedOperationException("provider bug"));
+
+    assertThatThrownBy(() -> provider.exists("k"))
+        .isInstanceOf(UnsupportedOperationException.class);
+
+    assertThat(calls("exists", "error")).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName(
+      "a provider that does not know an object's length counts no bytes, not negative ones")
+  void unknownLengthCountsNothing() {
+    when(delegate.get("k"))
+        .thenReturn(Optional.of(new StorageContent(bytes(0), -1, "application/pdf")));
+
+    provider.get("k");
+
+    assertThat(transferred("download")).isZero();
+  }
+
+  @Test
   @DisplayName("no tag carries an object key")
   void tagsNeverCarryTheKey() {
     provider.exists("sha256/ab/abcdef");
@@ -128,21 +152,27 @@ class MeteredStorageProviderTest {
   }
 
   @Test
-  @DisplayName("any provider in the context is wrapped once, and nothing else is touched")
-  void postProcessorWrapsProvidersOnly() {
-    StaticListableBeanFactory beans = new StaticListableBeanFactory();
-    beans.addBean("storageMeters", meters);
-    StorageProviderMetering metering =
-        new StorageProviderMetering(beans.getBeanProvider(StorageMeters.class));
+  @DisplayName("a provider is wrapped once, however often it is asked for")
+  void wrapsOnce() {
+    assertThat(MeteredStorageProvider.around(provider, meters)).isSameAs(provider);
+  }
 
-    Object wrapped = metering.postProcessAfterInitialization(delegate, "storageProvider");
-    assertThat(wrapped).isInstanceOf(MeteredStorageProvider.class);
-    assertThat(((MeteredStorageProvider) wrapped).delegate()).isSameAs(delegate);
-    // Already measured: not measured twice.
-    assertThat(metering.postProcessAfterInitialization(wrapped, "storageProvider"))
-        .isSameAs(wrapped);
-    Object other = new Object();
-    assertThat(metering.postProcessAfterInitialization(other, "other")).isSameAs(other);
+  @Test
+  @DisplayName("the storage service measures whichever provider it is given (issue #962)")
+  void theServiceMeasuresItsProvider() {
+    StorageService service =
+        new StorageService(
+            delegate,
+            mock(StorageObjectRepository.class),
+            mock(S3Properties.class),
+            mock(SchedulerService.class),
+            meters);
+    when(delegate.get("k")).thenReturn(Optional.empty());
+
+    service.get("k");
+
+    // An add-on's provider needs to do nothing to appear here, and stays the bean it is.
+    assertThat(calls("get", "success")).isEqualTo(1);
   }
 
   private long calls(String operation, String outcome) {

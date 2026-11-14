@@ -21,6 +21,7 @@
 package io.qnop.service.mail;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -166,6 +167,17 @@ class MailServiceTest {
 
     assertThat(sends("team_invitation", "sent")).isEqualTo(1);
     assertThat(registry.find(MailMeters.SEND).timers()).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("an attempt that throws before delivery is still measured, as failed")
+  void throwingAttemptIsMeasured() {
+    when(senderProvider.current()).thenThrow(new IllegalStateException("settings unreadable"));
+
+    assertThatThrownBy(() -> service.sendMail("to@example.com", "s", "p", null))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(sends(MailMeters.ADHOC, "failed")).isEqualTo(1);
   }
 
   /** How many send attempts were measured for this template and outcome (issue #962). */

@@ -36,6 +36,7 @@ public class ReviewEventMeters {
 
   public static final String EVENTS = "qnop.review.events";
   public static final String LISTENER_FAILURES = "qnop.review.events.listener.failures";
+  public static final String DROPPED = "qnop.review.events.dropped";
 
   /** The kinds of review event. */
   public enum Type {
@@ -50,9 +51,20 @@ public class ReviewEventMeters {
   }
 
   private final MeterRegistry registry;
+  private final Counter dropped;
 
   public ReviewEventMeters(MeterRegistry registry) {
     this.registry = registry;
+    this.dropped =
+        Counter.builder(DROPPED)
+            .description(
+                "Review events not handed to listeners because the dispatch queue was full")
+            .register(registry);
+  }
+
+  /** The dispatch queue was full and one event was not handed to the listeners (ADR-0059). */
+  public void dropped() {
+    dropped.increment();
   }
 
   /** A review event of this kind was committed. */

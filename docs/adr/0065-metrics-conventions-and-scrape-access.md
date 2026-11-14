@@ -34,6 +34,8 @@ scrape of an idle instance had 587 series, 92 of them timing every Spring Securi
 
 - Domain meters are named `qnop.<area>.<thing>`, lower-case and dotted, in base units (seconds,
   bytes). Framework meters keep their standard names.
+  An inventory gauge, which counts what exists, is named for the thing alone: `qnop.jobs`,
+  `qnop.reviews`, `qnop.users`.
 - **A tag value comes from a closed set**: an enum or a fixed catalogue such as the job type, the
   scheduler job id, the mail template key, a storage operation, a format, an outcome. Never a user,
   document or team id, an e-mail address, a slug, a file name, an IP address, or the name an admin
@@ -62,8 +64,14 @@ state an add-on introduces (ADR-0011) is counted under `other`.
 Services record at their edges (a job attempt, a conversion, a scheduler run), not inside the
 anchoring or diff algorithms, which stay free of both the database and metrics. `qnop-spi` and
 `qnop-api` gain no dependency: an enterprise `StorageProvider` or extractor is measured by the core
-code that calls it. For the object store that is literal: whichever `StorageProvider` bean the
-context holds is wrapped in a measuring decorator, so no caller and no provider has to take part.
+code that calls it. For the object store that is literal: the storage services wrap the provider
+they are given in a measuring decorator. The bean itself is not replaced, because a provider can
+be more to Spring than a `StorageProvider` (a lifecycle, a listener, a health indicator), and a
+wrapper in its place would hide that.
+
+Review events are counted on the thread that committed them, not on the executor that hands them
+to listeners: that executor drops when a listener is slow, and it counts what it drops
+(`qnop.review.events.dropped`).
 
 What is deliberately not measured: the HTTP calls of the OIDC login flow. They run through the
 SSRF-guarded transport (issue #904), inside Spring Security's own clients; timing them
@@ -84,9 +92,10 @@ as gauges from the database instead (see below).
 
 Gauges derived from the database read a **snapshot that is loaded once and shared**, at most
 fifteen seconds old (`CachedSnapshot`); the product counts (reviews, annotations, accounts, stored
-objects), which move slowly and read whole tables, at most a minute old. A scrape therefore issues a bounded number of statements
-however many gauges exist. A failed load is remembered for the same fifteen seconds and every
-gauge reports `NaN`: without that, each gauge would retry on its own and, with the database down,
+objects), which move slowly, at most a minute old. Two of those four reads scan their table; a
+reading is abandoned after five seconds and then counts as failed. A scrape therefore issues a bounded number of statements
+however many gauges exist. A failed load is remembered for as long as a successful one would be (fifteen seconds, or the
+minute of the product counts) and every gauge reports `NaN`: without that, each gauge would retry on its own and, with the database down,
 wait out the connection timeout in turn, holding a request thread for minutes per scrape. The health indicator keeps reading live: a probe wants the truth now, not fifteen
 seconds ago.
 

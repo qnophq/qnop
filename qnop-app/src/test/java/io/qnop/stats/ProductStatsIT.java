@@ -23,8 +23,12 @@ package io.qnop.stats;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.qnop.bootstrap.AbstractIntegrationTest;
+import io.qnop.entity.Annotation;
+import io.qnop.entity.Document;
 import io.qnop.entity.StorageObject;
 import io.qnop.entity.User;
+import io.qnop.repository.AnnotationRepository;
+import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.StorageObjectRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.stats.ProductStats;
@@ -33,6 +37,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * The grouped counts behind the product gauges, against a real PostgreSQL (issue #962). The
@@ -43,6 +48,9 @@ class ProductStatsIT extends AbstractIntegrationTest {
   @Autowired private ProductStatsService stats;
   @Autowired private UserRepository users;
   @Autowired private StorageObjectRepository storageObjects;
+  @Autowired private DocumentRepository documents;
+  @Autowired private AnnotationRepository annotations;
+  @Autowired private JdbcTemplate jdbc;
 
   @Test
   @DisplayName("accounts are counted by whether they can sign in, and why not")
@@ -89,14 +97,33 @@ class ProductStatsIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("the review and annotation counts read without error and are never negative")
-  void readsReviewAndAnnotationCounts() {
-    ProductStats current = stats.current();
+  @DisplayName("reviews and annotations are counted by state; an unknown state is 'other'")
+  void countsReviewsAndAnnotations() {
+    ProductStats before = stats.current();
+    String suffix = UUID.randomUUID().toString().substring(0, 8);
+    User owner = users.saveAndFlush(user("stats-owner-" + suffix));
+    Document draft = documents.saveAndFlush(new Document(owner.getId(), "Stats draft"));
+    Document custom = documents.saveAndFlush(new Document(owner.getId(), "Stats custom"));
+    // A state an add-on introduced (ADR-0011): the column takes it, the Community enum does not.
+    jdbc.update("UPDATE document SET workflow_state = 'LEGAL_HOLD' WHERE id = ?", custom.getId());
+    Annotation open = annotations.saveAndFlush(new Annotation(draft.getId(), owner.getId()));
+    try {
+      ProductStats after = stats.current();
 
-    assertThat(ProductStats.REVIEW_STATES).containsAll(current.reviews().keySet());
-    assertThat(ProductStats.ANNOTATION_STATUSES).containsAll(current.annotations().keySet());
-    assertThat(current.reviews().values()).allSatisfy(count -> assertThat(count).isPositive());
-    assertThat(current.annotations().values()).allSatisfy(count -> assertThat(count).isPositive());
+      assertThat(after.reviews().getOrDefault("draft", 0L))
+          .isEqualTo(before.reviews().getOrDefault("draft", 0L) + 1);
+      assertThat(after.reviews().getOrDefault(ProductStats.OTHER, 0L))
+          .isEqualTo(before.reviews().getOrDefault(ProductStats.OTHER, 0L) + 1);
+      // Never under the add-on's own name: that would be a series per state somebody invents.
+      assertThat(ProductStats.REVIEW_STATES).containsAll(after.reviews().keySet());
+      assertThat(after.annotations().getOrDefault("open", 0L))
+          .isEqualTo(before.annotations().getOrDefault("open", 0L) + 1);
+    } finally {
+      annotations.delete(open);
+      documents.delete(draft);
+      documents.delete(custom);
+      users.delete(owner);
+    }
   }
 
   private static User user(String username) {

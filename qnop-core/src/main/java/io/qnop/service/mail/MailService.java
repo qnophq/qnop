@@ -128,15 +128,19 @@ public class MailService {
    */
   private SendResult measured(MailTemplateKey template, Supplier<SendResult> attempt) {
     long started = System.nanoTime();
-    SendResult result = attempt.get();
-    Outcome outcome =
-        switch (result) {
-          case SendResult.Sent sent -> Outcome.SENT;
-          case SendResult.Skipped skipped -> Outcome.SKIPPED;
-          case SendResult.Failed failed -> Outcome.FAILED;
-        };
-    meters.sent(template, outcome, Duration.ofNanos(System.nanoTime() - started));
-    return result;
+    Outcome outcome = Outcome.FAILED;
+    try {
+      SendResult result = attempt.get();
+      outcome =
+          switch (result) {
+            case SendResult.Sent sent -> Outcome.SENT;
+            case SendResult.Skipped skipped -> Outcome.SKIPPED;
+            case SendResult.Failed failed -> Outcome.FAILED;
+          };
+      return result;
+    } finally {
+      meters.sent(template, outcome, Duration.ofNanos(System.nanoTime() - started));
+    }
   }
 
   /**

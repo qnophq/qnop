@@ -39,6 +39,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ProductStatsService {
 
+  /** How long one reading may take before it is abandoned. */
+  static final int READ_TIMEOUT_SECONDS = 5;
+
   private final DocumentRepository documents;
   private final AnnotationRepository annotations;
   private final UserRepository users;
@@ -55,7 +58,12 @@ public class ProductStatsService {
     this.storageObjects = storageObjects;
   }
 
-  @Transactional(readOnly = true)
+  /**
+   * Two of the four reads (annotations, stored objects) scan their table: neither has an index on
+   * its status, and one read a minute does not earn one. The timeout is what bounds the cost: a
+   * reading that takes longer fails, and the gauges show {@code NaN} until the next one succeeds.
+   */
+  @Transactional(readOnly = true, timeout = READ_TIMEOUT_SECONDS)
   public ProductStats current() {
     Map<String, Long> reviews = new HashMap<>();
     for (Object[] row : documents.countGroupedByWorkflowState()) {

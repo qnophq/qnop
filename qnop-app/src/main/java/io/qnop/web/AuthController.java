@@ -135,6 +135,9 @@ public class AuthController implements AuthApi {
     } catch (RateLimitExceededException throttled) {
       meters.login(Method.LOCAL, LoginOutcome.THROTTLED);
       throw throttled;
+    } catch (RuntimeException failure) {
+      meters.login(Method.LOCAL, LoginOutcome.ERROR);
+      throw failure;
     }
     if (authenticated.isEmpty()) {
       // The client is told the same either way; the meter tells the operator which it was.
@@ -145,9 +148,16 @@ public class AuthController implements AuthApi {
     }
     UUID userId = authenticated.get();
     identifierRateLimiter.loginSucceeded(attempt.get());
-    meters.login(Method.LOCAL, LoginOutcome.SUCCESS);
     log.info("Login succeeded for {}", userId);
-    ResponseEntity<TokenResponse> session = issueSession(userId);
+    ResponseEntity<TokenResponse> session;
+    try {
+      session = issueSession(userId);
+    } catch (RuntimeException failure) {
+      // Right credentials, no session: not a success the user would recognise.
+      meters.login(Method.LOCAL, LoginOutcome.ERROR);
+      throw failure;
+    }
+    meters.login(Method.LOCAL, LoginOutcome.SUCCESS);
     // Recognise this device on the next attempt (issue #899, LoginDeviceCookies).
     return ResponseEntity.status(session.getStatusCode())
         .headers(session.getHeaders())

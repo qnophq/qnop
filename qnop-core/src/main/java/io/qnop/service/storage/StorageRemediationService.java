@@ -21,6 +21,7 @@
 package io.qnop.service.storage;
 
 import io.qnop.entity.AuditEvent;
+import io.qnop.observability.metrics.StorageMeters;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentAttachmentRepository;
 import io.qnop.repository.DocumentVersionRepository;
@@ -69,8 +70,9 @@ public class StorageRemediationService {
       DocumentAttachmentRepository documentAttachments,
       StorageObjectRepository storageObjects,
       AuditEventRepository auditEvents,
-      PlatformTransactionManager transactionManager) {
-    this.storage = storage;
+      PlatformTransactionManager transactionManager,
+      StorageMeters meters) {
+    this.storage = MeteredStorageProvider.around(storage, meters);
     this.documentVersions = documentVersions;
     this.documentAttachments = documentAttachments;
     this.storageObjects = storageObjects;

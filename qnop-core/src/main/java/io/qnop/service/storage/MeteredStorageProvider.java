@@ -37,6 +37,10 @@ import java.util.stream.Stream;
  * Measures every call to the {@link StorageProvider} it wraps (issue #962, ADR-0065) and changes
  * nothing else: arguments, results and exceptions pass through untouched.
  *
+ * <p>The services of this package wrap the provider they are given ({@link #around}); the bean in
+ * the context stays the provider itself. Replacing the bean instead would hide whatever else an
+ * add-on's provider is to Spring: a lifecycle, a listener, a health indicator.
+ *
  * <p>A {@code get} is timed until the object is opened, a {@code list} until the lazy stream is
  * returned; what the caller then spends reading is the caller's time, not the store's.
  */
@@ -45,14 +49,16 @@ final class MeteredStorageProvider implements StorageProvider {
   private final StorageProvider delegate;
   private final StorageMeters meters;
 
-  MeteredStorageProvider(StorageProvider delegate, StorageMeters meters) {
+  private MeteredStorageProvider(StorageProvider delegate, StorageMeters meters) {
     this.delegate = delegate;
     this.meters = meters;
   }
 
-  /** The provider being measured. */
-  StorageProvider delegate() {
-    return delegate;
+  /** {@code provider}, measured; a provider that already is, is returned as it is. */
+  static StorageProvider around(StorageProvider provider, StorageMeters meters) {
+    return provider instanceof MeteredStorageProvider
+        ? provider
+        : new MeteredStorageProvider(provider, meters);
   }
 
   @Override
@@ -69,7 +75,9 @@ final class MeteredStorageProvider implements StorageProvider {
   @Override
   public Optional<StorageContent> get(String key) {
     Optional<StorageContent> content = timed(Operation.GET, () -> delegate.get(key));
-    content.ifPresent(opened -> meters.transferred(Direction.DOWNLOAD, opened.contentLength()));
+    // A provider that does not know the length says so with a negative one; that is no bytes.
+    content.ifPresent(
+        opened -> meters.transferred(Direction.DOWNLOAD, Math.max(0, opened.contentLength())));
     return content;
   }
 
@@ -96,8 +104,11 @@ final class MeteredStorageProvider implements StorageProvider {
       outcome = Outcome.SUCCESS;
       return result;
     } catch (UnsupportedOperationException unsupported) {
-      // A provider that cannot list is not failing; the scan degrades and nothing is measured.
-      outcome = null;
+      // A provider that cannot list is not failing: the scan degrades and nothing is measured.
+      // From any other call it is a defect like any other exception.
+      if (operation == Operation.LIST) {
+        outcome = null;
+      }
       throw unsupported;
     } finally {
       if (outcome != null) {

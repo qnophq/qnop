@@ -199,7 +199,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
     // Other tests' leftovers may be reaped in the same pass, so: at least this one (issue #962).
     assertThat(meterRegistry.counter(StorageMeters.ORPHANS_REAPED).count())
         .isGreaterThanOrEqualTo(reapedBefore + 1);
-    // The provider the context hands out is the measured one, whichever implementation it is.
+    // The service measures the provider it was given, whichever implementation that is.
     assertThat(providerCalls("delete")).isGreaterThanOrEqualTo(deletesBefore + 1);
 
     assertThat(repository.findByObjectKey(orphan.key())).isEmpty();

@@ -76,7 +76,7 @@ public class StorageService {
       S3Properties properties,
       SchedulerService scheduler,
       StorageMeters meters) {
-    this.provider = provider;
+    this.provider = MeteredStorageProvider.around(provider, meters);
     this.repository = repository;
     this.properties = properties;
     this.scheduler = scheduler;

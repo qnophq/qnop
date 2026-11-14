@@ -89,19 +89,22 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
       HttpServletRequest request, HttpServletResponse response, Authentication authentication)
       throws IOException {
     OAuth2AuthenticationToken token = (OAuth2AuthenticationToken) authentication;
+    String target;
     try {
       LoginResult result = oidcLoginService.completeLogin(token, providerAccessToken(token));
       IssuedRefreshToken refresh = refreshTokenService.issue(result.userId());
       response.addHeader(
           HttpHeaders.SET_COOKIE,
           cookieFactory.build(refresh.plaintext(), refresh.maxAge()).toString());
+      target = frontendBase() + "/";
+      // Counted once nothing in here can still fail, so one attempt is one outcome.
       meters.login(Method.OIDC, LoginOutcome.SUCCESS);
-      response.sendRedirect(frontendBase() + "/");
     } catch (RuntimeException e) {
       meters.login(Method.OIDC, outcomeOf(e));
       log.warn("OIDC login could not be completed: {}", e.getMessage());
-      response.sendRedirect(frontendBase() + "/login?error=" + errorCode(e));
+      target = frontendBase() + "/login?error=" + errorCode(e);
     }
+    response.sendRedirect(target);
   }
 
   /** A disabled account or a missing address is the account's doing; anything else is ours. */
