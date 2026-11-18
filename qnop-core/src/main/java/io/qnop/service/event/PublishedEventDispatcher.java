@@ -21,6 +21,8 @@
 package io.qnop.service.event;
 
 import io.qnop.entity.Document;
+import io.qnop.observability.metrics.ReviewEventMeters;
+import io.qnop.observability.metrics.ReviewEventMeters.Type;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.service.review.ReviewEvent;
 import io.qnop.spi.event.PublishedEvent;
@@ -54,11 +56,29 @@ public class PublishedEventDispatcher {
 
   private final List<PublishedEventListener> listeners;
   private final DocumentRepository documents;
+  private final ReviewEventMeters meters;
 
   public PublishedEventDispatcher(
-      List<PublishedEventListener> listeners, DocumentRepository documents) {
+      List<PublishedEventListener> listeners,
+      DocumentRepository documents,
+      ReviewEventMeters meters) {
     this.listeners = List.copyOf(listeners);
     this.documents = documents;
+    this.meters = meters;
+  }
+
+  /** The event's kind as a meter tag; exhaustive, so a new event cannot go uncounted. */
+  private static Type typeOf(ReviewEvent event) {
+    return switch (event) {
+      case ReviewEvent.ParticipantAdded e -> Type.PARTICIPANT_ADDED;
+      case ReviewEvent.AnnotationCreated e -> Type.ANNOTATION_CREATED;
+      case ReviewEvent.AnnotationDecided e -> Type.ANNOTATION_DECIDED;
+      case ReviewEvent.AnnotationDismissed e -> Type.ANNOTATION_DISMISSED;
+      case ReviewEvent.CommentAdded e -> Type.COMMENT_ADDED;
+      case ReviewEvent.VersionUploaded e -> Type.VERSION_UPLOADED;
+      case ReviewEvent.WorkflowChanged e -> Type.WORKFLOW_CHANGED;
+      case ReviewEvent.ReviewDeleted e -> Type.REVIEW_DELETED;
+    };
   }
 
   private boolean isAnonymous(ReviewEvent event) {
@@ -68,9 +88,20 @@ public class PublishedEventDispatcher {
     return documents.findById(event.documentId()).map(Document::isAnonymous).orElse(true);
   }
 
+  /**
+   * Counts the event on the thread that committed it (issue #962). Not on the dispatch executor:
+   * that one drops when an add-on's listener is slow, which is exactly when the count is looked at,
+   * and what happened in reviews is worth seeing where nothing listens at all.
+   */
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void count(ReviewEvent event) {
+    meters.committed(typeOf(event));
+  }
+
   @Async("publishedEventExecutor")
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void on(ReviewEvent event) {
+    Type type = typeOf(event);
     if (listeners.isEmpty()) {
       return;
     }
@@ -79,6 +110,7 @@ public class PublishedEventDispatcher {
       try {
         listener.on(published);
       } catch (RuntimeException ex) {
+        meters.listenerFailed(type);
         log.warn(
             "published-event listener {} failed for {} on document {}",
             listener.getClass().getName(),

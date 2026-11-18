@@ -20,6 +20,8 @@
  */
 package io.qnop.service.tracking;
 
+import io.qnop.observability.metrics.TrackingMeters;
+import io.qnop.observability.metrics.TrackingMeters.Outcome;
 import io.qnop.service.http.HttpClientProperties;
 import io.qnop.service.http.OutboundHttpClients;
 import jakarta.annotation.PreDestroy;
@@ -70,6 +72,7 @@ public class TrackingProxyService {
   private final TrackingConfigService config;
   private final CloseableHttpClient http;
   private final RequestConfig requestDefaults;
+  private final TrackingMeters meters;
 
   /**
    * Whether the last forward failed, so a broken backend is reported once instead of once per
@@ -91,8 +94,10 @@ public class TrackingProxyService {
   public TrackingProxyService(
       TrackingConfigService config,
       HttpClientProperties httpProperties,
-      @Value("${qnop.tracking.allow-private-host:false}") boolean allowPrivateHost) {
+      @Value("${qnop.tracking.allow-private-host:false}") boolean allowPrivateHost,
+      TrackingMeters meters) {
     this.config = config;
+    this.meters = meters;
     this.http = OutboundHttpClients.create(httpProperties, allowPrivateHost);
     this.requestDefaults = OutboundHttpClients.defaultRequestConfig(httpProperties);
   }
@@ -169,6 +174,7 @@ public class TrackingProxyService {
         .format(clientIp)
         .ifPresent(forwarded -> request.setHeader("X-Forwarded-For", forwarded));
 
+    long started = System.nanoTime();
     try {
       int status =
           http.execute(
@@ -177,13 +183,16 @@ public class TrackingProxyService {
                 EntityUtils.consume(response.getEntity());
                 return response.getCode();
               });
-      if (status >= 200 && status < 300) {
+      boolean accepted = status >= 200 && status < 300;
+      measured(active, accepted ? Outcome.SUCCESS : Outcome.REJECTED, started);
+      if (accepted) {
         recovered();
       } else {
         broken("{} answered {} for a measurement", active.collectBaseUrl(), status);
       }
       return Optional.of(status);
     } catch (IOException e) {
+      measured(active, Outcome.ERROR, started);
       broken("could not reach {}: {}", active.collectBaseUrl(), e.getMessage());
       return Optional.empty();
     }
@@ -200,6 +209,12 @@ public class TrackingProxyService {
         .setResponseTimeout(bound)
         .setConnectionRequestTimeout(bound)
         .build();
+  }
+
+  /** Every forward is measured (issue #962); the log above speaks only on a change of state. */
+  private void measured(TrackingRuntimeConfig active, Outcome outcome, long startedNanos) {
+    meters.forwarded(
+        active.provider(), outcome, Duration.ofNanos(System.nanoTime() - startedNanos));
   }
 
   /** Reports a broken backend on the transition into that state, never once per measurement. */

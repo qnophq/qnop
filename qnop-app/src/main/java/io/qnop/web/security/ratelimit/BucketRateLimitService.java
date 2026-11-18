@@ -24,6 +24,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
+import io.qnop.observability.metrics.AuthMeters;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import org.springframework.stereotype.Component;
@@ -44,8 +45,10 @@ public class BucketRateLimitService {
   private static final long MAX_BUCKET_TTL_SECONDS = 3_600;
 
   private final java.util.concurrent.ConcurrentMap<String, Bucket> buckets;
+  private final AuthMeters meters;
 
-  public BucketRateLimitService(RateLimitProperties properties) {
+  public BucketRateLimitService(RateLimitProperties properties, AuthMeters meters) {
+    this.meters = meters;
     // Size-cap the bucket store so a high-cardinality key space (e.g. a spoofable client IP when
     // no trusted proxy is configured) cannot grow it without bound (issue #49).
     this.buckets =
@@ -74,6 +77,8 @@ public class BucketRateLimitService {
     if (probe.isConsumed()) {
       return new RateLimitResult.Allowed(probe.getRemainingTokens());
     }
+    // Every refusal of every limit passes here; the scope is the limit's name, never its key.
+    meters.rateLimited(scope);
     long retryAfterSeconds = Duration.ofNanos(probe.getNanosToWaitForRefill()).toSeconds() + 1;
     return new RateLimitResult.Rejected(retryAfterSeconds);
   }

@@ -27,15 +27,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import io.qnop.bootstrap.AbstractIntegrationTest;
 import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
+import io.qnop.observability.metrics.AuthMeters;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.JwtTokenService;
 import io.qnop.web.security.RefreshTokenCookieFactory;
 import jakarta.servlet.http.Cookie;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -65,6 +68,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
   @Autowired UserRepository userRepository;
   @Autowired PasswordEncoder passwordEncoder;
   @Autowired JwtTokenService jwtTokenService;
+  @Autowired MeterRegistry meterRegistry;
 
   @Test
   void loginIssuesAccessTokenAndRefreshCookie() throws Exception {
@@ -88,8 +92,56 @@ class AuthControllerIT extends AbstractIntegrationTest {
   @Test
   void rejectsInvalidCredentials() throws Exception {
     createUser("bob");
+    double rejectedBefore = logins("rejected");
 
     mockMvc.perform(loginRequest("bob", "wrong-password")).andExpect(status().isUnauthorized());
+
+    assertThat(logins("rejected")).isEqualTo(rejectedBefore + 1);
+  }
+
+  @Test
+  @DisplayName("logins and refreshes are counted by outcome, with no tag naming anyone (#962)")
+  void countsLoginsAndRefreshes() throws Exception {
+    createUser("metered");
+    double loginsBefore = logins("success");
+    double rotatedBefore = refreshes("success");
+    double reusedBefore = refreshes("reused");
+    double missingBefore = refreshes("missing");
+
+    Cookie refresh = login("metered");
+    mockMvc
+        .perform(post("/api/v1/auth/refresh").cookie(refresh).with(csrf()))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(post("/api/v1/auth/refresh").cookie(refresh).with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mockMvc.perform(post("/api/v1/auth/refresh").with(csrf())).andExpect(status().isUnauthorized());
+
+    assertThat(logins("success")).isEqualTo(loginsBefore + 1);
+    assertThat(refreshes("success")).isEqualTo(rotatedBefore + 1);
+    assertThat(refreshes("reused")).isEqualTo(reusedBefore + 1);
+    assertThat(refreshes("missing")).isEqualTo(missingBefore + 1);
+    assertThat(meterRegistry.find(AuthMeters.LOGIN).counters())
+        .allSatisfy(
+            counter ->
+                assertThat(counter.getId().getTags())
+                    .extracting(tag -> tag.getKey())
+                    .containsExactlyInAnyOrder("application", "method", "outcome"));
+  }
+
+  private double logins(String outcome) {
+    var counter =
+        meterRegistry
+            .find(AuthMeters.LOGIN)
+            .tag("method", "local")
+            .tag("outcome", outcome)
+            .counter();
+    return counter == null ? 0 : counter.count();
+  }
+
+  private double refreshes(String outcome) {
+    var counter = meterRegistry.find(AuthMeters.REFRESH).tag("outcome", outcome).counter();
+    return counter == null ? 0 : counter.count();
   }
 
   @Test

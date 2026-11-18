@@ -1,0 +1,173 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Alert rules for qnop (issue #962). Thresholds are starting points, not truths: tune them to the
+# deployment. Every qnop_* series named here is published by the application; a test in the
+# repository fails when a rule names one that is not (MetricCatalogueTest).
+#
+# A counter that is created by its first event (mail failures, reused refresh tokens) cannot show
+# that first event to increase(); the rules on such counters fire from the second one on.
+#
+# Aggregation: series read from the database are the same on every instance and are aggregated
+# with max/min; per-instance counters and timers with sum (docs/OBSERVABILITY.md).
+
+groups:
+  - name: qnop-availability
+    rules:
+      - alert: QnopDown
+        expr: up{job="qnop"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: qnop instance {{ $labels.instance }} cannot be scraped
+          description: Prometheus has not reached the instance for two minutes. It is down, or the management port is not reachable.
+
+      - alert: QnopHighServerErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{application="qnop", uri!~"/actuator.*", outcome="SERVER_ERROR"}[5m]))
+            / sum(rate(http_server_requests_seconds_count{application="qnop", uri!~"/actuator.*"}[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: More than 5% of qnop's requests fail with a server error
+          description: The dashboard's "Server errors by endpoint" panel shows where.
+
+      - alert: QnopSlowRequests
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application="qnop", uri!~"/actuator.*"}[5m]))) > 2.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: qnop's 95th-percentile response time is above 2.5 s
+
+  - name: qnop-jobs
+    rules:
+      - alert: QnopJobQueueStuck
+        expr: max(qnop_jobs_oldest_pending_age_seconds{application="qnop"}) > 600
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: A due job has been waiting for more than ten minutes
+          description: Uploads are not being extracted and annotations not re-anchored. Either no worker is polling the queue or every worker is busy.
+
+      - alert: QnopJobsStale
+        expr: max(qnop_jobs{application="qnop", state="stale"}) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Jobs are marked running but have not moved
+          description: A worker died mid-job and the reaper has not put its jobs back. Check that the reaper runs.
+
+      # On the queue's own count, not on the execution counter: that counter is created by the
+      # first failure, so its first failure after every restart is invisible to increase().
+      - alert: QnopJobsFailing
+        expr: max(delta(qnop_jobs{application="qnop", state="failed"}[30m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: Jobs gave up after their last retry
+          description: The failed jobs stay in the queue table for inspection (qnop_jobs{state="failed"}).
+
+      - alert: QnopConverterSaturated
+        expr: sum(increase(qnop_office_conversion_refused_total{application="qnop"}[15m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Word uploads are being turned away for want of a converter slot
+          description: The jobs are retried, so nothing is lost, but DOCX uploads are slow. Raise the converter limit or add an instance.
+
+  - name: qnop-scheduler
+    rules:
+      - alert: QnopScheduledJobFailed
+        expr: max by (job) (qnop_scheduler_last_run_failed{application="qnop"}) == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Scheduled job {{ $labels.job }} failed on its last run
+
+      # Most maintenance jobs run daily. A job on a longer schedule needs its own threshold.
+      - alert: QnopScheduledJobNotRunning
+        expr: |
+          (time() - max by (job) (qnop_scheduler_last_run_timestamp_seconds{application="qnop"}) > 2 * 86400)
+            and max by (job) (qnop_scheduler_job_enabled{application="qnop"}) == 1
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: Scheduled job {{ $labels.job }} is enabled but has not run for two days
+
+      # A job that has never run reports no timestamp (NaN), and NaN equals nothing, itself
+      # included: "unless x == x" keeps exactly the enabled jobs without one.
+      - alert: QnopScheduledJobNeverRan
+        expr: |
+          max by (job) (qnop_scheduler_job_enabled{application="qnop"}) == 1
+            unless max by (job) (qnop_scheduler_last_run_timestamp_seconds{application="qnop"})
+              == max by (job) (qnop_scheduler_last_run_timestamp_seconds{application="qnop"})
+        for: 2d
+        labels:
+          severity: warning
+        annotations:
+          summary: Scheduled job {{ $labels.job }} is enabled but has never run
+
+  - name: qnop-integrity
+    rules:
+      - alert: QnopAuditChainBroken
+        expr: min(qnop_audit_chain_intact{application="qnop"}) == 0
+        labels:
+          severity: critical
+        annotations:
+          summary: The audit trail did not pass its integrity check
+          description: The last verification found a break in the audit chain, or could not finish. qnop_audit_chain_problems and the run's message on the scheduler page say which. See "Audit-trail integrity" in docs/DEPLOYMENT.md.
+
+      - alert: QnopRefreshTokenReuse
+        expr: sum(increase(qnop_auth_refresh_total{application="qnop", outcome="reused"}[15m])) > 5
+        labels:
+          severity: warning
+        annotations:
+          summary: Already-used refresh tokens are being presented
+          description: A few can be a client retrying; a burst is the shape of a stolen session cookie (ADR-0026).
+
+  - name: qnop-dependencies
+    rules:
+      - alert: QnopStorageErrors
+        expr: |
+          sum(rate(qnop_storage_operation_seconds_count{application="qnop", outcome="error"}[5m]))
+            / sum(rate(qnop_storage_operation_seconds_count{application="qnop"}[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: More than 5% of qnop's object-storage calls fail
+
+      - alert: QnopMailFailing
+        expr: sum(increase(qnop_mail_send_seconds_count{application="qnop", outcome="failed"}[15m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: qnop cannot send mail
+          description: Verification and password-reset mails are not arriving. Check the SMTP settings and the server.
+
+      - alert: QnopDatabasePoolExhausted
+        expr: max by (instance) (hikaricp_connections_pending{application="qnop"}) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Requests on {{ $labels.instance }} are waiting for a database connection
+
+      - alert: QnopHeapNearlyFull
+        expr: |
+          sum by (instance) (jvm_memory_used_bytes{application="qnop", area="heap"})
+            / sum by (instance) (jvm_memory_max_bytes{application="qnop", area="heap"}) > 0.9
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: The heap of {{ $labels.instance }} has been above 90% for fifteen minutes

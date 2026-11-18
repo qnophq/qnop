@@ -27,6 +27,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.qnop.observability.metrics.MailMeters;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,7 +77,8 @@ class DeferredMailAfterCommitTest {
         MailSenderProvider senderProvider,
         MailTemplateService templates,
         org.springframework.context.ApplicationEventPublisher events) {
-      return new MailService(senderProvider, templates, events);
+      return new MailService(
+          senderProvider, templates, events, new MailMeters(new SimpleMeterRegistry()));
     }
 
     @Bean

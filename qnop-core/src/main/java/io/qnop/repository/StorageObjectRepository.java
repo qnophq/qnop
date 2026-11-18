@@ -45,4 +45,13 @@ public interface StorageObjectRepository extends JpaRepository<StorageObject, UU
    */
   @Query("SELECT s.objectKey FROM StorageObject s")
   List<String> findAllObjectKeys();
+
+  /**
+   * How many registry rows there are per lifecycle state and how many bytes they hold (issue #962),
+   * as {@code [status, count, bytes]} rows — one grouped read for the product gauges.
+   */
+  @Query(
+      "SELECT s.status, COUNT(s), COALESCE(SUM(s.sizeBytes), 0) FROM StorageObject s"
+          + " GROUP BY s.status")
+  List<Object[]> countAndSizeGroupedByStatus();
 }

@@ -58,6 +58,7 @@ in-process registries described below are the seams those bundles will feed.
 - **Contract:** `io.qnop.spi.storage.StorageProvider` — `put(key, content, length, contentType)`, `get(key) → Optional<StorageContent>`, `exists(key)`, `delete(key)`; throws `StorageException`. Listing via `StorageListing`.
 - **Wiring:** replaceable default. The S3/MinIO adapter (`io.qnop.service.storage`, `S3Configuration`) is `@ConditionalOnMissingBean(StorageProvider.class)` — an extension providing its own bean replaces it entirely.
 - **Core keeps:** the upload-then-commit staging registry and the orphan reaper ([ADR-0036](adr/0036-object-storage-lifecycle-staging-and-reaper.md)) sit *above* the provider — a provider stores bytes by opaque key and knows nothing about commit semantics.
+- **Measured by core:** the storage services wrap the provider they are given in a measuring decorator ([ADR-0065](adr/0065-metrics-conventions-and-scrape-access.md)), so a replacement shows up in `qnop.storage.operation` and `qnop.storage.transferred` without doing anything. The bean itself is left as it is: an extension's provider keeps its own type, lifecycle and listeners.
 - **Owned by:** [ADR-0005](adr/0005-binary-documents-in-object-storage.md), ADR-0036; issue #243.
 
 ### 2. `DocumentExtractor` — document formats (backend, published)
@@ -65,6 +66,7 @@ in-process registries described below are the seams those bundles will feed.
 - **Contract:** `io.qnop.spi.extract.DocumentExtractor` — `supports(contentType)` against the **server-sniffed** MIME type (never the filename), `extract(InputStream) → RenderedDocument` (surfaces + positioned `TextSpan`s, the canonical extraction of [ADR-0032](adr/0032-document-representation-and-rendering-pipeline.md)).
 - **Wiring:** contribution beside a default — the extraction job handler iterates the registered list and uses the first extractor whose `supports` claims the sniffed type; none matching fails the version permanently. Community ships the PDF extractor; DOCX arrives as PDF via the out-of-process LibreOffice conversion ([ADR-0010](adr/0010-docx-representation-strategy.md)) *before* this seam.
 - **Advertisement (issue #601, ADR-0032 amendment):** `default Set<String> mediaTypes()` is the enumerable face of the claim — it makes the type pass the upload accept gate, surfaces in `GET /config` `supportedMediaTypes` (from which the upload UI derives its file filter), and must agree with `supports`. A claimed type is extracted directly; the office conversion stays DOCX-only.
+- **Measured by core:** extraction is timed around the extractor (`qnop.document.extraction`). A format an extension adds is reported under `format="other"`; an extension that wants its own breakdown publishes meters of its own, named `qnop.ee.<area>.<thing>` ([OBSERVABILITY.md](OBSERVABILITY.md#for-extension-authors)).
 - **Owned by:** ADR-0010/0032; the seam promise "a new format is an added implementation, not a core rewrite".
 
 ### 3. `MentionResolver` — mention namespaces (backend, published)
