@@ -46,6 +46,31 @@ scrape of an idle instance had 587 series, 92 of them timing every Spring Securi
   as client-side percentiles (they cannot be aggregated across instances) and not through
   `percentiles-histogram` (about sixty buckets per route, method and status).
 
+### Where meters are recorded
+
+`qnop-core` depends on `micrometer-core`, the Spring-free facade; which registry backs it stays the
+application's choice. This is the seam ADR-0037 deferred. The meters live in
+`io.qnop.observability.metrics`, one small class per area that owns its meter names and takes its
+tag values as enums, so for those the closed-set rule is enforced by the type system rather than
+by review. Two tags are strings because their sets live elsewhere: the job `type` (the type of a
+registered handler) and the scheduler `job` (an id from the scheduler catalogue). Both are bounded
+by their call sites, which return before metering when no handler or no work is registered; a new
+caller must keep that.
+
+Services record at their edges (a job attempt, a conversion, a scheduler run), not inside the
+anchoring or diff algorithms, which stay free of both the database and metrics. `qnop-spi` and
+`qnop-api` gain no dependency: an enterprise `StorageProvider` or extractor is measured by the core
+code that calls it.
+
+A counter that describes committed work is incremented after the commit (`AfterCommit`).
+Re-anchoring results, accepted uploads and reaped jobs are counted that way, because the queue
+retries a rolled-back attempt and a request that loses a uniqueness race rolls back, and either
+would otherwise be counted without having happened. Timers measure attempts, whatever their fate.
+
+Timers and counters are per instance; a job that ShedLock runs on one pod is timed on that pod
+only. Facts that must be the same everywhere, such as when a scheduled job last ran, are published
+as gauges from the database instead (see below).
+
 ### What a scrape may cost
 
 Gauges derived from the database read a **snapshot that is loaded once and shared**, at most

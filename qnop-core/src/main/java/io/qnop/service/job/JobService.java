@@ -23,6 +23,8 @@ package io.qnop.service.job;
 import io.qnop.entity.Job;
 import io.qnop.entity.JobStatus;
 import io.qnop.observability.LogContext;
+import io.qnop.observability.metrics.AfterCommit;
+import io.qnop.observability.metrics.JobMeters;
 import io.qnop.repository.JobRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -66,10 +68,13 @@ public class JobService {
   private final JobRepository repository;
   private final JobEnqueuer enqueuer;
   private final Map<String, JobHandler> handlers;
+  private final JobMeters meters;
 
-  public JobService(JobRepository repository, JobEnqueuer enqueuer, List<JobHandler> handlers) {
+  public JobService(
+      JobRepository repository, JobEnqueuer enqueuer, List<JobHandler> handlers, JobMeters meters) {
     this.repository = repository;
     this.enqueuer = enqueuer;
+    this.meters = meters;
     this.handlers =
         handlers.stream()
             .collect(Collectors.toUnmodifiableMap(JobHandler::type, Function.identity()));
@@ -111,13 +116,27 @@ public class JobService {
     // The type belongs on every line the handler writes: an id alone says which
     // job, not what it was trying to do (issue #659).
     try (LogContext.Scope ignored = LogContext.scope(LogContext.JOB_TYPE, job.getType())) {
+      meters.waited(job.getType(), Duration.between(job.getRunAfter(), Instant.now()));
       long startedAt = System.nanoTime();
-      handler.handle(job.getPayload());
-      job.markDone();
-      repository.save(job);
+      try {
+        handler.handle(job.getPayload());
+        job.markDone();
+        repository.save(job);
+      } catch (RuntimeException e) {
+        // The same test recordFailure applies next, so the outcome here says what
+        // the queue is about to do with the job: try again, or give up.
+        boolean exhausted = job.getAttempts() >= job.getMaxAttempts();
+        meters.executed(
+            job.getType(),
+            exhausted ? JobMeters.Outcome.FAILED : JobMeters.Outcome.RETRY,
+            Duration.ofNanos(System.nanoTime() - startedAt));
+        throw e;
+      }
+      Duration elapsed = Duration.ofNanos(System.nanoTime() - startedAt);
+      meters.executed(job.getType(), JobMeters.Outcome.SUCCESS, elapsed);
       // One line per completed job, with the duration: the cheapest way to see a
       // handler that has quietly become slow.
-      log.info("Job done in {} ms", (System.nanoTime() - startedAt) / 1_000_000);
+      log.info("Job done in {} ms", elapsed.toMillis());
     }
   }
 
@@ -156,7 +175,11 @@ public class JobService {
   @Transactional
   public int reapStale() {
     Instant now = Instant.now();
-    return repository.reapStaleRunning(now.minus(STALE_AFTER), now);
+    int reclaimed = repository.reapStaleRunning(now.minus(STALE_AFTER), now);
+    if (reclaimed > 0) {
+      AfterCommit.run(() -> meters.reaped(reclaimed));
+    }
+    return reclaimed;
   }
 
   /**
@@ -177,6 +200,17 @@ public class JobService {
         repository.countByStatus(JobStatus.RUNNING),
         repository.countByStatusAndUpdatedAtBefore(JobStatus.RUNNING, staleBefore),
         repository.countByStatus(JobStatus.FAILED));
+  }
+
+  /**
+   * How long the longest-waiting due job has been waiting (issue #962), zero when nothing is due. A
+   * queue can be short and still stuck; this is the number that says whether it is moving.
+   */
+  @Transactional(readOnly = true)
+  public Duration oldestPendingAge() {
+    Instant now = Instant.now();
+    Instant earliest = repository.findEarliestRunAfter(JobStatus.PENDING, now);
+    return earliest == null ? Duration.ZERO : Duration.between(earliest, now);
   }
 
   /** Capped exponential backoff: {@code base * 2^(attempts-1)}, clamped to the cap. */

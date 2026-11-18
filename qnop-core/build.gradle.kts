@@ -53,6 +53,9 @@ dependencies {
     // filter is wired in qnop-app.
     implementation(libs.spring.security.oauth2.jose)
     implementation(libs.caffeine)
+    // Timers and counters at the service edges (issue #962, ADR-0065). The facade only: which
+    // registry backs it is the application's choice.
+    implementation(libs.micrometer.core)
 
     // OIDC/OAuth2 provider admin (issue #21): ClientRegistrations.fromIssuerLocation
     // for endpoint discovery. The browser login flow is wired in qnop-app (PR B).

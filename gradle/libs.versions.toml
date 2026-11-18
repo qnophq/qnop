@@ -103,6 +103,8 @@ spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-
 # Prometheus scrape registry for Actuator metrics (issue #348, ADR-0013). Version via the BOM;
 # auto-configured at runtime, so it is a runtime-only dependency (no compile-time symbols).
 micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
+# The metrics facade qnop-core records against (issue #962, ADR-0065). Spring-free; version via the BOM.
+micrometer-core = { module = "io.micrometer:micrometer-core" }
 spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
 # AOP, for the one aspect that traces the service layer at DEBUG (issue #659, ADR-0054).
 # Writing that by hand would mean a log line in every method, drifting from the first

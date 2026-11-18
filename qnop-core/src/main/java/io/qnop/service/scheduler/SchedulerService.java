@@ -22,6 +22,7 @@ package io.qnop.service.scheduler;
 
 import io.qnop.entity.AuditEvent;
 import io.qnop.entity.SchedulerJob;
+import io.qnop.observability.metrics.SchedulerMeters;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.SchedulerJobRepository;
 import io.qnop.service.limits.FeatureDisabledException;
@@ -97,6 +98,7 @@ public class SchedulerService {
   private final LockProvider lockProvider;
   private final TransactionTemplate tx;
   private final FeatureToggleProperties features;
+  private final SchedulerMeters meters;
   private final Map<String, SchedulerWork> works = new ConcurrentHashMap<>();
 
   public SchedulerService(
@@ -104,8 +106,10 @@ public class SchedulerService {
       AuditEventRepository auditEvents,
       LockProvider lockProvider,
       PlatformTransactionManager transactionManager,
-      FeatureToggleProperties features) {
+      FeatureToggleProperties features,
+      SchedulerMeters meters) {
     this.jobs = jobs;
+    this.meters = meters;
     this.auditEvents = auditEvents;
     this.lockProvider = lockProvider;
     this.tx = new TransactionTemplate(transactionManager);
@@ -260,6 +264,7 @@ public class SchedulerService {
     }
     boolean dryRun = state.dryRun() && supportsDryRun(jobId);
     String summary;
+    long startedAt = System.nanoTime();
     try {
       if (isSelfTransactional(jobId)) {
         // The job commits in independent units of its own choosing (issue #577), so it must NOT run
@@ -272,14 +277,32 @@ public class SchedulerService {
       }
     } catch (RuntimeException e) {
       log.error("Scheduler job {} ({}) failed", jobId, trigger, e);
+      time(jobId, SchedulerMeters.Outcome.FAILURE, trigger, dryRun, startedAt);
       recordOutcome(jobId, RunOutcome.FAILURE, trigger, summarize(e), dryRun, actorId);
       return RunOutcome.FAILURE;
     }
     // The job's own summary becomes the dashboard's last-run detail; a job with
     // nothing to say still leaves a marker for a dry run.
+    time(jobId, SchedulerMeters.Outcome.SUCCESS, trigger, dryRun, startedAt);
     String detail = summary != null ? clamp(summary) : (dryRun ? "Dry run" : null);
     recordOutcome(jobId, RunOutcome.SUCCESS, trigger, detail, dryRun, actorId);
     return RunOutcome.SUCCESS;
+  }
+
+  private void time(
+      String jobId,
+      SchedulerMeters.Outcome outcome,
+      RunTrigger trigger,
+      boolean dryRun,
+      long startedAt) {
+    meters.ran(
+        jobId,
+        outcome,
+        trigger == RunTrigger.MANUAL
+            ? SchedulerMeters.Trigger.MANUAL
+            : SchedulerMeters.Trigger.SCHEDULED,
+        dryRun,
+        Duration.ofNanos(System.nanoTime() - startedAt));
   }
 
   /** Clamps a job-supplied summary to the {@code last_detail} column, like {@link #summarize}. */

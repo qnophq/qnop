@@ -25,9 +25,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qnop.entity.AnnotationPlacement;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.PlacementStatus;
+import io.qnop.observability.metrics.ReanchorMeters;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import java.util.List;
@@ -36,6 +38,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Unit tests for {@link ReanchorJobHandler} (issue #248): pending placements resolve to
@@ -44,11 +48,13 @@ import org.junit.jupiter.api.Test;
  */
 class ReanchorJobHandlerTest {
 
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
   private final DocumentVersionRepository versions = mock(DocumentVersionRepository.class);
   private final AnnotationPlacementRepository placements =
       mock(AnnotationPlacementRepository.class);
   private final ReanchorJobHandler handler =
-      new ReanchorJobHandler(versions, placements, ReanchoringProperties.defaults());
+      new ReanchorJobHandler(
+          versions, placements, ReanchoringProperties.defaults(), new ReanchorMeters(registry));
 
   private final UUID versionId = UUID.randomUUID();
   private DocumentVersion version;
@@ -95,6 +101,9 @@ class ReanchorJobHandlerTest {
     assertThat(exact.getStatus()).isEqualTo(PlacementStatus.PLACED);
     assertThat(exact.getAnchor()).contains("\"textPosition\"");
     assertThat(gone.getStatus()).isEqualTo(PlacementStatus.ORPHANED);
+    assertThat(reanchored("placed")).isEqualTo(1.0);
+    assertThat(reanchored("orphaned")).isEqualTo(1.0);
+    assertThat(reanchored("moved")).isZero();
   }
 
   @Test
@@ -110,6 +119,34 @@ class ReanchorJobHandlerTest {
 
     assertThat(geometric.getStatus()).isEqualTo(PlacementStatus.MOVED);
     assertThat(geometric.getAnchor()).isEqualTo(anchor);
+    assertThat(reanchored("moved")).isEqualTo(1.0);
+  }
+
+  @Test
+  @DisplayName("counts the results only once the placements are committed (issue #962)")
+  void countsAfterCommit() {
+    AnnotationPlacement gone =
+        pending("{\"textQuote\":{\"quote\":\"a clause that no longer exists anywhere\"}}");
+    when(placements.findByDocumentVersionIdAndStatus(versionId, PlacementStatus.PENDING))
+        .thenReturn(List.of(gone));
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      handler.handle("{\"versionId\":\"" + versionId + "\"}");
+
+      // Still inside the transaction: a rollback from here must leave the counter alone.
+      assertThat(reanchored("orphaned")).isZero();
+
+      TransactionSynchronizationManager.getSynchronizations()
+          .forEach(TransactionSynchronization::afterCommit);
+      assertThat(reanchored("orphaned")).isEqualTo(1.0);
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
+  }
+
+  /** The re-anchoring counter for one result (issue #962). */
+  private double reanchored(String result) {
+    return registry.find(ReanchorMeters.ANNOTATIONS).tag("result", result).counter().count();
   }
 
   @Test

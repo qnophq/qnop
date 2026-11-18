@@ -29,8 +29,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
+import io.qnop.observability.metrics.IngestMeters;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.DocumentRepository;
@@ -74,6 +76,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 @ExtendWith(MockitoExtension.class)
 class DocumentIngestServiceTest {
 
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+
   @Mock private DocumentRepository documents;
   @Mock private DocumentVersionRepository versions;
   @Mock private StorageService storage;
@@ -111,7 +115,8 @@ class DocumentIngestServiceTest {
         transactionManager,
         org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class),
         renditions,
-        noLimits());
+        noLimits(),
+        new IngestMeters(registry));
   }
 
   // --- request validation (rejected before any storage or settings work) -----

@@ -23,6 +23,7 @@ package io.qnop.service.document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ExtractionStatus;
 import io.qnop.observability.LogContext;
+import io.qnop.observability.metrics.IngestMeters;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.job.JobHandler;
 import io.qnop.service.job.JobPayload;
@@ -32,8 +33,10 @@ import io.qnop.spi.extract.DocumentExtractor;
 import io.qnop.spi.extract.ExtractionException;
 import io.qnop.spi.extract.RenderedDocument;
 import io.qnop.spi.storage.StorageContent;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,13 +79,16 @@ public class DocumentExtractionJobHandler implements JobHandler {
   private final List<DocumentExtractor> extractors;
   private final DocumentExtractionWriter writer;
   private final DocumentRenditionService renditions;
+  private final IngestMeters meters;
 
   public DocumentExtractionJobHandler(
       DocumentVersionRepository versions,
       StorageService storage,
       List<DocumentExtractor> extractors,
       DocumentExtractionWriter writer,
-      DocumentRenditionService renditions) {
+      DocumentRenditionService renditions,
+      IngestMeters meters) {
+    this.meters = meters;
     this.versions = versions;
     this.storage = storage;
     this.extractors = extractors;
@@ -112,12 +118,27 @@ public class DocumentExtractionJobHandler implements JobHandler {
     // From here on the lines carry the review (issue #659). Without it, extraction is
     // the one place where a failure a user reports on their review has no way back to
     // it: the job runs on its own thread, long after the upload's request is gone.
+    IngestMeters.Format format = IngestMeters.Format.ofContentType(version.getContentType());
+    long startedAt = System.nanoTime();
     try (LogContext.Scope ignored = LogContext.document(version.getDocumentId())) {
-      extract(version, versionId);
+      OptionalInt surfaces = extract(version, versionId);
+      meters.extracted(
+          format,
+          surfaces.isPresent() ? IngestMeters.Outcome.SUCCESS : IngestMeters.Outcome.REJECTED,
+          Duration.ofNanos(System.nanoTime() - startedAt));
+      surfaces.ifPresent(count -> meters.surfaces(format, count));
+    } catch (RuntimeException e) {
+      meters.extracted(
+          format, IngestMeters.Outcome.ERROR, Duration.ofNanos(System.nanoTime() - startedAt));
+      throw e;
     }
   }
 
-  private void extract(DocumentVersion version, UUID versionId) {
+  /**
+   * Extracts the version and returns how many surfaces it has, or empty when the document was
+   * rejected for good and the version marked FAILED.
+   */
+  private OptionalInt extract(DocumentVersion version, UUID versionId) {
 
     // What gets extracted is the PDF, whether that is the upload or the conversion of
     // it (issue #343). The renditions service converts at most once per version and
@@ -128,7 +149,7 @@ public class DocumentExtractionJobHandler implements JobHandler {
     } catch (ExtractionException e) {
       log.warn("Conversion of version {} failed permanently: {}", versionId, e.getMessage());
       writer.failPermanently(versionId, e.getMessage());
-      return;
+      return OptionalInt.empty();
     }
 
     // The extractor is chosen for what is actually parsed, not for what was uploaded:
@@ -146,12 +167,13 @@ public class DocumentExtractionJobHandler implements JobHandler {
           extractedType,
           versionId);
       writer.failPermanently(versionId, "no extractor supports content type " + extractedType);
-      return;
+      return OptionalInt.empty();
     }
 
     // The fetch + parse run with no DB transaction held (issue #314); only the write phase below
     // opens a short transaction.
     String renderedJson;
+    int surfaces;
     try (StorageContent content =
         storage
             .get(renderableKey)
@@ -161,15 +183,17 @@ public class DocumentExtractionJobHandler implements JobHandler {
                         "stored object missing for version " + versionId))) {
       RenderedDocument rendered = extractor.get().extract(content.stream());
       renderedJson = MAPPER.writeValueAsString(rendered);
+      surfaces = rendered.surfaces().size();
     } catch (ExtractionException e) {
       log.warn("Extraction of version {} failed permanently: {}", versionId, e.getMessage());
       writer.failPermanently(versionId, e.getMessage());
-      return;
+      return OptionalInt.empty();
     } catch (JacksonException e) {
       // Serializing our own SPI records can only fail on a code bug; add context and let the
       // queue's retry/FAILED policy surface it.
       throw new IllegalStateException("Failed to serialize rendered document", e);
     }
     writer.attachRenderedAndChain(versionId, renderedJson);
+    return OptionalInt.of(surfaces);
   }
 }

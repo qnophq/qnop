@@ -29,8 +29,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qnop.entity.AuditEvent;
 import io.qnop.entity.SchedulerJob;
+import io.qnop.observability.metrics.SchedulerMeters;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.SchedulerJobRepository;
 import io.qnop.service.limits.FeatureDisabledException;
@@ -72,6 +75,7 @@ class SchedulerServiceTest {
   @Mock private LockProvider lockProvider;
   @Mock private PlatformTransactionManager transactionManager;
 
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
   private SchedulerService scheduler;
 
   @BeforeEach
@@ -79,7 +83,12 @@ class SchedulerServiceTest {
     when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
     scheduler =
         new SchedulerService(
-            jobs, auditEvents, lockProvider, transactionManager, FeatureToggleProperties.all());
+            jobs,
+            auditEvents,
+            lockProvider,
+            transactionManager,
+            FeatureToggleProperties.all(),
+            new SchedulerMeters(registry));
   }
 
   @Test
@@ -104,6 +113,35 @@ class SchedulerServiceTest {
     assertThat(job.getLastTrigger()).isEqualTo("SCHEDULED");
     verify(jobs).save(job);
     verify(auditEvents, never()).save(any()); // scheduled runs never audit
+    assertThat(runsTimed(TOKEN_JOB, "success", "scheduled")).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("a failing run is timed as a failure")
+  void failingRunIsTimedAsFailure() {
+    when(jobs.findById(TOKEN_JOB)).thenReturn(Optional.of(SchedulerJob.seed(TOKEN_JOB, true)));
+    scheduler.register(
+        TOKEN_JOB,
+        dryRun -> {
+          throw new IllegalStateException("sweep failed");
+        });
+
+    assertThat(scheduler.runScheduled(TOKEN_JOB)).isEqualTo(RunOutcome.FAILURE);
+
+    assertThat(runsTimed(TOKEN_JOB, "failure", "scheduled")).isEqualTo(1);
+    assertThat(runsTimed(TOKEN_JOB, "success", "scheduled")).isZero();
+  }
+
+  /** How many runs were timed with these tags (issue #962). */
+  private long runsTimed(String jobId, String outcome, String trigger) {
+    Timer timer =
+        registry
+            .find(SchedulerMeters.RUN)
+            .tag("job", jobId)
+            .tag("outcome", outcome)
+            .tag("trigger", trigger)
+            .timer();
+    return timer == null ? 0 : timer.count();
   }
 
   @Test
@@ -125,6 +163,8 @@ class SchedulerServiceTest {
     assertThat(outcome).isEqualTo(RunOutcome.SKIPPED_DISABLED);
     assertThat(runs).hasValue(0);
     verify(jobs, never()).save(any());
+    // A skipped run is not a run: nothing is timed.
+    assertThat(registry.find(SchedulerMeters.RUN).timers()).isEmpty();
   }
 
   @Test
@@ -217,6 +257,9 @@ class SchedulerServiceTest {
     verify(auditEvents).save(captor.capture());
     assertThat(captor.getValue().getActorId()).isEqualTo(actor);
     assertThat(captor.getValue().getEventType()).isEqualTo("scheduler.job.run");
+    assertThat(runsTimed(TOKEN_JOB, "success", "manual")).isEqualTo(1);
+    assertThat(runsTimed(TOKEN_JOB, "success", "scheduled")).isZero();
+    assertThat(registry.find(SchedulerMeters.RUN).tag("dry_run", "false").timer()).isNotNull();
   }
 
   @Test
@@ -380,7 +423,8 @@ class SchedulerServiceTest {
             lockProvider,
             transactionManager,
             FeatureToggleProperties.allExcept(
-                FeatureDisabledException.Feature.SCHEDULER_MANUAL_RUN));
+                FeatureDisabledException.Feature.SCHEDULER_MANUAL_RUN),
+            new SchedulerMeters(registry));
     AtomicInteger runs = new AtomicInteger();
     withoutManualRun.register(
         TOKEN_JOB,
@@ -417,7 +461,8 @@ class SchedulerServiceTest {
             lockProvider,
             transactionManager,
             FeatureToggleProperties.allExcept(
-                FeatureDisabledException.Feature.SCHEDULER_JOB_SETTINGS));
+                FeatureDisabledException.Feature.SCHEDULER_JOB_SETTINGS),
+            new SchedulerMeters(registry));
 
     assertThatThrownBy(
             () -> withFixedSettings.updateSettings(UUID.randomUUID(), TOKEN_JOB, false, null))

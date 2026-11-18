@@ -29,9 +29,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import io.qnop.bootstrap.AbstractIntegrationTest;
 import io.qnop.entity.ReviewParticipant;
 import io.qnop.entity.User;
+import io.qnop.observability.metrics.IngestMeters;
+import io.qnop.observability.metrics.JobMeters;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.UserRepository;
@@ -77,6 +82,7 @@ class DocumentIngestIT extends AbstractIntegrationTest {
   @Autowired ReviewParticipantRepository participants;
   @Autowired PasswordEncoder passwordEncoder;
   @Autowired JobQueuePoller poller;
+  @Autowired MeterRegistry meterRegistry;
   @Autowired ApplicationSettingsService settings;
 
   private final List<UUID> createdDocuments = new ArrayList<>();
@@ -87,6 +93,68 @@ class DocumentIngestIT extends AbstractIntegrationTest {
     // Documents cascade their versions/participants; owner FK is RESTRICT → docs first.
     createdDocuments.forEach(id -> documents.findById(id).ifPresent(documents::delete));
     createdUsers.forEach(id -> users.findById(id).ifPresent(users::delete));
+  }
+
+  @Test
+  @DisplayName("an ingested document shows up in the job, extraction and upload meters (#962)")
+  void ingestIsMeasured() throws Exception {
+    UUID owner = createUser();
+    byte[] pdf = pdf("Hello qnop metrics");
+    // The registry is shared by every test of this context, so compare against where it stood.
+    long extractionsBefore = count(extractionTimer());
+    long jobsBefore = count(jobTimer());
+    long waitsBefore = count(queueWaitTimer());
+    DistributionSummary sizeBefore = uploadSize();
+    long uploadsBefore = sizeBefore == null ? 0 : sizeBefore.count();
+    double bytesBefore = sizeBefore == null ? 0 : sizeBefore.totalAmount();
+
+    MvcResult upload =
+        mockMvc
+            .perform(
+                multipart("/api/v1/documents")
+                    .file(pdfFile(pdf))
+                    .param("title", "Metrics IT")
+                    .with(asUser(owner)))
+            .andExpect(status().isCreated())
+            .andReturn();
+    documentIdOf(upload); // registers the document for cleanup
+    poller.poll();
+
+    assertThat(uploadSize().count()).isEqualTo(uploadsBefore + 1);
+    assertThat(uploadSize().totalAmount()).isEqualTo(bytesBefore + pdf.length);
+    // "More than before", not "one more": the poll also runs whatever earlier tests of this
+    // shared database left pending in the queue.
+    assertThat(count(extractionTimer())).isGreaterThan(extractionsBefore);
+    assertThat(count(jobTimer())).isGreaterThan(jobsBefore);
+    assertThat(count(queueWaitTimer())).isGreaterThan(waitsBefore);
+  }
+
+  private static long count(Timer timer) {
+    return timer == null ? 0 : timer.count();
+  }
+
+  private Timer extractionTimer() {
+    return meterRegistry
+        .find(IngestMeters.EXTRACTION)
+        .tag("format", "pdf")
+        .tag("outcome", "success")
+        .timer();
+  }
+
+  private Timer jobTimer() {
+    return meterRegistry
+        .find(JobMeters.EXECUTION)
+        .tag("type", "document.extract")
+        .tag("outcome", "success")
+        .timer();
+  }
+
+  private Timer queueWaitTimer() {
+    return meterRegistry.find(JobMeters.QUEUE_WAIT).tag("type", "document.extract").timer();
+  }
+
+  private DistributionSummary uploadSize() {
+    return meterRegistry.find(IngestMeters.UPLOAD_SIZE).tag("format", "pdf").summary();
   }
 
   @Test
