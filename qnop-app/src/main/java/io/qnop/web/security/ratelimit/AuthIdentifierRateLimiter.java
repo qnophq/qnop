@@ -20,6 +20,7 @@
  */
 package io.qnop.web.security.ratelimit;
 
+import io.qnop.observability.metrics.AuthMeters;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -87,8 +88,13 @@ public class AuthIdentifierRateLimiter {
   public AuthIdentifierRateLimiter(
       RateLimitProperties properties,
       HttpClientIpResolver clientIpResolver,
-      LoginDeviceCookies deviceCookies) {
-    this(new BucketRateLimitService(properties), properties, clientIpResolver, deviceCookies);
+      LoginDeviceCookies deviceCookies,
+      AuthMeters meters) {
+    this(
+        new BucketRateLimitService(properties, meters),
+        properties,
+        clientIpResolver,
+        deviceCookies);
   }
 
   AuthIdentifierRateLimiter(

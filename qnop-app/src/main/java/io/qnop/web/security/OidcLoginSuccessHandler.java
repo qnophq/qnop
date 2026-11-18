@@ -20,6 +20,9 @@
  */
 package io.qnop.web.security;
 
+import io.qnop.observability.metrics.AuthMeters;
+import io.qnop.observability.metrics.AuthMeters.LoginOutcome;
+import io.qnop.observability.metrics.AuthMeters.Method;
 import io.qnop.security.QnopProperties;
 import io.qnop.service.RefreshTokenService;
 import io.qnop.service.RefreshTokenService.IssuedRefreshToken;
@@ -64,18 +67,21 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
   private final RefreshTokenCookieFactory cookieFactory;
   private final OAuth2AuthorizedClientService authorizedClientService;
   private final QnopProperties properties;
+  private final AuthMeters meters;
 
   public OidcLoginSuccessHandler(
       OidcLoginService oidcLoginService,
       RefreshTokenService refreshTokenService,
       RefreshTokenCookieFactory cookieFactory,
       OAuth2AuthorizedClientService authorizedClientService,
-      QnopProperties properties) {
+      QnopProperties properties,
+      AuthMeters meters) {
     this.oidcLoginService = oidcLoginService;
     this.refreshTokenService = refreshTokenService;
     this.cookieFactory = cookieFactory;
     this.authorizedClientService = authorizedClientService;
     this.properties = properties;
+    this.meters = meters;
   }
 
   @Override
@@ -83,17 +89,29 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
       HttpServletRequest request, HttpServletResponse response, Authentication authentication)
       throws IOException {
     OAuth2AuthenticationToken token = (OAuth2AuthenticationToken) authentication;
+    String target;
     try {
       LoginResult result = oidcLoginService.completeLogin(token, providerAccessToken(token));
       IssuedRefreshToken refresh = refreshTokenService.issue(result.userId());
       response.addHeader(
           HttpHeaders.SET_COOKIE,
           cookieFactory.build(refresh.plaintext(), refresh.maxAge()).toString());
-      response.sendRedirect(frontendBase() + "/");
+      target = frontendBase() + "/";
+      // Counted once nothing in here can still fail, so one attempt is one outcome.
+      meters.login(Method.OIDC, LoginOutcome.SUCCESS);
     } catch (RuntimeException e) {
+      meters.login(Method.OIDC, outcomeOf(e));
       log.warn("OIDC login could not be completed: {}", e.getMessage());
-      response.sendRedirect(frontendBase() + "/login?error=" + errorCode(e));
+      target = frontendBase() + "/login?error=" + errorCode(e);
     }
+    response.sendRedirect(target);
+  }
+
+  /** A disabled account or a missing address is the account's doing; anything else is ours. */
+  private static LoginOutcome outcomeOf(RuntimeException e) {
+    return e instanceof OidcAccountDisabledException || e instanceof OidcEmailMissingException
+        ? LoginOutcome.REJECTED
+        : LoginOutcome.ERROR;
   }
 
   /**

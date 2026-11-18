@@ -20,6 +20,7 @@
  */
 package io.qnop.service.storage;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -30,18 +31,25 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qnop.entity.StorageObject;
+import io.qnop.entity.StorageObjectStatus;
+import io.qnop.observability.metrics.StorageMeters;
 import io.qnop.repository.StorageObjectRepository;
 import io.qnop.service.scheduler.SchedulerService;
 import io.qnop.spi.storage.StorageProvider;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * DB-free unit tests for {@link StorageService#stage} dedup correctness. A registry hit is only a
@@ -54,9 +62,54 @@ class StorageServiceTest {
 
   private final StorageProvider provider = mock(StorageProvider.class);
   private final StorageObjectRepository repository = mock(StorageObjectRepository.class);
+  private final S3Properties properties = mock(S3Properties.class);
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
   private final StorageService storage =
       new StorageService(
-          provider, repository, mock(S3Properties.class), mock(SchedulerService.class));
+          provider,
+          repository,
+          properties,
+          mock(SchedulerService.class),
+          new StorageMeters(registry));
+
+  private double reaped() {
+    return registry.counter(StorageMeters.ORPHANS_REAPED).count();
+  }
+
+  private void oneOrphanIsDue() {
+    when(properties.reaperGracePeriod()).thenReturn(Duration.ofHours(1));
+    when(repository.findByStatusAndCreatedAtBefore(eq(StorageObjectStatus.PENDING), any()))
+        .thenReturn(List.of(pendingRow()));
+  }
+
+  @Test
+  @DisplayName("a dry run of the reaper deletes nothing and counts nothing (issue #962)")
+  void dryRunCountsNothing() {
+    oneOrphanIsDue();
+
+    storage.reapOrphansOnce(true);
+
+    assertThat(reaped()).isZero();
+  }
+
+  @Test
+  @DisplayName("reaped orphans are counted only once the reaper's transaction commits")
+  void reapedOrphansAreCountedAfterCommit() {
+    oneOrphanIsDue();
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      storage.reapOrphansOnce(false);
+
+      // A rollback from here would bring the rows back; the counter must not have moved.
+      assertThat(reaped()).isZero();
+
+      TransactionSynchronizationManager.getSynchronizations()
+          .forEach(TransactionSynchronization::afterCommit);
+      assertThat(reaped()).isEqualTo(1.0);
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
+  }
 
   private static InputStream content() {
     return new ByteArrayInputStream("some qnop document bytes".getBytes());

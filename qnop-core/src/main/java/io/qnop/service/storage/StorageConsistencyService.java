@@ -23,6 +23,7 @@ package io.qnop.service.storage;
 import static java.util.stream.Collectors.toMap;
 
 import io.qnop.entity.Document;
+import io.qnop.observability.metrics.StorageMeters;
 import io.qnop.repository.AttachmentStorageRef;
 import io.qnop.repository.DocumentAttachmentRepository;
 import io.qnop.repository.DocumentRepository;
@@ -84,8 +85,9 @@ public class StorageConsistencyService {
       DocumentAttachmentRepository documentAttachments,
       StorageObjectRepository storageObjects,
       DocumentRepository documents,
-      S3Properties properties) {
-    this.storage = storage;
+      S3Properties properties,
+      StorageMeters meters) {
+    this.storage = MeteredStorageProvider.around(storage, meters);
     this.documentVersions = documentVersions;
     this.documentAttachments = documentAttachments;
     this.storageObjects = storageObjects;

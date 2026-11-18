@@ -22,7 +22,9 @@ package io.qnop.service.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qnop.entity.Document;
+import io.qnop.observability.metrics.ReviewEventMeters;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.service.review.ReviewEvent;
 import io.qnop.spi.event.PublishedEvent;
@@ -34,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -42,6 +45,9 @@ import org.mockito.Mockito;
  * isolation guarantee, with the test-only listeners the seam issues require.
  */
 class PublishedEventDispatcherTest {
+
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+  private final ReviewEventMeters meters = new ReviewEventMeters(registry);
 
   private final UUID doc = UUID.randomUUID();
   private final UUID actor = UUID.randomUUID();
@@ -107,7 +113,7 @@ class PublishedEventDispatcherTest {
           throw new IllegalStateException("extension breakage");
         };
     PublishedEventDispatcher dispatcher =
-        new PublishedEventDispatcher(List.of(broken, healthy), documents(false));
+        new PublishedEventDispatcher(List.of(broken, healthy), documents(false), meters);
 
     dispatcher.on(new ReviewEvent.AnnotationCreated(doc, actor, annotation));
 
@@ -120,7 +126,7 @@ class PublishedEventDispatcherTest {
     Recorder first = new Recorder();
     Recorder second = new Recorder();
     PublishedEventDispatcher dispatcher =
-        new PublishedEventDispatcher(List.of(first, second), documents(false));
+        new PublishedEventDispatcher(List.of(first, second), documents(false), meters);
 
     dispatcher.on(new ReviewEvent.CommentAdded(doc, actor, annotation, UUID.randomUUID()));
 
@@ -132,9 +138,48 @@ class PublishedEventDispatcherTest {
   void withoutListenersNothingIsMapped() {
     // The Community default: dispatcher present, nobody listening, zero work.
     DocumentRepository repository = Mockito.mock(DocumentRepository.class);
-    new PublishedEventDispatcher(List.of(), repository)
+    new PublishedEventDispatcher(List.of(), repository, meters)
         .on(new ReviewEvent.AnnotationCreated(doc, actor, annotation));
     Mockito.verifyNoInteractions(repository);
+  }
+
+  @Test
+  @DisplayName("an event is counted when it commits, whether or not it is ever dispatched (#962)")
+  void countsOnCommitNotOnDispatch() {
+    PublishedEventDispatcher dispatcher =
+        new PublishedEventDispatcher(List.of(), Mockito.mock(DocumentRepository.class), meters);
+
+    // The committing thread counts; a dispatch the executor dropped never calls on().
+    dispatcher.count(new ReviewEvent.AnnotationCreated(doc, actor, annotation));
+
+    assertThat(counted(ReviewEventMeters.EVENTS, "annotation_created")).isEqualTo(1.0);
+  }
+
+  @Test
+  @DisplayName("dispatching does not count the event a second time")
+  void dispatchDoesNotCountAgain() {
+    new PublishedEventDispatcher(List.of(new Recorder()), documents(false), meters)
+        .on(new ReviewEvent.AnnotationCreated(doc, actor, annotation));
+
+    assertThat(counted(ReviewEventMeters.EVENTS, "annotation_created")).isZero();
+  }
+
+  @Test
+  @DisplayName("a listener that throws is counted under the event's kind (issue #962)")
+  void listenerFailuresAreCounted() {
+    PublishedEventListener broken =
+        event -> {
+          throw new IllegalStateException("listener down");
+        };
+    new PublishedEventDispatcher(List.of(broken, new Recorder()), documents(false), meters)
+        .on(new ReviewEvent.CommentAdded(doc, actor, annotation, UUID.randomUUID()));
+
+    assertThat(counted(ReviewEventMeters.LISTENER_FAILURES, "comment_added")).isEqualTo(1.0);
+  }
+
+  private double counted(String meter, String type) {
+    var counter = registry.find(meter).tag("type", type).counter();
+    return counter == null ? 0 : counter.count();
   }
 
   @Test
@@ -147,13 +192,13 @@ class PublishedEventDispatcherTest {
   @Test
   void anonymousReviewsNeverPublishTheActor() {
     Recorder recorder = new Recorder();
-    new PublishedEventDispatcher(List.of(recorder), documents(true))
+    new PublishedEventDispatcher(List.of(recorder), documents(true), meters)
         .on(new ReviewEvent.AnnotationCreated(doc, actor, annotation));
     assertThat(recorder.heard.getFirst().actorId()).isNull();
 
     // The deletion event carries the flag itself — nothing is left to load.
     Recorder deleted = new Recorder();
-    new PublishedEventDispatcher(List.of(deleted), documents(false))
+    new PublishedEventDispatcher(List.of(deleted), documents(false), meters)
         .on(new ReviewEvent.ReviewDeleted(doc, actor, UUID.randomUUID(), "t", true));
     assertThat(deleted.heard.getFirst().actorId()).isNull();
   }
@@ -163,7 +208,7 @@ class PublishedEventDispatcherTest {
     // The roster is the one list an anonymous review refuses to reveal (ADR-0038 #422):
     // participant.added must not hand it to an out-of-process consumer, principal by principal.
     Recorder recorder = new Recorder();
-    new PublishedEventDispatcher(List.of(recorder), documents(true))
+    new PublishedEventDispatcher(List.of(recorder), documents(true), meters)
         .on(new ReviewEvent.ParticipantAdded(doc, actor, UUID.randomUUID(), null));
     PublishedEvent heard = recorder.heard.getFirst();
     assertThat(heard.actorId()).isNull();
@@ -175,7 +220,7 @@ class PublishedEventDispatcherTest {
     Recorder recorder = new Recorder();
     DocumentRepository repository = Mockito.mock(DocumentRepository.class);
     Mockito.when(repository.findById(doc)).thenReturn(Optional.empty());
-    new PublishedEventDispatcher(List.of(recorder), repository)
+    new PublishedEventDispatcher(List.of(recorder), repository, meters)
         .on(new ReviewEvent.AnnotationCreated(doc, actor, annotation));
     assertThat(recorder.heard.getFirst().actorId()).isNull();
   }

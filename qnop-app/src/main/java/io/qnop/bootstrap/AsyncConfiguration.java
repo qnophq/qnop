@@ -20,6 +20,7 @@
  */
 package io.qnop.bootstrap;
 
+import io.qnop.observability.metrics.ReviewEventMeters;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -139,16 +140,18 @@ public class AsyncConfiguration {
       name = "qnop.events.sync-dispatch",
       havingValue = "false",
       matchIfMissing = true)
-  public ThreadPoolTaskExecutor publishedEventExecutor() {
+  public ThreadPoolTaskExecutor publishedEventExecutor(ReviewEventMeters meters) {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
     executor.setThreadNamePrefix("published-event-");
     executor.setCorePoolSize(1);
     executor.setMaxPoolSize(2);
     executor.setQueueCapacity(500);
     executor.setRejectedExecutionHandler(
-        (task, pool) ->
-            org.slf4j.LoggerFactory.getLogger(AsyncConfiguration.class)
-                .warn("published-event queue full — dropping one event dispatch"));
+        (task, pool) -> {
+          meters.dropped();
+          org.slf4j.LoggerFactory.getLogger(AsyncConfiguration.class)
+              .warn("published-event queue full — dropping one event dispatch");
+        });
     return executor;
   }
 

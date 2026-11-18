@@ -26,6 +26,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.qnop.observability.metrics.AuthMeters;
 import io.qnop.web.security.ratelimit.AuthIdentifierRateLimiter.LoginAttempt;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,7 +50,8 @@ class AuthIdentifierRateLimiterTest {
       new RateLimitProperties(
           List.of(), null, null, null, null, null, null, TWO, FIVE, TWO, TWO, FIVE, TWO, null, null,
           100_000L);
-  private final BucketRateLimitService buckets = new BucketRateLimitService(properties);
+  private final BucketRateLimitService buckets =
+      new BucketRateLimitService(properties, new AuthMeters(new SimpleMeterRegistry()));
   private final LoginDeviceCookies deviceCookies =
       LoginDeviceCookiesTest.cookies(LoginDeviceCookiesTest.PROPERTIES, Instant.now());
   private final AuthIdentifierRateLimiter limiter =

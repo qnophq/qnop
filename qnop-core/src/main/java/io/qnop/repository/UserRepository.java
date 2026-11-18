@@ -256,4 +256,13 @@ public interface UserRepository extends JpaRepository<User, UUID> {
               + " OR LOWER(u.displayName) LIKE :q"
               + " OR (u.username IS NOT NULL AND LOWER(u.username) LIKE :q))")
   Page<User> pageEnabledPrincipals(@Param("q") String q, Pageable pageable);
+
+  /**
+   * How many accounts there are per sign-in state (issue #962), as {@code [enabled,
+   * emailVerificationPending, count]} rows — one grouped read for the product gauges.
+   */
+  @Query(
+      "SELECT u.enabled, u.emailVerificationPending, COUNT(u) FROM User u"
+          + " GROUP BY u.enabled, u.emailVerificationPending")
+  List<Object[]> countGroupedBySignInState();
 }

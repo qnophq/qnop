@@ -25,6 +25,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.sun.net.httpserver.HttpServer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.qnop.observability.metrics.TrackingMeters;
 import io.qnop.service.http.HttpClientProperties;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -51,11 +53,14 @@ import org.junit.jupiter.api.Test;
  */
 class TrackingProxyServiceTest {
 
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+
   private static final String DOC = "8f3c1d2e-4a5b-6c7d-8e9f-0a1b2c3d4e5f";
 
   private final TrackingConfigService config = mock(TrackingConfigService.class);
 
   private HttpServer backend;
+  private volatile int backendStatus = 200;
   private TrackingProxyService proxy;
   private final BlockingQueue<String> requests = new ArrayBlockingQueue<>(8);
 
@@ -74,7 +79,7 @@ class TrackingProxyServiceTest {
                   + exchange.getRequestURI().getPath()
                   + (query == null ? "" : "?" + query)
                   + (body.isEmpty() ? "" : " " + body));
-          exchange.sendResponseHeaders(200, -1);
+          exchange.sendResponseHeaders(backendStatus, -1);
           exchange.close();
         });
     backend.start();
@@ -92,7 +97,7 @@ class TrackingProxyServiceTest {
                     false,
                     ClientIpForwarding.ANONYMIZED)));
     // The stand-in backend listens on loopback, so this deployment opts in to private hosts.
-    proxy = new TrackingProxyService(config, defaults(), true);
+    proxy = new TrackingProxyService(config, defaults(), true, new TrackingMeters(registry));
   }
 
   @AfterEach
@@ -122,6 +127,8 @@ class TrackingProxyServiceTest {
     assertThat(status).contains(200);
     String seen = requests.poll(5, TimeUnit.SECONDS);
     assertThat(seen).as("the backend saw the measurement").isNotNull();
+    // Tagged with the backend's kind, never its host (ADR-0065).
+    assertThat(forwards("matomo", "success")).isEqualTo(1);
     assertThat(seen).startsWith("GET /matomo.php?");
     assertThat(seen).doesNotContain(DOC).doesNotContain("filter%3Dopen");
     // Matomo's title field is emptied rather than dropped, so the parameter list
@@ -172,18 +179,48 @@ class TrackingProxyServiceTest {
         .isEmpty();
 
     assertThat(requests.poll(1, TimeUnit.SECONDS)).as("nothing was forwarded").isNull();
+    // Nothing was forwarded, so nothing was timed.
+    assertThat(registry.find(TrackingMeters.FORWARD).timers()).isEmpty();
+  }
+
+  /** How many forwards were measured for this backend kind and outcome (issue #962). */
+  private long forwards(String provider, String outcome) {
+    var timer =
+        registry
+            .find(TrackingMeters.FORWARD)
+            .tag("provider", provider)
+            .tag("outcome", outcome)
+            .timer();
+    return timer == null ? 0 : timer.count();
   }
 
   @Test
   @DisplayName("without the private-host opt-in, a loopback backend is never contacted")
   void privateBackendIsRefusedAtConnectionTime() throws Exception {
-    TrackingProxyService guarded = new TrackingProxyService(config, defaults(), false);
+    TrackingProxyService guarded =
+        new TrackingProxyService(config, defaults(), false, new TrackingMeters(registry));
 
     assertThat(
             guarded.forward(
                 "GET", "/matomo.php", "idsite=1&rec=1", new byte[0], null, null, "Mozilla/5.0"))
         .isEmpty();
     assertThat(requests.poll(1, TimeUnit.SECONDS)).as("nothing was sent").isNull();
+    // The user sees nothing of it; the operator sees a forward that did not get through.
+    assertThat(forwards("matomo", "error")).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("a backend that answers with an error is measured as rejected, not as a success")
+  void backendErrorIsMeasuredAsRejected() {
+    backendStatus = 500;
+
+    assertThat(
+            proxy.forward(
+                "GET", "/matomo.php", "idsite=1&rec=1", new byte[0], null, null, "Mozilla/5.0"))
+        .contains(500);
+
+    assertThat(forwards("matomo", "rejected")).isEqualTo(1);
+    assertThat(forwards("matomo", "success")).isZero();
   }
 
   @Test
