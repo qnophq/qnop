@@ -54,7 +54,7 @@ class SchedulerRunMetricsTest {
   }
 
   private double gauge(String name, String jobId) {
-    return registry.find(name).tag("job", jobId).gauge().value();
+    return registry.find(name).tag("scheduler_job", jobId).gauge().value();
   }
 
   private void bind() {
@@ -112,8 +112,12 @@ class SchedulerRunMetricsTest {
     bind();
 
     for (String jobId : SchedulerJobCatalog.jobIds()) {
-      registry.find("qnop.scheduler.last.run.timestamp").tag("job", jobId).gauge().value();
-      registry.find("qnop.scheduler.last.run.failed").tag("job", jobId).gauge().value();
+      registry
+          .find("qnop.scheduler.last.run.timestamp")
+          .tag("scheduler_job", jobId)
+          .gauge()
+          .value();
+      registry.find("qnop.scheduler.last.run.failed").tag("scheduler_job", jobId).gauge().value();
     }
 
     verify(scheduler, times(1)).list();

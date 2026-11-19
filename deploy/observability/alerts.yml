@@ -84,36 +84,36 @@ groups:
   - name: qnop-scheduler
     rules:
       - alert: QnopScheduledJobFailed
-        expr: max by (job) (qnop_scheduler_last_run_failed{application="qnop"}) == 1
+        expr: max by (scheduler_job) (qnop_scheduler_last_run_failed{application="qnop"}) == 1
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: Scheduled job {{ $labels.job }} failed on its last run
+          summary: Scheduled job {{ $labels.scheduler_job }} failed on its last run
 
       # Most maintenance jobs run daily. A job on a longer schedule needs its own threshold.
       - alert: QnopScheduledJobNotRunning
         expr: |
-          (time() - max by (job) (qnop_scheduler_last_run_timestamp_seconds{application="qnop"}) > 2 * 86400)
-            and max by (job) (qnop_scheduler_job_enabled{application="qnop"}) == 1
+          (time() - max by (scheduler_job) (qnop_scheduler_last_run_timestamp_seconds{application="qnop"}) > 2 * 86400)
+            and max by (scheduler_job) (qnop_scheduler_job_enabled{application="qnop"}) == 1
         for: 30m
         labels:
           severity: warning
         annotations:
-          summary: Scheduled job {{ $labels.job }} is enabled but has not run for two days
+          summary: Scheduled job {{ $labels.scheduler_job }} is enabled but has not run for two days
 
       # A job that has never run reports no timestamp (NaN), and NaN equals nothing, itself
       # included: "unless x == x" keeps exactly the enabled jobs without one.
       - alert: QnopScheduledJobNeverRan
         expr: |
-          max by (job) (qnop_scheduler_job_enabled{application="qnop"}) == 1
-            unless max by (job) (qnop_scheduler_last_run_timestamp_seconds{application="qnop"})
-              == max by (job) (qnop_scheduler_last_run_timestamp_seconds{application="qnop"})
+          max by (scheduler_job) (qnop_scheduler_job_enabled{application="qnop"}) == 1
+            unless max by (scheduler_job) (qnop_scheduler_last_run_timestamp_seconds{application="qnop"})
+              == max by (scheduler_job) (qnop_scheduler_last_run_timestamp_seconds{application="qnop"})
         for: 2d
         labels:
           severity: warning
         annotations:
-          summary: Scheduled job {{ $labels.job }} is enabled but has never run
+          summary: Scheduled job {{ $labels.scheduler_job }} is enabled but has never run
 
   - name: qnop-integrity
     rules:

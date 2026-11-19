@@ -137,7 +137,7 @@ class SchedulerServiceTest {
     Timer timer =
         registry
             .find(SchedulerMeters.RUN)
-            .tag("job", jobId)
+            .tag("scheduler_job", jobId)
             .tag("outcome", outcome)
             .tag("trigger", trigger)
             .timer();

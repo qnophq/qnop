@@ -2815,11 +2815,11 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "time() - max by (job) (qnop_scheduler_last_run_timestamp_seconds{application=\"qnop\"})",
+          "expr": "time() - max by (scheduler_job) (qnop_scheduler_last_run_timestamp_seconds{application=\"qnop\"})",
           "refId": "A",
           "editorMode": "code",
           "range": true,
-          "legendFormat": "{{job}}"
+          "legendFormat": "{{scheduler_job}}"
         }
       ],
       "fieldConfig": {
@@ -2872,11 +2872,11 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "max by (job) (qnop_scheduler_last_run_failed{application=\"qnop\"})",
+          "expr": "max by (scheduler_job) (qnop_scheduler_last_run_failed{application=\"qnop\"})",
           "refId": "A",
           "editorMode": "code",
           "range": true,
-          "legendFormat": "{{job}}"
+          "legendFormat": "{{scheduler_job}}"
         }
       ],
       "fieldConfig": {
@@ -2930,11 +2930,11 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "max by (job) (qnop_scheduler_job_enabled{application=\"qnop\"})",
+          "expr": "max by (scheduler_job) (qnop_scheduler_job_enabled{application=\"qnop\"})",
           "refId": "A",
           "editorMode": "code",
           "range": true,
-          "legendFormat": "{{job}}"
+          "legendFormat": "{{scheduler_job}}"
         }
       ],
       "fieldConfig": {
@@ -2988,11 +2988,11 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, job) (rate(qnop_scheduler_run_seconds_bucket{application=\"qnop\", instance=~\"$instance\", dry_run=\"false\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le, scheduler_job) (rate(qnop_scheduler_run_seconds_bucket{application=\"qnop\", instance=~\"$instance\", dry_run=\"false\"}[$__rate_interval])))",
           "refId": "A",
           "editorMode": "code",
           "range": true,
-          "legendFormat": "{{job}}"
+          "legendFormat": "{{scheduler_job}}"
         }
       ],
       "fieldConfig": {
@@ -3045,11 +3045,11 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (job, outcome) (increase(qnop_scheduler_run_seconds_count{application=\"qnop\", instance=~\"$instance\"}[$__rate_interval]))",
+          "expr": "sum by (scheduler_job, outcome) (increase(qnop_scheduler_run_seconds_count{application=\"qnop\", instance=~\"$instance\"}[$__rate_interval]))",
           "refId": "A",
           "editorMode": "code",
           "range": true,
-          "legendFormat": "{{job}} · {{outcome}}"
+          "legendFormat": "{{scheduler_job}} · {{outcome}}"
         }
       ],
       "fieldConfig": {
