@@ -42,9 +42,9 @@ public interface StorageObjectRepository extends JpaRepository<StorageObject, UU
    * (issue #982). Identical uploads share one content-addressed row, so commits of it race: the
    * database serializes them on the row lock, and every commit after the first matches no row
    * instead of failing an optimistic-lock check. A row that is already {@code COMMITTED} keeps its
-   * commit time and version. The version is bumped like a managed update would, so a writer that
-   * loaded the row while it was still {@code PENDING} (the orphan reaper deleting it) fails its
-   * optimistic-lock check instead of acting on the stale state.
+   * commit time and version. The version is bumped like a managed update would, so a managed write
+   * of the row loaded while it was still {@code PENDING} fails its optimistic-lock check rather
+   * than overwriting the commit.
    *
    * @return 1 if this call committed the row, 0 if it was already committed or is unknown
    */

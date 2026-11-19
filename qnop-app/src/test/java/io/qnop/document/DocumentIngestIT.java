@@ -47,8 +47,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -187,13 +189,16 @@ class DocumentIngestIT extends AbstractIntegrationTest {
                       .andReturn();
                 }));
       }
+      Set<UUID> created = new HashSet<>();
       for (Future<MvcResult> result : results) {
         MvcResult upload = result.get(60, TimeUnit.SECONDS);
         if (upload.getResponse().getStatus() == 201) {
-          documentIdOf(upload);
+          created.add(documentIdOf(upload));
         }
         assertThat(upload.getResponse().getStatus()).as("upload status").isEqualTo(201);
       }
+      // Each upload is its own review sharing one stored object, and every one is persisted.
+      assertThat(created).hasSize(uploads).allMatch(documents::existsById);
     } finally {
       pool.shutdownNow();
     }

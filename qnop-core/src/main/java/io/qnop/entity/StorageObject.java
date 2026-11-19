@@ -97,12 +97,6 @@ public class StorageObject {
     return new StorageObject(objectKey, contentHash, contentType, sizeBytes);
   }
 
-  /** Marks this object committed (referenced by a durable domain row); idempotent. */
-  public void markCommitted(Instant at) {
-    this.status = StorageObjectStatus.COMMITTED;
-    this.committedAt = at;
-  }
-
   public UUID getId() {
     return id;
   }
