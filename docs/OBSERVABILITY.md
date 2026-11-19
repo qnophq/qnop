@@ -168,10 +168,10 @@ A request that a per-IP limit stops never reaches the login or refresh endpoint:
 
 | Meter | Type | Tags | Scope | Meaning |
 |---|---|---|---|---|
-| `qnop.scheduler.run` | timer | `job`, `outcome` = success, failure · `trigger` = scheduled, manual · `dry_run` | instance | One run of a maintenance job, on the instance that held the lock |
-| `qnop.scheduler.last.run.timestamp` | gauge (s) | `job` | database | When the job last ran, as a Unix timestamp; no value if never |
-| `qnop.scheduler.last.run.failed` | gauge | `job` | database | 1 if the last run failed |
-| `qnop.scheduler.job.enabled` | gauge | `job` | database | 0 if an operator switched the job off |
+| `qnop.scheduler.run` | timer | `scheduler_job`, `outcome` = success, failure · `trigger` = scheduled, manual · `dry_run` | instance | One run of a maintenance job, on the instance that held the lock |
+| `qnop.scheduler.last.run.timestamp` | gauge (s) | `scheduler_job` | database | When the job last ran, as a Unix timestamp; no value if never |
+| `qnop.scheduler.last.run.failed` | gauge | `scheduler_job` | database | 1 if the last run failed |
+| `qnop.scheduler.job.enabled` | gauge | `scheduler_job` | database | 0 if an operator switched the job off |
 
 ### Usage tracking
 

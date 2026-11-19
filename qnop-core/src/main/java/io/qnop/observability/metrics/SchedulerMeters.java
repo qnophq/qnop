@@ -74,7 +74,7 @@ public class SchedulerMeters {
       String jobId, Outcome outcome, Trigger trigger, boolean dryRun, Duration duration) {
     Timer.builder(RUN)
         .description("Duration of one run of a scheduled maintenance job")
-        .tag("job", jobId)
+        .tag("scheduler_job", jobId)
         .tag("outcome", MeterTags.of(outcome))
         .tag("trigger", MeterTags.of(trigger))
         // A dry run does none of the work, so its duration says nothing about a real one.

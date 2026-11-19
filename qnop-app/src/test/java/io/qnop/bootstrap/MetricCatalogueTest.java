@@ -99,7 +99,7 @@ class MetricCatalogueTest {
           "status",
           "outcome",
           "type",
-          "job",
+          "scheduler_job",
           "trigger",
           "dry_run",
           "format",
@@ -122,6 +122,9 @@ class MetricCatalogueTest {
   /** One label matcher of a selector. */
   private static final Pattern MATCHER =
       Pattern.compile("([a-z_]+)\\s*(=~|!~|!=|=)\\s*\"([^\"]*)\"");
+
+  /** Labels Prometheus attaches to every series of a scrape target. */
+  private static final Set<String> TARGET_LABELS = Set.of("job", "instance");
 
   /** Labels every qnop series has: the common tag, and the one Prometheus adds. */
   private static final Set<String> UNIVERSAL_LABELS = Set.of("application", "instance");
@@ -245,6 +248,22 @@ class MetricCatalogueTest {
                     // The histogram's own bucket label, on the gauges Micrometer derives.
                     .filteredOn(key -> !key.equals("le"))
                     .isSubsetOf(TAG_KEYS));
+  }
+
+  @Test
+  @DisplayName("no qnop meter carries a tag that Prometheus sets on every target itself")
+  void metersDoNotShadowTargetLabels() {
+    // Prometheus keeps its own label and renames a colliding one to exported_<name>, so a panel
+    // or rule grouping by it silently aggregates over the whole target (issue #979).
+    assertThat(registry.getMeters())
+        .filteredOn(meter -> meter.getId().getName().startsWith("qnop."))
+        .allSatisfy(
+            meter ->
+                assertThat(meter.getId().getTags())
+                    .as("tags of %s", meter.getId().getName())
+                    .extracting(Tag::getKey)
+                    .doesNotContainAnyElementsOf(TARGET_LABELS));
+    assertThat(TAG_KEYS).doesNotContainAnyElementsOf(TARGET_LABELS);
   }
 
   @Test

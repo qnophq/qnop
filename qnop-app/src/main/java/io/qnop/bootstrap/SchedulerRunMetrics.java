@@ -126,7 +126,7 @@ class SchedulerRunMetrics implements MeterBinder {
               SchedulerJobView view = s.get().get(jobId);
               return view == null ? Double.NaN : value.applyAsDouble(view);
             })
-        .tag("job", jobId)
+        .tag("scheduler_job", jobId)
         .baseUnit(baseUnit)
         .description(description)
         .register(registry);

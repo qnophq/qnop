@@ -181,3 +181,16 @@ safe to reason about:
   sixteen, but not the principle: the next gauge would bring its own query. Caching bounds the cost
   for all of them.
 - **`percentiles-histogram: true`.** Rejected on cardinality; see above.
+
+## Amendment (2026-11-19, no tag may shadow a target label)
+
+The scheduler meters shipped with the tag `job`, as "Where meters are recorded" names it. `job` is
+also the label Prometheus attaches to every series of a scrape target. With the default
+`honor_labels: false` Prometheus keeps its own `job="qnop"` and renames the application's tag to
+`exported_job`, so every panel and alert rule that grouped `by (job)` silently aggregated over all
+maintenance jobs at once: the dashboard showed one series instead of one per job, and
+`QnopScheduledJobNotRunning` could not fire for a stuck job while any other job ran (issue #979).
+
+The tag is now `scheduler_job`. The rule it adds to "Names and tags": **a tag key never equals a
+label Prometheus sets on a target itself (`job`, `instance`)**. `MetricCatalogueTest` enforces it
+for every qnop meter and for the list of permitted tag keys.
