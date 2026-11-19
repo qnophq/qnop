@@ -163,10 +163,15 @@ public class StorageService {
     }
   }
 
-  /** Marks the object committed (its domain row is now durable). Idempotent; no-op if unknown. */
+  /**
+   * Marks the object committed (its domain row is now durable). Idempotent and safe under
+   * concurrency: identical uploads committing the same content-addressed row at once all succeed,
+   * and an already committed row is left as it is (issue #982). No-op if the key is unknown.
+   */
   @Transactional
   public void commit(String key) {
-    repository.findByObjectKey(key).ifPresent(object -> object.markCommitted(Instant.now()));
+    repository.commitIfPending(
+        key, Instant.now(), StorageObjectStatus.PENDING, StorageObjectStatus.COMMITTED);
   }
 
   /** Opens the object for reading, or empty if absent. The caller closes the returned content. */
