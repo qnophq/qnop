@@ -18,7 +18,7 @@ services:
       QNOP_MANAGEMENT_PORT: '8081'
 
   prometheus:
-    image: prom/prometheus:v3.7.3@sha256:49214755b6153f90a597adcbff0252cc61069f8ab69ce8411285cd4a560e8038
+    image: prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06
     restart: unless-stopped
     command:
       - --config.file=/etc/prometheus/prometheus.yml
