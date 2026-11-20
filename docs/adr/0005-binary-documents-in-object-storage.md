@@ -35,3 +35,8 @@ The S3 adapter translated only the errors the service answered (`S3Exception`). 
 - **The web layer answers an unavailable store with 503.** The response is the standard `ErrorResponse` with code `STORAGE_UNAVAILABLE`, instead of the catch-all 500. The server itself works, and the same request may succeed once the store is back; clients and load balancers can act on that. The log line names the root cause without a stack trace. Any other `StorageException` remains a 500.
 
 A provider that does not throw the subtype loses nothing: its failures stay 500s, as before. The stream variant of `put` still cannot be retried, and says so in its documentation.
+
+Two consequences for code built against the SPI. Signatures stay compatible, but behaviour changes:
+
+- The core now uploads through `putReopenable`. A test that mocks `StorageProvider` and verifies `put` no longer sees the core's uploads, because a mock does not run the default method. Such a test must verify `putReopenable` instead.
+- A provider that wraps another one, for example to measure or log its calls, must forward `putReopenable`. Otherwise the default routes the content through the stream variant, and the wrapped provider silently loses its retry.

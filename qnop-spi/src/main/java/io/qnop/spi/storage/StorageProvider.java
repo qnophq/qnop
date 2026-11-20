@@ -58,6 +58,11 @@ public interface StorageProvider {
    * {@code default} opens the content once and passes it to the stream variant, so a provider that
    * does not retry keeps compiling and working unchanged.
    *
+   * <p>A provider that wraps another one, to measure or log its calls, must forward this method to
+   * the wrapped provider as well. Otherwise the default sends the content through the stream
+   * variant, and the wrapped provider can no longer retry. A test that mocks this interface sees
+   * the core's uploads here, not on {@code put}: a mock does not run the default.
+   *
    * @param key the object key
    * @param content the bytes to store; each {@link ContentSource#open()} starts from the first byte
    * @param contentLength the exact number of bytes in the content
@@ -65,10 +70,20 @@ public interface StorageProvider {
    */
   default void putReopenable(
       String key, ContentSource content, long contentLength, String contentType) {
-    try (InputStream stream = content.open()) {
-      put(key, stream, contentLength, contentType);
+    InputStream stream;
+    try {
+      stream = content.open();
     } catch (IOException e) {
       throw new StorageException("Failed to read the content to store", e);
+    }
+    try {
+      put(key, stream, contentLength, contentType);
+    } finally {
+      try {
+        stream.close();
+      } catch (IOException ignored) {
+        // The content was only read: a stream that fails to close loses nothing that was stored.
+      }
     }
   }
 

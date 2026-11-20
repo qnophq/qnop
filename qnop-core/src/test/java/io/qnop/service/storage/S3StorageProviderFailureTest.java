@@ -51,7 +51,9 @@ import software.amazon.awssdk.http.SdkHttpClient;
 import software.amazon.awssdk.http.SdkHttpResponse;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
 /**
@@ -146,6 +148,59 @@ class S3StorageProviderFailureTest {
         .isNotInstanceOf(StorageUnavailableException.class);
   }
 
+  @Test
+  @DisplayName("every stream opened for an attempt is closed, the retried one included")
+  void everyAttemptsStreamIsClosed() {
+    http.failFirst(1);
+    List<TrackedStream> opened = new CopyOnWriteArrayList<>();
+
+    provider.putReopenable(
+        KEY,
+        () -> {
+          TrackedStream stream = new TrackedStream(CONTENT);
+          opened.add(stream);
+          return stream;
+        },
+        CONTENT.length,
+        "application/pdf");
+
+    assertThat(opened).hasSizeGreaterThanOrEqualTo(2).allMatch(stream -> stream.closed);
+  }
+
+  @Test
+  @DisplayName("content that cannot be opened is a local failure, not an unavailable store")
+  void contentThatCannotBeOpenedIsNotUnavailable() {
+    assertThatThrownBy(
+            () ->
+                provider.putReopenable(
+                    KEY,
+                    () -> {
+                      throw new IOException("buffer gone");
+                    },
+                    CONTENT.length,
+                    "application/pdf"))
+        .isInstanceOf(StorageException.class)
+        .isNotInstanceOf(StorageUnavailableException.class);
+  }
+
+  @Test
+  @DisplayName("a missing object is an answer, not a failure")
+  void missingObjectIsAnAnswer() {
+    S3Client mocked = mock(S3Client.class);
+    S3StorageProvider over = new S3StorageProvider(mocked, "qnop");
+
+    when(mocked.headObject(any(HeadObjectRequest.class)))
+        .thenThrow(NoSuchKeyException.builder().statusCode(404).build());
+    assertThat(over.exists(KEY)).isFalse();
+
+    when(mocked.headObject(any(HeadObjectRequest.class))).thenThrow(serviceError(404));
+    assertThat(over.exists(KEY)).isFalse();
+
+    when(mocked.getObject(any(GetObjectRequest.class)))
+        .thenThrow(NoSuchKeyException.builder().statusCode(404).build());
+    assertThat(over.get(KEY)).isEmpty();
+  }
+
   private static S3Exception serviceError(int status) {
     return (S3Exception)
         S3Exception.builder()
@@ -153,6 +208,27 @@ class S3StorageProviderFailureTest {
             .awsErrorDetails(AwsErrorDetails.builder().errorCode("Status" + status).build())
             .message("status " + status)
             .build();
+  }
+
+  /** An unmarkable stream that remembers whether it was closed. */
+  private static final class TrackedStream extends FilterInputStream {
+
+    private volatile boolean closed;
+
+    TrackedStream(byte[] bytes) {
+      super(new ByteArrayInputStream(bytes));
+    }
+
+    @Override
+    public boolean markSupported() {
+      return false;
+    }
+
+    @Override
+    public void close() throws IOException {
+      closed = true;
+      super.close();
+    }
   }
 
   /** A stream the SDK cannot rewind, as a network or multipart stream is. */

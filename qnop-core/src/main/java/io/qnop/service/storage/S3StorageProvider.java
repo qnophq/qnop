@@ -88,7 +88,12 @@ public class S3StorageProvider implements StorageProvider {
   @Override
   public void put(String key, InputStream content, long contentLength, String contentType) {
     requireValidKey(key);
-    upload(key, RequestBody.fromInputStream(content, contentLength), contentLength, contentType);
+    try {
+      upload(key, RequestBody.fromInputStream(content, contentLength), contentLength, contentType);
+    } catch (IllegalStateException e) {
+      // The SDK's retry of a one-shot stream it has already read: the attempt before it failed.
+      throw new StorageException("Failed to store object " + key, e);
+    }
   }
 
   /**
@@ -101,11 +106,20 @@ public class S3StorageProvider implements StorageProvider {
       String key, ContentSource content, long contentLength, String contentType) {
     requireValidKey(key);
     try (ReopenableContent reopenable = new ReopenableContent(content)) {
-      upload(
-          key,
-          RequestBody.fromContentProvider(reopenable, contentLength, contentType),
-          contentLength,
-          contentType);
+      try {
+        upload(
+            key,
+            RequestBody.fromContentProvider(reopenable, contentLength, contentType),
+            contentLength,
+            contentType);
+      } catch (StorageUnavailableException e) {
+        // The SDK may wrap our own failure to open the content as a client failure; that is a
+        // local fault, not the store being unavailable.
+        if (reopenable.openFailure != null) {
+          throw new StorageException("Failed to read the content to store", reopenable.openFailure);
+        }
+        throw e;
+      }
     }
   }
 
@@ -117,8 +131,7 @@ public class S3StorageProvider implements StorageProvider {
           body);
       // Keys are content-addressed and pattern-checked (issue #337): a hash, never a name.
       log.debug("PUT {} ({} bytes, {}) in {} ms", key, contentLength, contentType, millis(started));
-    } catch (SdkException | UncheckedIOException | IllegalStateException e) {
-      // IllegalStateException: the SDK's retry of a one-shot stream it has already read.
+    } catch (SdkException | UncheckedIOException e) {
       throw translate("Failed to store object " + key, e);
     }
   }
@@ -237,6 +250,7 @@ public class S3StorageProvider implements StorageProvider {
 
     private final ContentSource source;
     private InputStream current;
+    private volatile IOException openFailure;
 
     ReopenableContent(ContentSource source) {
       this.source = source;
@@ -249,6 +263,7 @@ public class S3StorageProvider implements StorageProvider {
         current = source.open();
         return current;
       } catch (IOException e) {
+        openFailure = e;
         throw new UncheckedIOException("Failed to open the content to store", e);
       }
     }

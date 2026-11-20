@@ -182,7 +182,9 @@ public class ApiExceptionHandler {
     while (root.getCause() != null && root.getCause() != root) {
       root = root.getCause();
     }
-    return root.getClass().getSimpleName() + ": " + root.getMessage();
+    return root.getMessage() == null
+        ? root.getClass().getSimpleName()
+        : root.getClass().getSimpleName() + ": " + root.getMessage();
   }
 
   /** A single-line text field holds control characters (issue #909). */
