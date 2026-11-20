@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -49,20 +50,23 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Predicate;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
 /**
- * DB-free unit tests for {@link StorageService#stage} dedup correctness. A registry hit is only a
- * dedup hint: the object's real existence is verified before the upload is skipped, and it is
- * (re-)uploaded from the buffered bytes whenever it is missing — whether the row is a poisoned
- * {@code PENDING} one (issue #289) or a {@code COMMITTED} one whose object vanished out of band
- * (issue #575) — so a stale row can never leave a key pointing at nothing.
+ * DB-free unit tests for {@link StorageService}: {@code stage} dedup correctness, the commit, the
+ * reaper and the locked deletion. For {@code stage}, a registry hit is only a dedup hint: the
+ * object's real existence is verified before the upload is skipped, and it is (re-)uploaded from
+ * the buffered bytes whenever it is missing — whether the row is a poisoned {@code PENDING} one
+ * (issue #289) or a {@code COMMITTED} one whose object vanished out of band (issue #575) — so a
+ * stale row can never leave a key pointing at nothing.
  */
 class StorageServiceTest {
 
@@ -171,29 +175,41 @@ class StorageServiceTest {
     return row;
   }
 
+  private static StorageObject committedRow(Instant lastStagedAt) {
+    StorageObject row = committedRow();
+    ReflectionTestUtils.setField(row, "id", UUID.randomUUID());
+    ReflectionTestUtils.setField(row, "lastStagedAt", lastStagedAt);
+    return row;
+  }
+
+  // --- commit ---------------------------------------------------------------
+
   @Test
-  @DisplayName("a commit that changes a row needs no second look (issue #982)")
-  void commitOfAPendingRowDoesNotLookTheRowUp() {
-    when(repository.commitIfPending(eq("k"), any(), any(), any())).thenReturn(1);
+  @DisplayName("a commit locks the row before it commits it (issues #982, #992)")
+  void commitLocksTheRowFirst() {
+    when(repository.findByObjectKeyForUpdate("k")).thenReturn(Optional.of(pendingRow()));
 
     storage.commit("k");
 
-    verify(repository)
+    InOrder order = inOrder(repository);
+    order.verify(repository).findByObjectKeyForUpdate("k");
+    order
+        .verify(repository)
         .commitIfPending(
             eq("k"), any(), eq(StorageObjectStatus.PENDING), eq(StorageObjectStatus.COMMITTED));
-    verify(repository, never()).findByObjectKey(anyString());
   }
 
   @Test
-  @DisplayName("a commit that changes nothing tells an already committed row from a vanished one")
-  void commitThatChangesNothingChecksWhetherTheRowStillExists() {
-    when(repository.commitIfPending(eq("k"), any(), any(), any())).thenReturn(0);
-    when(repository.findByObjectKey("k")).thenReturn(Optional.empty());
+  @DisplayName("a commit of a vanished row logs and changes nothing")
+  void commitOfAVanishedRowChangesNothing() {
+    when(repository.findByObjectKeyForUpdate("k")).thenReturn(Optional.empty());
 
     storage.commit("k"); // logs, never throws: the domain row is already durable
 
-    verify(repository).findByObjectKey("k");
+    verify(repository, never()).commitIfPending(any(), any(), any(), any());
   }
+
+  // --- stage ----------------------------------------------------------------
 
   @Test
   @DisplayName("staging aborts over the byte limit before any upload (issue #361)")
@@ -204,13 +220,12 @@ class StorageServiceTest {
         .isInstanceOf(StorageQuotaExceededException.class);
 
     verify(provider, never()).put(anyString(), any(), anyLong(), anyString());
-    verify(repository, never()).save(any());
+    verify(repository, never()).saveAndFlush(any());
   }
 
   @Test
   @DisplayName("content exactly at the byte limit still stages")
   void contentAtLimitIsStaged() {
-    when(repository.findByObjectKey(anyString())).thenReturn(Optional.empty());
     InputStream fourBytes = new ByteArrayInputStream("abcd".getBytes());
 
     storage.stage(fourBytes, "application/pdf", 4L);
@@ -219,67 +234,76 @@ class StorageServiceTest {
   }
 
   @Test
+  @DisplayName("a COMMITTED hit is marked as staged now, so a deletion leaves it (issue #992)")
+  void committedHitIsMarkedAsStaged() {
+    when(repository.markStagedIfCommitted(anyString(), any(), eq(StorageObjectStatus.COMMITTED)))
+        .thenReturn(1);
+    when(provider.exists(anyString())).thenReturn(true);
+    Instant before = Instant.now();
+
+    storage.stage(content(), "application/pdf");
+
+    verify(repository)
+        .markStagedIfCommitted(
+            anyString(), argThat(at -> !at.isBefore(before)), eq(StorageObjectStatus.COMMITTED));
+    verify(repository, never()).restageIfPending(any(), any(), any());
+    verify(repository, never()).saveAndFlush(any());
+  }
+
+  @Test
   @DisplayName("a COMMITTED hit whose object exists dedups without uploading")
   void committedRowWithExistingObjectDedups() {
-    when(repository.findByObjectKey(anyString())).thenReturn(Optional.of(committedRow()));
+    when(repository.markStagedIfCommitted(anyString(), any(), any())).thenReturn(1);
     when(provider.exists(anyString())).thenReturn(true);
 
     storage.stage(content(), "application/pdf");
 
-    // The object is verified present, then the upload is skipped and the row left untouched.
     verify(provider).exists(anyString());
     verify(provider, never()).put(anyString(), any(), anyLong(), anyString());
-    verify(repository, never()).save(any());
   }
 
   @Test
   @DisplayName("a COMMITTED hit whose object vanished out of band re-uploads — the #575 fix")
   void committedRowWithMissingObjectIsReuploaded() {
-    when(repository.findByObjectKey(anyString())).thenReturn(Optional.of(committedRow()));
+    when(repository.markStagedIfCommitted(anyString(), any(), any())).thenReturn(1);
     when(provider.exists(anyString())).thenReturn(false);
 
     storage.stage(content(), "application/pdf");
 
     // The COMMITTED row is no longer trusted blindly: the absent object is re-materialized from
     // the buffered bytes, and the row is not re-inserted (it already exists and stays COMMITTED).
-    verify(provider).exists(anyString());
     verify(provider).put(anyString(), any(), anyLong(), eq("application/pdf"));
-    verify(repository, never()).save(any());
+    verify(repository, never()).saveAndFlush(any());
   }
 
   @Test
   @DisplayName("a poisoned PENDING hit (object missing) re-uploads — the fix")
   void pendingRowWithMissingObjectIsReuploaded() {
-    when(repository.findByObjectKey(anyString())).thenReturn(Optional.of(pendingRow()));
     when(repository.restageIfPending(anyString(), any(), eq(StorageObjectStatus.PENDING)))
         .thenReturn(1);
     when(provider.exists(anyString())).thenReturn(false);
 
     storage.stage(content(), "application/pdf");
 
-    verify(provider).exists(anyString());
     verify(provider).put(anyString(), any(), anyLong(), eq("application/pdf"));
-    verify(repository, never()).save(any()); // row already exists — not re-inserted
+    verify(repository, never()).saveAndFlush(any()); // row already exists — not re-inserted
   }
 
   @Test
   @DisplayName("a PENDING hit whose object exists (mid-flight) is not re-uploaded")
   void pendingRowWithExistingObjectIsNotReuploaded() {
-    when(repository.findByObjectKey(anyString())).thenReturn(Optional.of(pendingRow()));
     when(repository.restageIfPending(anyString(), any(), eq(StorageObjectStatus.PENDING)))
         .thenReturn(1);
     when(provider.exists(anyString())).thenReturn(true);
 
     storage.stage(content(), "application/pdf");
 
-    verify(provider).exists(anyString());
     verify(provider, never()).put(anyString(), any(), anyLong(), anyString());
   }
 
   @Test
   @DisplayName("a reused PENDING row is marked as staged now, so the reaper leaves it (issue #987)")
   void reusedPendingRowIsRestaged() {
-    when(repository.findByObjectKey(anyString())).thenReturn(Optional.of(pendingRow()));
     when(repository.restageIfPending(anyString(), any(), eq(StorageObjectStatus.PENDING)))
         .thenReturn(1);
     when(provider.exists(anyString())).thenReturn(true);
@@ -290,48 +314,143 @@ class StorageServiceTest {
     verify(repository)
         .restageIfPending(
             anyString(), argThat(at -> !at.isBefore(before)), eq(StorageObjectStatus.PENDING));
-    verify(repository, never()).save(any());
+    verify(repository, never()).saveAndFlush(any());
   }
 
   @Test
-  @DisplayName("a PENDING row reaped after it was read is inserted and uploaded again (issue #987)")
-  void pendingRowReapedMeanwhileIsInsertedAgain() {
-    when(repository.findByObjectKey(anyString())).thenReturn(Optional.of(pendingRow()));
-    when(repository.restageIfPending(anyString(), any(), eq(StorageObjectStatus.PENDING)))
-        .thenReturn(0);
-
-    storage.stage(content(), "application/pdf");
-
-    // The reaper took the row and its object: a new row, and the upload, with no HEAD check.
-    verify(repository).save(any(StorageObject.class));
-    verify(provider, never()).exists(anyString());
-    verify(provider).put(anyString(), any(), anyLong(), eq("application/pdf"));
-  }
-
-  @Test
-  @DisplayName("fresh content inserts the row and uploads, with no wasted HEAD check")
+  @DisplayName("fresh content inserts the row under the key's lock and uploads, with no HEAD check")
   void freshContentInsertsAndUploads() {
-    when(repository.findByObjectKey(anyString())).thenReturn(Optional.empty());
-
     storage.stage(content(), "application/pdf");
 
-    verify(repository).save(any(StorageObject.class));
+    // The lock makes the insert wait for a deletion of the same key (issue #992).
+    InOrder order = inOrder(repository, provider);
+    order.verify(repository).lockObjectKey(anyString());
+    order.verify(repository).saveAndFlush(any(StorageObject.class));
+    order.verify(provider).put(anyString(), any(), anyLong(), eq("application/pdf"));
     verify(provider, never()).exists(anyString());
-    verify(provider).put(anyString(), any(), anyLong(), eq("application/pdf"));
   }
 
   @Test
-  @DisplayName("a lost insert race (DataIntegrityViolation) still verify-and-(re)uploads")
+  @DisplayName("a lost insert race (DataIntegrityViolation) looks again and verify-and-uploads")
   void concurrentInsertRaceIsVerifiedNotTrusted() {
-    when(repository.findByObjectKey(anyString())).thenReturn(Optional.empty());
-    when(repository.save(any())).thenThrow(new DataIntegrityViolationException("dup key"));
     when(repository.restageIfPending(anyString(), any(), eq(StorageObjectStatus.PENDING)))
+        .thenReturn(0)
         .thenReturn(1);
+    when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("dup key"));
     when(provider.exists(anyString())).thenReturn(false); // race winner's put had failed too
 
     storage.stage(content(), "application/pdf");
 
+    verify(repository, times(1)).saveAndFlush(any());
     verify(provider).exists(anyString());
     verify(provider, times(1)).put(anyString(), any(), anyLong(), eq("application/pdf"));
+  }
+
+  @Test
+  @DisplayName("a stage whose row keeps changing gives up rather than loop forever")
+  void stageGivesUpWhenTheRowKeepsChanging() {
+    when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("dup key"));
+
+    assertThatThrownBy(() -> storage.stage(content(), "application/pdf"))
+        .isInstanceOf(StorageException.class)
+        .hasMessageContaining("kept changing")
+        .hasCauseInstanceOf(DataIntegrityViolationException.class);
+
+    verify(repository, times(5)).saveAndFlush(any());
+    verify(provider, never()).put(anyString(), any(), anyLong(), anyString());
+  }
+
+  // --- deleteUnlessReferenced (issue #992) -------------------------------------
+
+  private void graceIsAnHour() {
+    when(properties.reaperGracePeriod()).thenReturn(Duration.ofHours(1));
+  }
+
+  @Test
+  @DisplayName("a deletion locks the key and its row before it asks whether the key is referenced")
+  void deletionAsksAboutReferencesOnlyUnderTheLock() {
+    graceIsAnHour();
+    @SuppressWarnings("unchecked")
+    Predicate<String> referenced = mock(Predicate.class);
+
+    StorageService.Deletion outcome = storage.deleteUnlessReferenced("k", referenced);
+
+    assertThat(outcome).isEqualTo(StorageService.Deletion.DELETED);
+    InOrder order = inOrder(repository, referenced, provider);
+    order.verify(repository).lockObjectKey("k");
+    order.verify(repository).findByObjectKeyForUpdate("k");
+    order.verify(referenced).test("k");
+    order.verify(provider).delete("k");
+  }
+
+  @Test
+  @DisplayName("a referenced key keeps its object and its row")
+  void referencedKeyIsKept() {
+    graceIsAnHour();
+    when(repository.findByObjectKeyForUpdate("k")).thenReturn(Optional.of(committedRow(null)));
+
+    StorageService.Deletion outcome = storage.deleteUnlessReferenced("k", k -> true);
+
+    assertThat(outcome).isEqualTo(StorageService.Deletion.REFERENCED);
+    verify(repository, never()).delete(any(StorageObject.class));
+    verify(provider, never()).delete(anyString());
+  }
+
+  @Test
+  @DisplayName("an unreferenced committed row goes before its object")
+  void unreferencedCommittedRowIsDeletedBeforeItsObject() {
+    graceIsAnHour();
+    StorageObject row = committedRow(null);
+    when(repository.findByObjectKeyForUpdate("k")).thenReturn(Optional.of(row));
+
+    StorageService.Deletion outcome = storage.deleteUnlessReferenced("k", k -> false);
+
+    assertThat(outcome).isEqualTo(StorageService.Deletion.DELETED);
+    InOrder order = inOrder(repository, provider);
+    order.verify(repository).delete(row);
+    order.verify(repository).flush();
+    order.verify(provider).delete("k");
+  }
+
+  @Test
+  @DisplayName("a row an upload staged within the grace period is handed back to the reaper")
+  void recentlyStagedRowIsHandedBackToTheReaper() {
+    graceIsAnHour();
+    StorageObject row = committedRow(Instant.now().minus(Duration.ofMinutes(5)));
+    when(repository.findByObjectKeyForUpdate("k")).thenReturn(Optional.of(row));
+
+    StorageService.Deletion outcome = storage.deleteUnlessReferenced("k", k -> false);
+
+    assertThat(outcome).isEqualTo(StorageService.Deletion.STAGED);
+    verify(repository).handBackToReaper(row.getId(), StorageObjectStatus.PENDING);
+    verify(repository, never()).delete(any(StorageObject.class));
+    verify(provider, never()).delete(anyString());
+  }
+
+  @Test
+  @DisplayName("a row last staged before the grace period is deleted with its object")
+  void longAgoStagedRowIsDeleted() {
+    graceIsAnHour();
+    StorageObject row = committedRow(Instant.now().minus(Duration.ofHours(2)));
+    when(repository.findByObjectKeyForUpdate("k")).thenReturn(Optional.of(row));
+
+    StorageService.Deletion outcome = storage.deleteUnlessReferenced("k", k -> false);
+
+    assertThat(outcome).isEqualTo(StorageService.Deletion.DELETED);
+    verify(repository, never()).handBackToReaper(any(), any());
+    verify(provider).delete("k");
+  }
+
+  @Test
+  @DisplayName("a pending row is the reaper's: the deletion keeps it and its object")
+  void pendingRowIsLeftToTheReaper() {
+    graceIsAnHour();
+    when(repository.findByObjectKeyForUpdate("k")).thenReturn(Optional.of(orphan("k")));
+
+    StorageService.Deletion outcome = storage.deleteUnlessReferenced("k", k -> false);
+
+    assertThat(outcome).isEqualTo(StorageService.Deletion.STAGED);
+    verify(repository, never()).delete(any(StorageObject.class));
+    verify(provider, never()).delete(anyString());
   }
 }

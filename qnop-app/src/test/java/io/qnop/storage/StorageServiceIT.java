@@ -30,6 +30,7 @@ import io.qnop.entity.StorageObjectStatus;
 import io.qnop.observability.metrics.StorageMeters;
 import io.qnop.repository.StorageObjectRepository;
 import io.qnop.service.storage.StagedObject;
+import io.qnop.service.storage.StorageRemediationService;
 import io.qnop.service.storage.StorageService;
 import io.qnop.spi.storage.StorageContent;
 import io.qnop.spi.storage.StorageProvider;
@@ -41,7 +42,9 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -66,6 +69,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
   @Autowired private JdbcTemplate jdbc;
   @Autowired private MeterRegistry meterRegistry;
   @Autowired private PlatformTransactionManager transactionManager;
+  @Autowired private StorageRemediationService remediation;
 
   private static byte[] uniqueContent() {
     return ("qnop-doc-" + UUID.randomUUID()).getBytes(UTF_8);
@@ -104,7 +108,9 @@ class StorageServiceIT extends AbstractIntegrationTest {
       assertThat(content.contentLength()).isEqualTo(data.length);
     }
 
-    storage.delete(staged.key());
+    storage.commit(staged.key());
+    assertThat(storage.deleteUnlessReferenced(staged.key(), key -> false))
+        .isEqualTo(StorageService.Deletion.DELETED);
     assertThat(storage.get(staged.key())).isEmpty();
     assertThat(repository.findByObjectKey(staged.key())).isEmpty();
   }
@@ -118,7 +124,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
 
     assertThat(staged.contentHash()).isEqualTo(expected);
     assertThat(staged.key()).isEqualTo("sha256/" + expected.substring(0, 2) + "/" + expected);
-    storage.delete(staged.key());
+    remove(staged.key());
   }
 
   @Test
@@ -138,7 +144,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
 
     assertThat(restaged.key()).isEqualTo(staged.key());
     assertThat(provider.exists(staged.key())).isTrue();
-    storage.delete(staged.key());
+    remove(staged.key());
   }
 
   @Test
@@ -165,7 +171,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
     assertThat(repository.findByObjectKey(staged.key()))
         .hasValueSatisfying(
             row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.COMMITTED));
-    storage.delete(staged.key());
+    remove(staged.key());
   }
 
   @Test
@@ -177,15 +183,18 @@ class StorageServiceIT extends AbstractIntegrationTest {
 
     assertThat(second.key()).isEqualTo(first.key());
     assertThat(repository.findByObjectKey(first.key())).isPresent();
-    storage.delete(first.key());
+    remove(first.key());
   }
 
   @Test
   void deleteIsIdempotent() {
     StagedObject staged = stage(uniqueContent(), "application/pdf");
+    storage.commit(staged.key());
 
-    storage.delete(staged.key());
-    storage.delete(staged.key()); // second delete must not fail
+    storage.deleteUnlessReferenced(staged.key(), key -> false);
+    // A second delete must not fail.
+    assertThat(storage.deleteUnlessReferenced(staged.key(), key -> false))
+        .isEqualTo(StorageService.Deletion.DELETED);
 
     assertThat(storage.get(staged.key())).isEmpty();
   }
@@ -225,7 +234,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
     assertThat(repository.findByObjectKey(committed.key())).isPresent();
     assertThat(storage.get(committed.key())).isPresent();
 
-    storage.delete(committed.key());
+    remove(committed.key());
   }
 
   @Test
@@ -247,7 +256,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
     assertThat(repository.findByObjectKey(again.key()))
         .hasValueSatisfying(
             row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.COMMITTED));
-    storage.delete(again.key());
+    remove(again.key());
   }
 
   @Test
@@ -283,7 +292,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
         if (row.isPresent()) {
           assertThat(row.get().getStatus()).isEqualTo(StorageObjectStatus.COMMITTED);
           assertThat(provider.exists(staged.key())).as("object of a committed row").isTrue();
-          storage.delete(staged.key());
+          remove(staged.key());
         } else {
           assertThat(provider.exists(staged.key())).as("object of a reaped row").isFalse();
         }
@@ -306,7 +315,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
         .hasValueSatisfying(
             row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.COMMITTED));
     assertThat(provider.exists(staged.key())).isTrue();
-    storage.delete(staged.key());
+    remove(staged.key());
   }
 
   @Test
@@ -325,7 +334,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
         .hasValueSatisfying(
             row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.PENDING));
     assertThat(provider.exists(staged.key())).isTrue();
-    storage.delete(staged.key());
+    remove(staged.key());
   }
 
   /**
@@ -333,31 +342,56 @@ class StorageServiceIT extends AbstractIntegrationTest {
    * once the reaper is waiting for a lock that {@code holder} took; then waits for the pass.
    */
   private void reapWhileHolding(Runnable holder) throws Exception {
+    runWhileHolding(holder, () -> storage.reapOrphansOnce(false));
+  }
+
+  /**
+   * Runs {@code holder} in a transaction, starts {@code contender} on another thread, and commits
+   * the transaction only once the contender is waiting for a lock; then returns its result.
+   */
+  private <T> T runWhileHolding(Runnable holder, Callable<T> contender) throws Exception {
     ExecutorService pool = Executors.newSingleThreadExecutor();
     try {
-      Future<String> reaper =
+      Future<T> result =
           new TransactionTemplate(transactionManager)
               .execute(
                   status -> {
                     holder.run();
-                    Future<String> pass = pool.submit(() -> storage.reapOrphansOnce(false));
-                    awaitLockWait();
-                    return pass;
+                    return startWaiting(pool, contender);
                   });
-      reaper.get(30, TimeUnit.SECONDS);
+      return result.get(30, TimeUnit.SECONDS);
     } finally {
       pool.shutdownNow();
     }
   }
 
-  /** Waits until a session of this database waits for a row lock, at most ten seconds. */
-  private void awaitLockWait() {
+  /** Starts {@code task} on {@code pool} and returns once it is waiting for a lock. */
+  private <T> Future<T> startWaiting(ExecutorService pool, Callable<T> task) {
+    Future<T> result = pool.submit(task);
+    awaitLockWait(result);
+    return result;
+  }
+
+  /** Waits until a session of this database waits for a lock, at most ten seconds. */
+  private void awaitLockWait(Future<?> contender) {
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
     while (System.nanoTime() < deadline) {
+      if (contender.isDone()) {
+        try {
+          throw new AssertionError("the contender finished without waiting: " + contender.get());
+        } catch (InterruptedException | ExecutionException e) {
+          throw new AssertionError("the contender failed without waiting", e);
+        }
+      }
+      // Usually called inside the holder's transaction, where PostgreSQL would otherwise keep
+      // serving the activity snapshot taken at its first read.
+      jdbc.execute("SELECT pg_stat_clear_snapshot()");
       Integer waiting =
           jdbc.queryForObject(
               "SELECT count(*) FROM pg_stat_activity"
-                  + " WHERE wait_event_type = 'Lock' AND datname = current_database()",
+                  + " WHERE wait_event_type = 'Lock' AND datname = current_database()"
+                  // Only the storage registry's waits, not those of unrelated background work.
+                  + " AND (query ILIKE '%storage_object%' OR query ILIKE '%pg_advisory%')",
               Integer.class);
       if (waiting != null && waiting > 0) {
         return;
@@ -369,7 +403,211 @@ class StorageServiceIT extends AbstractIntegrationTest {
         throw new IllegalStateException(e);
       }
     }
-    throw new AssertionError("the reaper never waited for the row lock");
+    throw new AssertionError("the contender never waited for a lock");
+  }
+
+  /** Test cleanup: removes the object and its row, whatever state they are in. */
+  private void remove(String key) {
+    provider.delete(key);
+    jdbc.update("DELETE FROM storage_object WHERE object_key = ?", key);
+  }
+
+  // --- deleting content an upload is reusing (issue #992) ---------------------
+
+  /** Stages and commits unique content, as a finished upload leaves it. */
+  private StagedObject stored(byte[] data) {
+    StagedObject staged = stage(data, "application/pdf");
+    storage.commit(staged.key());
+    return staged;
+  }
+
+  private StorageObjectStatus status(String key) {
+    return repository.findByObjectKey(key).map(StorageObject::getStatus).orElse(null);
+  }
+
+  @Test
+  void deletingContentAnUploadStagedAgainLeavesItToThatUploadsCommit() {
+    // Another upload of the same content dedups onto the stored object, and the last document
+    // using the content is deleted before that upload's own version is written. Before #992 the
+    // object went, and the new version pointed at nothing.
+    byte[] data = uniqueContent();
+    StagedObject first = stored(data);
+    StagedObject again = stage(data, "application/pdf");
+
+    StorageService.Deletion outcome = storage.deleteUnlessReferenced(first.key(), key -> false);
+
+    assertThat(outcome).isEqualTo(StorageService.Deletion.STAGED);
+    assertThat(provider.exists(again.key())).isTrue();
+    assertThat(status(again.key())).isEqualTo(StorageObjectStatus.PENDING);
+    storage.commit(again.key());
+    assertThat(status(again.key())).isEqualTo(StorageObjectStatus.COMMITTED);
+    remove(again.key());
+  }
+
+  @Test
+  void contentHandedBackToTheReaperGoesIfTheUploadNeverCommits() {
+    byte[] data = uniqueContent();
+    StagedObject first = stored(data);
+    stage(data, "application/pdf"); // an upload that fails before its commit
+    storage.deleteUnlessReferenced(first.key(), key -> false);
+
+    // Pending since that upload staged it; once the grace period has passed, the reaper takes it.
+    jdbc.update(
+        "UPDATE storage_object SET created_at = created_at - interval '2 hours',"
+            + " last_staged_at = last_staged_at - interval '2 hours' WHERE object_key = ?",
+        first.key());
+    storage.reapOrphansOnce(false);
+
+    assertThat(repository.findByObjectKey(first.key())).isEmpty();
+    assertThat(provider.exists(first.key())).isFalse();
+  }
+
+  @Test
+  void contentNoUploadStagedAgainIsDeleted() {
+    StagedObject first = stored(uniqueContent());
+
+    assertThat(storage.deleteUnlessReferenced(first.key(), key -> false))
+        .isEqualTo(StorageService.Deletion.DELETED);
+
+    assertThat(repository.findByObjectKey(first.key())).isEmpty();
+    assertThat(provider.exists(first.key())).isFalse();
+  }
+
+  @Test
+  void deletionWaitingOnAStageOfTheSameContentKeepsTheObject() throws Exception {
+    // The stage holds the row lock while it marks the committed row as staged. The deletion must
+    // wait for it and see the mark, rather than judge the row from before it.
+    byte[] data = uniqueContent();
+    StagedObject first = stored(data);
+
+    StorageService.Deletion outcome =
+        runWhileHolding(
+            () ->
+                repository.markStagedIfCommitted(
+                    first.key(), Instant.now(), StorageObjectStatus.COMMITTED),
+            () -> storage.deleteUnlessReferenced(first.key(), key -> false));
+
+    assertThat(outcome).isEqualTo(StorageService.Deletion.STAGED);
+    assertThat(provider.exists(first.key())).isTrue();
+    remove(first.key());
+  }
+
+  @Test
+  void commitWaitingOnADeletionCommitsTheRowItHandsBack() throws Exception {
+    // The upload's commit arrives while the deletion holds the row. Unless the commit waits for
+    // the lock, it judges the row COMMITTED from before the hand-back and leaves it PENDING, for
+    // the reaper to take although the upload's version now references it.
+    byte[] data = uniqueContent();
+    StagedObject first = stored(data);
+    stage(data, "application/pdf");
+    ExecutorService pool = Executors.newSingleThreadExecutor();
+    try {
+      List<Future<?>> commit = new ArrayList<>();
+      StorageService.Deletion outcome =
+          storage.deleteUnlessReferenced(
+              first.key(),
+              key -> {
+                commit.add(
+                    startWaiting(
+                        pool,
+                        () -> {
+                          storage.commit(key);
+                          return null;
+                        }));
+                return false;
+              });
+      commit.getFirst().get(30, TimeUnit.SECONDS);
+
+      assertThat(outcome).isEqualTo(StorageService.Deletion.STAGED);
+      assertThat(status(first.key())).isEqualTo(StorageObjectStatus.COMMITTED);
+      assertThat(provider.exists(first.key())).isTrue();
+    } finally {
+      pool.shutdownNow();
+    }
+    remove(first.key());
+  }
+
+  @Test
+  void stageWaitingOnADeletionUploadsTheContentAgain() throws Exception {
+    // The deletion holds the row when an upload of the same content arrives. The stage must wait,
+    // find the row gone, and register and upload the content anew.
+    byte[] data = uniqueContent();
+    StagedObject first = stored(data);
+    ExecutorService pool = Executors.newSingleThreadExecutor();
+    try {
+      List<Future<StagedObject>> upload = new ArrayList<>();
+      StorageService.Deletion outcome =
+          storage.deleteUnlessReferenced(
+              first.key(),
+              key -> {
+                upload.add(startWaiting(pool, () -> stage(data, "application/pdf")));
+                return false;
+              });
+      StagedObject again = upload.getFirst().get(30, TimeUnit.SECONDS);
+
+      assertThat(outcome).isEqualTo(StorageService.Deletion.DELETED);
+      assertThat(again.key()).isEqualTo(first.key());
+      assertThat(status(again.key())).isEqualTo(StorageObjectStatus.PENDING);
+      assertThat(provider.exists(again.key())).isTrue();
+    } finally {
+      pool.shutdownNow();
+    }
+    remove(first.key());
+  }
+
+  @Test
+  void stageOfAKeyWithoutARowWaitsForItsDeletion() throws Exception {
+    // A key with an object but no row, as a bucket orphan is. A row lock cannot guard it, so the
+    // stage's insert must wait on the key's lock; otherwise it puts the object, and the deletion
+    // that is under way removes it from under the new row.
+    byte[] data = uniqueContent();
+    StagedObject first = stage(data, "application/pdf");
+    jdbc.update("DELETE FROM storage_object WHERE object_key = ?", first.key());
+    ExecutorService pool = Executors.newSingleThreadExecutor();
+    try {
+      List<Future<StagedObject>> upload = new ArrayList<>();
+      StorageService.Deletion outcome =
+          storage.deleteUnlessReferenced(
+              first.key(),
+              key -> {
+                upload.add(startWaiting(pool, () -> stage(data, "application/pdf")));
+                return false;
+              });
+      upload.getFirst().get(30, TimeUnit.SECONDS);
+
+      assertThat(outcome).isEqualTo(StorageService.Deletion.DELETED);
+      assertThat(status(first.key())).isEqualTo(StorageObjectStatus.PENDING);
+      assertThat(provider.exists(first.key())).isTrue();
+    } finally {
+      pool.shutdownNow();
+    }
+    remove(first.key());
+  }
+
+  @Test
+  void remediationWaitsForAStageRegisteringTheSameContent() throws Exception {
+    // A bucket orphan is remediated while an upload of the same content registers its row. The
+    // remediation must wait for the key, then see the row and keep the object. The holder is the
+    // stage's insert transaction (lock the key, insert the row), which a real stage commits too
+    // quickly to hold open.
+    byte[] data = uniqueContent();
+    StagedObject first = stage(data, "application/pdf");
+    jdbc.update("DELETE FROM storage_object WHERE object_key = ?", first.key());
+
+    StorageRemediationService.RemediationResult result =
+        runWhileHolding(
+            () -> {
+              repository.lockObjectKey(first.key());
+              repository.saveAndFlush(
+                  StorageObject.pending(
+                      first.key(), first.contentHash(), "application/pdf", first.sizeBytes()));
+            },
+            () -> remediation.deleteOrphans(List.of(first.key()), null));
+
+    assertThat(result.deleted()).isEmpty();
+    assertThat(result.skipped()).hasSize(1);
+    assertThat(provider.exists(first.key())).isTrue();
+    remove(first.key());
   }
 
   /** Moves a row's staging time beyond the reaper's grace period (default 1h). */
@@ -388,7 +626,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
 
     assertThat(repository.findByObjectKey(fresh.key())).isPresent();
     assertThat(storage.get(fresh.key())).isPresent();
-    storage.delete(fresh.key());
+    remove(fresh.key());
   }
 
   @Test
@@ -419,7 +657,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
         assertThat(repository.findByObjectKey(staged.key()))
             .hasValueSatisfying(
                 row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.COMMITTED));
-        storage.delete(staged.key());
+        remove(staged.key());
       }
     } finally {
       pool.shutdownNow();
@@ -439,7 +677,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
     assertThat(again.getStatus()).isEqualTo(StorageObjectStatus.COMMITTED);
     assertThat(again.getCommittedAt()).isEqualTo(first.getCommittedAt());
     assertThat(rowVersion(staged.key())).isEqualTo(firstVersion);
-    storage.delete(staged.key());
+    remove(staged.key());
   }
 
   @Test
