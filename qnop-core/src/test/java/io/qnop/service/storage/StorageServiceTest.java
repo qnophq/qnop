@@ -219,7 +219,7 @@ class StorageServiceTest {
     Assertions.assertThatThrownBy(() -> storage.stage(tenBytes, "application/pdf", 4L))
         .isInstanceOf(StorageQuotaExceededException.class);
 
-    verify(provider, never()).put(anyString(), any(), anyLong(), anyString());
+    verify(provider, never()).putReopenable(anyString(), any(), anyLong(), anyString());
     verify(repository, never()).saveAndFlush(any());
   }
 
@@ -230,7 +230,7 @@ class StorageServiceTest {
 
     storage.stage(fourBytes, "application/pdf", 4L);
 
-    verify(provider).put(anyString(), any(), anyLong(), eq("application/pdf"));
+    verify(provider).putReopenable(anyString(), any(), anyLong(), eq("application/pdf"));
   }
 
   @Test
@@ -259,7 +259,7 @@ class StorageServiceTest {
     storage.stage(content(), "application/pdf");
 
     verify(provider).exists(anyString());
-    verify(provider, never()).put(anyString(), any(), anyLong(), anyString());
+    verify(provider, never()).putReopenable(anyString(), any(), anyLong(), anyString());
   }
 
   @Test
@@ -272,7 +272,7 @@ class StorageServiceTest {
 
     // The COMMITTED row is no longer trusted blindly: the absent object is re-materialized from
     // the buffered bytes, and the row is not re-inserted (it already exists and stays COMMITTED).
-    verify(provider).put(anyString(), any(), anyLong(), eq("application/pdf"));
+    verify(provider).putReopenable(anyString(), any(), anyLong(), eq("application/pdf"));
     verify(repository, never()).saveAndFlush(any());
   }
 
@@ -285,7 +285,7 @@ class StorageServiceTest {
 
     storage.stage(content(), "application/pdf");
 
-    verify(provider).put(anyString(), any(), anyLong(), eq("application/pdf"));
+    verify(provider).putReopenable(anyString(), any(), anyLong(), eq("application/pdf"));
     verify(repository, never()).saveAndFlush(any()); // row already exists — not re-inserted
   }
 
@@ -298,7 +298,7 @@ class StorageServiceTest {
 
     storage.stage(content(), "application/pdf");
 
-    verify(provider, never()).put(anyString(), any(), anyLong(), anyString());
+    verify(provider, never()).putReopenable(anyString(), any(), anyLong(), anyString());
   }
 
   @Test
@@ -326,7 +326,7 @@ class StorageServiceTest {
     InOrder order = inOrder(repository, provider);
     order.verify(repository).lockObjectKey(anyString());
     order.verify(repository).saveAndFlush(any(StorageObject.class));
-    order.verify(provider).put(anyString(), any(), anyLong(), eq("application/pdf"));
+    order.verify(provider).putReopenable(anyString(), any(), anyLong(), eq("application/pdf"));
     verify(provider, never()).exists(anyString());
   }
 
@@ -343,7 +343,7 @@ class StorageServiceTest {
 
     verify(repository, times(1)).saveAndFlush(any());
     verify(provider).exists(anyString());
-    verify(provider, times(1)).put(anyString(), any(), anyLong(), eq("application/pdf"));
+    verify(provider, times(1)).putReopenable(anyString(), any(), anyLong(), eq("application/pdf"));
   }
 
   @Test
@@ -357,7 +357,7 @@ class StorageServiceTest {
         .hasCauseInstanceOf(DataIntegrityViolationException.class);
 
     verify(repository, times(5)).saveAndFlush(any());
-    verify(provider, never()).put(anyString(), any(), anyLong(), anyString());
+    verify(provider, never()).putReopenable(anyString(), any(), anyLong(), anyString());
   }
 
   // --- deleteUnlessReferenced (issue #992) -------------------------------------

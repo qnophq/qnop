@@ -26,15 +26,19 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qnop.observability.metrics.StorageMeters;
 import io.qnop.repository.StorageObjectRepository;
 import io.qnop.service.scheduler.SchedulerService;
+import io.qnop.spi.storage.ContentSource;
 import io.qnop.spi.storage.StorageContent;
 import io.qnop.spi.storage.StorageException;
 import io.qnop.spi.storage.StorageProvider;
+import io.qnop.spi.storage.StorageUnavailableException;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.Optional;
@@ -75,6 +79,32 @@ class MeteredStorageProviderTest {
     assertThat(calls("put", "error")).isEqualTo(1);
     assertThat(calls("put", "success")).isZero();
     assertThat(transferred("upload")).isZero();
+  }
+
+  @Test
+  @DisplayName("a reopenable put reaches the provider as it is, so the provider can retry it")
+  void reopenablePutIsForwardedAsItIs() {
+    ContentSource content = () -> bytes(42);
+
+    provider.putReopenable("k", content, 42, "application/pdf");
+
+    // Not opened here and handed on as a stream: the provider opens it per attempt (issue #983).
+    verify(delegate).putReopenable("k", content, 42, "application/pdf");
+    verify(delegate, never()).put(any(), any(InputStream.class), anyLong(), any());
+    assertThat(calls("put", "success")).isEqualTo(1);
+    assertThat(transferred("upload")).isEqualTo(42.0);
+  }
+
+  @Test
+  @DisplayName("an unavailable store is measured as an error and passed on as it is")
+  void unavailablePutIsAnError() {
+    StorageUnavailableException down = new StorageUnavailableException("store down", null);
+    doThrow(down).when(delegate).putReopenable(any(), any(), anyLong(), any());
+
+    assertThatThrownBy(() -> provider.putReopenable("k", () -> bytes(1), 1, "application/pdf"))
+        .isSameAs(down);
+
+    assertThat(calls("put", "error")).isEqualTo(1);
   }
 
   @Test

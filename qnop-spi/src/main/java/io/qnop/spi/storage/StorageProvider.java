@@ -20,6 +20,7 @@
  */
 package io.qnop.spi.storage;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -30,7 +31,9 @@ import java.util.stream.Stream;
  * multi-cloud layer — ADR-0005), so keys are plain strings and content streams both ways.
  *
  * <p>Implementations must be safe for concurrent use. All failures surface as {@link
- * StorageException}.
+ * StorageException}; a store that cannot be reached, or fails on its own side, should say so with
+ * the subtype {@link StorageUnavailableException}, which the web layer answers with 503 rather than
+ * 500.
  */
 public interface StorageProvider {
 
@@ -43,6 +46,46 @@ public interface StorageProvider {
    * @param contentType the MIME type to record with the object
    */
   void put(String key, InputStream content, long contentLength, String contentType);
+
+  /**
+   * Stores the content under {@code key}, as {@link #put(String, InputStream, long, String)} does,
+   * but from content that can be opened again (issue #983). A separate name rather than an overload
+   * of {@code put}, so a caller's or a test's {@code put(…, any(), …)} stays unambiguous. A
+   * provider that retries a failed attempt should override this and open the content anew for each
+   * attempt; a one-shot stream cannot be replayed. The core stores every upload this way.
+   *
+   * <p>This is an additive, backward-compatible extension to the contract (SemVer minor): the
+   * {@code default} opens the content once and passes it to the stream variant, so a provider that
+   * does not retry keeps compiling and working unchanged.
+   *
+   * <p>A provider that wraps another one, to measure or log its calls, must forward this method to
+   * the wrapped provider as well. Otherwise the default sends the content through the stream
+   * variant, and the wrapped provider can no longer retry. A test that mocks this interface sees
+   * the core's uploads here, not on {@code put}: a mock does not run the default.
+   *
+   * @param key the object key
+   * @param content the bytes to store; each {@link ContentSource#open()} starts from the first byte
+   * @param contentLength the exact number of bytes in the content
+   * @param contentType the MIME type to record with the object
+   */
+  default void putReopenable(
+      String key, ContentSource content, long contentLength, String contentType) {
+    InputStream stream;
+    try {
+      stream = content.open();
+    } catch (IOException e) {
+      throw new StorageException("Failed to read the content to store", e);
+    }
+    try {
+      put(key, stream, contentLength, contentType);
+    } finally {
+      try {
+        stream.close();
+      } catch (IOException ignored) {
+        // The content was only read: a stream that fails to close loses nothing that was stored.
+      }
+    }
+  }
 
   /**
    * Opens the object at {@code key} for reading, or {@link Optional#empty()} if none exists. The

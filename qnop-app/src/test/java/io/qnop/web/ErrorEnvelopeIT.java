@@ -20,6 +20,7 @@
  */
 package io.qnop.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -29,21 +30,32 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.qnop.bootstrap.AbstractIntegrationTest;
+import io.qnop.spi.storage.StorageException;
+import io.qnop.spi.storage.StorageUnavailableException;
+import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.method.ControllerAdviceBean;
+import org.springframework.web.servlet.handler.HandlerExceptionResolverComposite;
+import org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver;
 
 /**
  * Verifies the uniform {@code ErrorResponse} envelope (issue #45) across the filter-chain error
  * paths: 401 (unauthenticated), 403 (authenticated but not permitted), and 400 (request
  * validation). Each must carry the same {@code code} / {@code message} / {@code timestamp} JSON
- * shape. Requires Docker (Testcontainers).
+ * shape. Also holds the order of the application's controller advices, which decides the status of
+ * an unavailable object store (issue #983). Requires Docker (Testcontainers).
  */
 class ErrorEnvelopeIT extends AbstractIntegrationTest {
 
@@ -100,5 +112,48 @@ class ErrorEnvelopeIT extends AbstractIntegrationTest {
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
         .andExpect(jsonPath("$.timestamp").isNotEmpty());
+  }
+
+  /**
+   * The application's own exception resolver, with every controller advice in the order the
+   * application registered them.
+   */
+  private ExceptionHandlerExceptionResolver exceptionResolver() {
+    return context
+        .getBean("handlerExceptionResolver", HandlerExceptionResolverComposite.class)
+        .getExceptionResolvers()
+        .stream()
+        .filter(ExceptionHandlerExceptionResolver.class::isInstance)
+        .map(ExceptionHandlerExceptionResolver.class::cast)
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private int statusFor(Exception ex) {
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    exceptionResolver().resolveException(new MockHttpServletRequest(), response, null, ex);
+    return response.getStatus();
+  }
+
+  @Test
+  void anUnavailableObjectStoreAnswers503ThroughTheApplicationsAdvices() {
+    // All advices share the lowest precedence, so registration order decides which one answers.
+    // The catch-all must not be the one that answers a storage outage (issue #983).
+    assertThat(
+            statusFor(new StorageUnavailableException("Failed to read object", new IOException())))
+        .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
+    assertThat(statusFor(new StorageException("Rejected storage key with an unexpected format")))
+        .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+  }
+
+  @Test
+  void theCatchAllAdviceComesAfterEveryOtherOne() {
+    List<Class<?>> advices =
+        exceptionResolver().getExceptionHandlerAdviceCache().keySet().stream()
+            .<Class<?>>map(ControllerAdviceBean::getBeanType)
+            .toList();
+
+    assertThat(advices).contains(ApiExceptionHandler.class, DocumentExceptionHandler.class);
+    assertThat(advices.getLast()).isEqualTo(UnhandledExceptionHandler.class);
   }
 }
