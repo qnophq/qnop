@@ -63,12 +63,13 @@ import org.springframework.transaction.support.TransactionTemplate;
  * record — and no Spring self-invocation caveat applies, since the work {@link SchedulerWork}
  * runnable is supplied by the owning service and invoked inside the gate's own transaction.
  *
- * <p>A job declared {@link SchedulerJobDefinition#selfTransactional} is the one exception (issue
- * #577): it is invoked with <em>no</em> enclosing transaction, because it needs to commit in
- * independent units the gate cannot know about. The review purge deletes one review per transaction
- * and touches object storage only after each commit; wrapping it would defer every commit to the
- * end of the run, so a crash mid-run would roll back reviews whose binaries are already gone. Such
- * a job takes on the duty the gate otherwise discharges: it must open its own transactions.
+ * <p>A job declared {@link SchedulerJobDefinition#selfTransactional} is the exception (issue #577):
+ * it is invoked with <em>no</em> enclosing transaction, because it needs to commit in independent
+ * units the gate cannot know about. The review purge deletes one review per transaction and touches
+ * object storage only after each commit; wrapping it would defer every commit to the end of the
+ * run, so a crash mid-run would roll back reviews whose binaries are already gone. The storage
+ * reaper claims and deletes one orphan per transaction for the same reason (issue #987). Such a job
+ * takes on the duty the gate otherwise discharges: it must open its own transactions.
  *
  * <h2>Fail-open — to the catalogue's default, not to "on"</h2>
  *

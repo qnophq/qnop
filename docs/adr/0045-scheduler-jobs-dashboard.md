@@ -52,3 +52,7 @@ The gate's other properties are unchanged: the outcome is still recorded in its 
 - **`@Transactional` on the gate + `REQUIRES_NEW` for the outcome.** Rejected: the sweep methods calling their own gate would hit the Spring self-invocation trap, and `REQUIRES_NEW` self-calls silently don't start a new transaction. The programmatic `TransactionTemplate` sidesteps both.
 - **A row (or setting) per job with the cron stored in the DB.** Rejected as premature: crons are deployment configuration, not per-instance operator state; storing them invites drift from the `@Scheduled` annotations that actually fire.
 - **Auditing every scheduled run.** Rejected: it floods the AUDITOR trail with routine noise; the `scheduler_job` row already carries the last outcome, and only operator-initiated actions are audit-worthy.
+
+## Amendment (2026-11-20, the storage reaper is self-transactional — issue #987)
+
+The original six jobs no longer all run inside the gate's transaction: the storage orphan reaper is now `selfTransactional`. It claims each orphan's row and deletes its object in a transaction of its own (`PROPAGATION_REQUIRES_NEW`), because inside the gate's single transaction the object deletes ran long before the row deletes were flushed, and a rollback at the end brought back rows whose objects were gone. See the 2026-11-20 amendment to ADR-0036.

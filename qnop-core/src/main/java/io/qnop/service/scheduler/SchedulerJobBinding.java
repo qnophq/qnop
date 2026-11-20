@@ -40,8 +40,9 @@ import org.springframework.stereotype.Component;
  * can fire.
  *
  * <p>The token sweeps ignore the dry-run flag; the storage reaper, the review archive and the
- * review purge honour it. The purge is also the one {@code selfTransactional} job (issue #577) —
- * the gate hands it no transaction, and it opens one per review itself.
+ * review purge honour it. The {@code selfTransactional} jobs get no transaction from the gate and
+ * open their own: the review purge one per review (issue #577), the storage reaper one per orphan
+ * (issue #987), and the notification sweep and digest one per batch or recipient.
  */
 @Component
 public class SchedulerJobBinding {

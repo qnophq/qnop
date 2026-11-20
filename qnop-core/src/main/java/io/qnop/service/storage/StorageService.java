@@ -49,6 +49,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -86,7 +87,10 @@ public class StorageService {
     this.properties = properties;
     this.scheduler = scheduler;
     this.meters = meters;
+    // Each orphan needs a transaction of its own, even if a caller ever runs the reaper inside
+    // one: joining it would defer every claim to its end, the bug of issue #987.
     this.tx = new TransactionTemplate(transactionManager);
+    this.tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
 
   /**

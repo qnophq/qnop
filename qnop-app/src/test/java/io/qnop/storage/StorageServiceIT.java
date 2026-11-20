@@ -35,6 +35,7 @@ import io.qnop.spi.storage.StorageContent;
 import io.qnop.spi.storage.StorageProvider;
 import java.io.ByteArrayInputStream;
 import java.security.MessageDigest;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -48,6 +49,8 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Object-storage acceptance against a real MinIO (issue #243, ADR-0005): put/get/delete round-trip,
@@ -62,6 +65,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
   @Autowired private StorageProvider provider;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private MeterRegistry meterRegistry;
+  @Autowired private PlatformTransactionManager transactionManager;
 
   private static byte[] uniqueContent() {
     return ("qnop-doc-" + UUID.randomUUID()).getBytes(UTF_8);
@@ -287,6 +291,85 @@ class StorageServiceIT extends AbstractIntegrationTest {
     } finally {
       pool.shutdownNow();
     }
+  }
+
+  @Test
+  void reaperWaitingOnACommitKeepsTheCommittedRowAndItsObject() throws Exception {
+    // Deterministic form of the race above (issue #987): the commit holds the row lock when the
+    // reaper reaches the row. The reaper must wait, see the row committed, and keep the object.
+    StagedObject staged = stage(uniqueContent(), "application/pdf");
+    backdate(staged.key());
+
+    reapWhileHolding(() -> storage.commit(staged.key()));
+
+    assertThat(repository.findByObjectKey(staged.key()))
+        .hasValueSatisfying(
+            row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.COMMITTED));
+    assertThat(provider.exists(staged.key())).isTrue();
+    storage.delete(staged.key());
+  }
+
+  @Test
+  void reaperWaitingOnARestageKeepsTheRowAndItsObject() throws Exception {
+    // A stage of the same content holds the row lock while it marks the old row as staged now
+    // (issue #987). The reaper read the row as old; it must wait, see it fresh, and skip it.
+    byte[] data = uniqueContent();
+    StagedObject staged = stage(data, "application/pdf");
+    backdate(staged.key());
+
+    reapWhileHolding(
+        () ->
+            repository.restageIfPending(staged.key(), Instant.now(), StorageObjectStatus.PENDING));
+
+    assertThat(repository.findByObjectKey(staged.key()))
+        .hasValueSatisfying(
+            row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.PENDING));
+    assertThat(provider.exists(staged.key())).isTrue();
+    storage.delete(staged.key());
+  }
+
+  /**
+   * Runs {@code holder} in a transaction, starts a reaper pass, and commits the transaction only
+   * once the reaper is waiting for a lock that {@code holder} took; then waits for the pass.
+   */
+  private void reapWhileHolding(Runnable holder) throws Exception {
+    ExecutorService pool = Executors.newSingleThreadExecutor();
+    try {
+      Future<String> reaper =
+          new TransactionTemplate(transactionManager)
+              .execute(
+                  status -> {
+                    holder.run();
+                    Future<String> pass = pool.submit(() -> storage.reapOrphansOnce(false));
+                    awaitLockWait();
+                    return pass;
+                  });
+      reaper.get(30, TimeUnit.SECONDS);
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  /** Waits until a session of this database waits for a row lock, at most ten seconds. */
+  private void awaitLockWait() {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (System.nanoTime() < deadline) {
+      Integer waiting =
+          jdbc.queryForObject(
+              "SELECT count(*) FROM pg_stat_activity"
+                  + " WHERE wait_event_type = 'Lock' AND datname = current_database()",
+              Integer.class);
+      if (waiting != null && waiting > 0) {
+        return;
+      }
+      try {
+        Thread.sleep(20);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException(e);
+      }
+    }
+    throw new AssertionError("the reaper never waited for the row lock");
   }
 
   /** Moves a row's staging time beyond the reaper's grace period (default 1h). */

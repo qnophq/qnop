@@ -64,8 +64,8 @@ public interface StorageObjectRepository extends JpaRepository<StorageObject, UU
    * Marks the {@code PENDING} row of {@code objectKey} as staged just now, so an upload that reuses
    * an old row is not older than the reaper's grace period between its stage and its commit (issue
    * #987). For a {@code PENDING} row, {@code created_at} is therefore the time it was last staged.
-   * Runs in a transaction of its own, because staging runs outside one. The version is bumped like
-   * a managed update would.
+   * Opens a transaction of its own when called outside one, as staging is. The version is bumped
+   * like a managed update would.
    *
    * @return 1 if the row is still {@code PENDING} and was refreshed, 0 if it was committed or
    *     removed in the meantime
