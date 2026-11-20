@@ -90,13 +90,25 @@ public class JobMeters {
    * fail, it comes back under the queue's backoff.
    */
   public void executed(String type, Outcome outcome, Duration duration) {
-    Timer.builder(EXECUTION)
+    executionTimer(type, outcome).record(duration);
+  }
+
+  /**
+   * Declares the job type of a registered handler, so its retry and failure series exist at 0
+   * before the first failed attempt (issue #984). The queue declares every handler's type at start.
+   */
+  public void typeDeclared(String type) {
+    executionTimer(type, Outcome.RETRY);
+    executionTimer(type, Outcome.FAILED);
+  }
+
+  private Timer executionTimer(String type, Outcome outcome) {
+    return Timer.builder(EXECUTION)
         .description("Duration of one attempt at a queued job")
         .tag("type", type)
         .tag("outcome", MeterTags.of(outcome))
         .serviceLevelObjectives(EXECUTION_BUCKETS)
-        .register(registry)
-        .record(duration);
+        .register(registry);
   }
 
   /** A job was picked up {@code wait} after it became due. */

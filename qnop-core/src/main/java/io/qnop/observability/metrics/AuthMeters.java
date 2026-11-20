@@ -70,23 +70,39 @@ public class AuthMeters {
 
   public AuthMeters(MeterRegistry registry) {
     this.registry = registry;
+    // Every outcome but success exists from the start: a burst of rejected logins or reused
+    // tokens right after a restart must be a rise from 0, not a series born at its final value
+    // (issue #984).
+    for (Method method : Method.values()) {
+      for (LoginOutcome outcome : LoginOutcome.values()) {
+        if (outcome != LoginOutcome.SUCCESS) {
+          loginCounter(method, outcome);
+        }
+      }
+    }
+    for (RefreshOutcome outcome : RefreshOutcome.values()) {
+      if (outcome != RefreshOutcome.SUCCESS) {
+        refreshCounter(outcome);
+      }
+    }
   }
 
   public void login(Method method, LoginOutcome outcome) {
-    Counter.builder(LOGIN)
-        .description("Login attempts")
-        .tag("method", MeterTags.of(method))
-        .tag("outcome", MeterTags.of(outcome))
-        .register(registry)
-        .increment();
+    loginCounter(method, outcome).increment();
   }
 
   public void refresh(RefreshOutcome outcome) {
-    Counter.builder(REFRESH)
-        .description("Refresh-token rotations")
-        .tag("outcome", MeterTags.of(outcome))
-        .register(registry)
-        .increment();
+    refreshCounter(outcome).increment();
+  }
+
+  /**
+   * Declares a rate limit, so its refusal series exists at 0 before the first refusal (issue #984).
+   * Every limit declares itself when it is created.
+   *
+   * @param scope the limit's name, as {@link #rateLimited} receives it
+   */
+  public void rateLimitDeclared(String scope) {
+    rateLimitCounter(scope);
   }
 
   /**
@@ -96,10 +112,28 @@ public class AuthMeters {
    *     that was limited
    */
   public void rateLimited(String scope) {
-    Counter.builder(RATE_LIMITED)
+    rateLimitCounter(scope).increment();
+  }
+
+  private Counter loginCounter(Method method, LoginOutcome outcome) {
+    return Counter.builder(LOGIN)
+        .description("Login attempts")
+        .tag("method", MeterTags.of(method))
+        .tag("outcome", MeterTags.of(outcome))
+        .register(registry);
+  }
+
+  private Counter refreshCounter(RefreshOutcome outcome) {
+    return Counter.builder(REFRESH)
+        .description("Refresh-token rotations")
+        .tag("outcome", MeterTags.of(outcome))
+        .register(registry);
+  }
+
+  private Counter rateLimitCounter(String scope) {
+    return Counter.builder(RATE_LIMITED)
         .description("Requests refused by a rate limit")
         .tag("scope", scope)
-        .register(registry)
-        .increment();
+        .register(registry);
   }
 }

@@ -60,6 +60,11 @@ public class MailService {
     this.templates = templates;
     this.events = events;
     this.meters = meters;
+    // Each template's failure series exists from the start (issue #984).
+    for (MailTemplateKey key : MailTemplateKey.values()) {
+      meters.templateDeclared(key);
+    }
+    meters.templateDeclared(null);
   }
 
   /** Sends a message; returns the outcome without throwing. */

@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -106,6 +107,16 @@ public class AuthIdentifierRateLimiter {
     this.properties = properties;
     this.clientIpResolver = clientIpResolver;
     this.deviceCookies = deviceCookies;
+    for (String scope :
+        List.of(
+            LOGIN_ACCOUNT,
+            LOGIN_ACCOUNT_NETWORK,
+            REGISTER_EMAIL,
+            FORGOT_PASSWORD_EMAIL,
+            FORGOT_PASSWORD_EMAIL_NETWORK,
+            RESET_PASSWORD_TOKEN)) {
+      buckets.declare(scope);
+    }
   }
 
   /**

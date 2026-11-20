@@ -55,7 +55,9 @@ One dashboard, "qnop — Overview" (uid `qnop-overview`), 57 panels in ten rows.
 
 The `Instance` variable narrows the per-instance panels to one or several instances. Panels built on database-derived gauges ignore it on purpose: those numbers describe the deployment, not an instance.
 
-An empty panel is not always a fault. Most counters and timers appear with the first event: a deployment that has never sent a mail has no mail series. For the same reason a rate misses the very first event of a series after a restart: the series is born at 1, and a rate needs a 0 to rise from.
+An empty panel is not always a fault. Success series appear with their first event: a deployment that has never sent a mail has no `outcome="sent"` series. Such a series is born at its value, and a rate needs an earlier sample to rise from, so the first events after a restart, all of them if they fall into one scrape interval, do not show in a rate.
+
+Failure series do not have that gap. Every series an alert rule or an error panel watches exists at 0 from the start: object-store errors per operation, every login and refresh outcome but success, rate-limit refusals per declared limit, mail failures per template, job retries and failures per job type, extraction and conversion failures, and listener failures per event type. A first failure, or a whole burst, after a restart is a rise from 0 that `rate()` and `increase()` see.
 
 The provisioned data source tells Grafana that Prometheus scrapes every 30 seconds. If you change the scrape interval, or import the dashboard into a Grafana of your own, set the data source's scrape interval to match, or short time ranges show gaps.
 
@@ -82,7 +84,7 @@ The provisioned data source tells Grafana that Prometheus scrapes every 30 secon
 | `QnopDatabasePoolExhausted` | warning | requests wait for a database connection, for 5 minutes |
 | `QnopHeapNearlyFull` | warning | an instance's heap is above 90% for 15 minutes |
 
-Three limits worth knowing. `QnopScheduledJobNotRunning` assumes a daily schedule: the hourly notification digest would be caught only after two days. `QnopMailFailing` and `QnopRefreshTokenReuse` watch counters that are created by their first event, so they fire from the second failure after a restart on; with a persistent fault that is seconds later. And `QnopAuditChainBroken` cannot tell a broken chain from a verification that failed to run through; `qnop_audit_chain_problems` and the run's message on the scheduler page can.
+Two limits worth knowing. `QnopScheduledJobNotRunning` assumes a daily schedule: the hourly notification digest would be caught only after two days. And `QnopAuditChainBroken` cannot tell a broken chain from a verification that failed to run through; `qnop_audit_chain_problems` and the run's message on the scheduler page can.
 
 ## More than one instance
 

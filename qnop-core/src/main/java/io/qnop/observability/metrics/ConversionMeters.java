@@ -75,16 +75,22 @@ public class ConversionMeters {
         Counter.builder(REFUSED)
             .description("Conversions refused because no converter slot came free in time")
             .register(registry);
+    // The failure series exist from the start, so the first failure is a rise from 0 (#984).
+    conversionTimer(Outcome.REJECTED);
+    conversionTimer(Outcome.FAILURE);
   }
 
   /** A conversion ran for {@code duration}, not counting the wait for a slot. */
   public void converted(Outcome outcome, Duration duration) {
-    Timer.builder(CONVERSION)
+    conversionTimer(outcome).record(duration);
+  }
+
+  private Timer conversionTimer(Outcome outcome) {
+    return Timer.builder(CONVERSION)
         .description("Duration of one out-of-process document conversion")
         .tag("outcome", MeterTags.of(outcome))
         .serviceLevelObjectives(BUCKETS)
-        .register(registry)
-        .record(duration);
+        .register(registry);
   }
 
   /** A conversion was refused after waiting {@code waited} for a slot; the converter never ran. */

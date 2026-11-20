@@ -4,8 +4,8 @@
 # deployment. Every qnop_* series named here is published by the application; a test in the
 # repository fails when a rule names one that is not (MetricCatalogueTest).
 #
-# A counter that is created by its first event (mail failures, reused refresh tokens) cannot show
-# that first event to increase(); the rules on such counters fire from the second one on.
+# The failure series the rules below watch exist at 0 from the application's start (issue #984), so
+# increase() sees the first failure after a restart, and a burst inside one scrape interval.
 #
 # Aggregation: series read from the database are the same on every instance and are aggregated
 # with max/min; per-instance counters and timers with sum (docs/OBSERVABILITY.md).
@@ -62,8 +62,8 @@ groups:
           summary: Jobs are marked running but have not moved
           description: A worker died mid-job and the reaper has not put its jobs back. Check that the reaper runs.
 
-      # On the queue's own count, not on the execution counter: that counter is created by the
-      # first failure, so its first failure after every restart is invisible to increase().
+      # On the queue's own count, not on the execution timer: the count is shared by every
+      # instance, and it stays put across restarts.
       - alert: QnopJobsFailing
         expr: max(delta(qnop_jobs{application="qnop", state="failed"}[30m])) > 0
         labels:

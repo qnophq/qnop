@@ -24,6 +24,7 @@ import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
 /**
@@ -91,17 +92,26 @@ public class IngestMeters {
 
   public IngestMeters(MeterRegistry registry) {
     this.registry = registry;
+    // The failure series of the formats qnop extracts exist from the start, so the first failure
+    // after a restart is a rise from 0 (issue #984). OTHER is never extracted.
+    for (Format format : List.of(Format.PDF, Format.DOCX)) {
+      extractionTimer(format, Outcome.REJECTED);
+      extractionTimer(format, Outcome.ERROR);
+    }
   }
 
   /** An extraction attempt finished; this includes any conversion to PDF that preceded it. */
   public void extracted(Format format, Outcome outcome, Duration duration) {
-    Timer.builder(EXTRACTION)
+    extractionTimer(format, outcome).record(duration);
+  }
+
+  private Timer extractionTimer(Format format, Outcome outcome) {
+    return Timer.builder(EXTRACTION)
         .description("Duration of extracting one document version, conversion included")
         .tag("format", MeterTags.of(format))
         .tag("outcome", MeterTags.of(outcome))
         .serviceLevelObjectives(EXTRACTION_BUCKETS)
-        .register(registry)
-        .record(duration);
+        .register(registry);
   }
 
   /** A document version of {@code bytes} was accepted. */

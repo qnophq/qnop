@@ -111,7 +111,9 @@ class MeteredStorageProviderTest {
 
     assertThatThrownBy(() -> provider.list("")).isInstanceOf(UnsupportedOperationException.class);
 
-    assertThat(registry.find(StorageMeters.OPERATION).timers()).isEmpty();
+    // The error series exist from the start (issue #984); none of them recorded anything.
+    assertThat(registry.find(StorageMeters.OPERATION).timers())
+        .allSatisfy(timer -> assertThat(timer.count()).isZero());
   }
 
   @Test

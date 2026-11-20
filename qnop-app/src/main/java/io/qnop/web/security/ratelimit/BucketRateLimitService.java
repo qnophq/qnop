@@ -60,6 +60,14 @@ public class BucketRateLimitService {
   }
 
   /**
+   * Declares the limit {@code scope}, so its refusal series exists at 0 before the first refusal
+   * (issue #984). Every limit backed by this service declares its scopes when it is created.
+   */
+  public void declare(String scope) {
+    meters.rateLimitDeclared(scope);
+  }
+
+  /**
    * Attempts to consume one token from the bucket identified by {@code scope + key}.
    *
    * @param scope rate-limit context label (e.g. {@code "login"}, {@code "change-password"})

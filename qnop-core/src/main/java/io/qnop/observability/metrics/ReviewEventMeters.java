@@ -60,6 +60,10 @@ public class ReviewEventMeters {
             .description(
                 "Review events not handed to listeners because the dispatch queue was full")
             .register(registry);
+    // A listener failure is rare and must be a rise from 0 when it happens (issue #984).
+    for (Type type : Type.values()) {
+      listenerFailures(type);
+    }
   }
 
   /** The dispatch queue was full and one event was not handed to the listeners (ADR-0059). */
@@ -78,10 +82,13 @@ public class ReviewEventMeters {
 
   /** A published-event listener threw on an event of this kind. */
   public void listenerFailed(Type type) {
-    Counter.builder(LISTENER_FAILURES)
+    listenerFailures(type).increment();
+  }
+
+  private Counter listenerFailures(Type type) {
+    return Counter.builder(LISTENER_FAILURES)
         .description("Published-event listeners that failed on an event")
         .tag("type", MeterTags.of(type))
-        .register(registry)
-        .increment();
+        .register(registry);
   }
 }
