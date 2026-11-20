@@ -83,9 +83,12 @@ public class PublicBaseUrl implements SettingsChangeListener {
    */
   public void reportMissing(String consequence) {
     if (warned.compareAndSet(false, true)) {
+      // Generic on purpose: the first caller is whichever ran first, and every
+      // other link built from the base URL breaks the same way.
       log.warn(
-          "general.base_url is not configured — {}. Set Settings → General → Base URL;"
-              + " further occurrences are logged at DEBUG.",
+          "general.base_url is not configured — links in mails and exports are relative or left"
+              + " out (first seen: {}). Set Settings → General → Base URL; further occurrences"
+              + " are logged at DEBUG.",
           consequence);
     } else {
       log.debug("general.base_url is not configured — {}", consequence);

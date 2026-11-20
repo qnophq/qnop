@@ -57,6 +57,9 @@ logging:
     # one WARN per font per document (issue #986). Ordinary PDFs do this all the
     # time, and it buried the real faults in the logback.events WARN rate. Its
     # errors still show; QNOP_LOG_LEVEL_PDFBOX_FONT=WARN brings the rest back.
+    # The trade-off: the same classes warn when a PDF's embedded font or ToUnicode
+    # map is damaged, and those lines go too. They also describe the document, not
+    # the server, and a PDF that cannot be extracted still fails visibly.
     org.apache.pdfbox.pdmodel.font: ${QNOP_LOG_LEVEL_PDFBOX_FONT:ERROR}
     # The exception: the provider of the server's own fonts warns once per process,
     # about the server (an unreadable font file, a font cache it cannot write).

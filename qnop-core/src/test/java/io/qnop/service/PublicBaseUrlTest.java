@@ -83,6 +83,7 @@ class PublicBaseUrlTest {
             Level.WARN, Level.DEBUG, Level.DEBUG, Level.DEBUG, Level.DEBUG, Level.DEBUG);
     assertThat(events.list.getFirst().getFormattedMessage())
         .contains("general.base_url is not configured")
+        .contains("links in mails and exports")
         .contains("notification mail links will be relative")
         .contains("Settings → General → Base URL");
   }
