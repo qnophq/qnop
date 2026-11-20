@@ -163,10 +163,27 @@ public class StorageService {
     }
   }
 
-  /** Marks the object committed (its domain row is now durable). Idempotent; no-op if unknown. */
+  /**
+   * Marks the object committed (its domain row is now durable). Idempotent and safe under
+   * concurrency: identical uploads committing the same content-addressed row at once all succeed,
+   * and an already committed row is left as it is (issue #982).
+   *
+   * <p>The update is a bulk statement that bypasses the persistence context: a {@code
+   * StorageObject} the caller already holds is not refreshed by it. A key without a row is not an
+   * error, but it means the row vanished between stage and commit (the orphan reaper took it), so
+   * the domain row now references an object the registry no longer tracks; that is logged.
+   */
   @Transactional
   public void commit(String key) {
-    repository.findByObjectKey(key).ifPresent(object -> object.markCommitted(Instant.now()));
+    int committed =
+        repository.commitIfPending(
+            key, Instant.now(), StorageObjectStatus.PENDING, StorageObjectStatus.COMMITTED);
+    if (committed == 0 && repository.findByObjectKey(key).isEmpty()) {
+      log.warn(
+          "Commit of storage object {} found no registry row; it was removed between stage and"
+              + " commit",
+          key);
+    }
   }
 
   /** Opens the object for reading, or empty if absent. The caller closes the returned content. */

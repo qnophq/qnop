@@ -48,6 +48,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -121,8 +122,34 @@ class StorageServiceTest {
 
   private static StorageObject committedRow() {
     StorageObject row = pendingRow();
-    row.markCommitted(Instant.now());
+    // Production commits through a conditional update (issue #982), not through the entity.
+    ReflectionTestUtils.setField(row, "status", StorageObjectStatus.COMMITTED);
+    ReflectionTestUtils.setField(row, "committedAt", Instant.now());
     return row;
+  }
+
+  @Test
+  @DisplayName("a commit that changes a row needs no second look (issue #982)")
+  void commitOfAPendingRowDoesNotLookTheRowUp() {
+    when(repository.commitIfPending(eq("k"), any(), any(), any())).thenReturn(1);
+
+    storage.commit("k");
+
+    verify(repository)
+        .commitIfPending(
+            eq("k"), any(), eq(StorageObjectStatus.PENDING), eq(StorageObjectStatus.COMMITTED));
+    verify(repository, never()).findByObjectKey(anyString());
+  }
+
+  @Test
+  @DisplayName("a commit that changes nothing tells an already committed row from a vanished one")
+  void commitThatChangesNothingChecksWhetherTheRowStillExists() {
+    when(repository.commitIfPending(eq("k"), any(), any(), any())).thenReturn(0);
+    when(repository.findByObjectKey("k")).thenReturn(Optional.empty());
+
+    storage.commit("k"); // logs, never throws: the domain row is already durable
+
+    verify(repository).findByObjectKey("k");
   }
 
   @Test

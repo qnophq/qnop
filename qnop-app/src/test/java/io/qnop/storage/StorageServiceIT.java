@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.qnop.bootstrap.AbstractIntegrationTest;
+import io.qnop.entity.StorageObject;
 import io.qnop.entity.StorageObjectStatus;
 import io.qnop.observability.metrics.StorageMeters;
 import io.qnop.repository.StorageObjectRepository;
@@ -34,8 +35,15 @@ import io.qnop.spi.storage.StorageContent;
 import io.qnop.spi.storage.StorageProvider;
 import java.io.ByteArrayInputStream;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -66,6 +74,11 @@ class StorageServiceIT extends AbstractIntegrationTest {
             .tag("outcome", "success")
             .timer();
     return timer == null ? 0 : timer.count();
+  }
+
+  private long rowVersion(String key) {
+    return jdbc.queryForObject(
+        "SELECT version FROM storage_object WHERE object_key = ?", Long.class, key);
   }
 
   private StagedObject stage(byte[] content, String contentType) {
@@ -219,5 +232,65 @@ class StorageServiceIT extends AbstractIntegrationTest {
     assertThat(repository.findByObjectKey(fresh.key())).isPresent();
     assertThat(storage.get(fresh.key())).isPresent();
     storage.delete(fresh.key());
+  }
+
+  @Test
+  void concurrentCommitsOfOneKeyAllSucceed() throws Exception {
+    // Identical uploads share one content-addressed row (ADR-0036); their commits race on it.
+    // Before #982 the loser failed the optimistic-lock check, and the upload answered 500 although
+    // its document had been created. Several rounds, because one round may not interleave.
+    int writers = 8;
+    ExecutorService pool = Executors.newFixedThreadPool(writers);
+    try {
+      for (int round = 0; round < 5; round++) {
+        StagedObject staged = stage(uniqueContent(), "application/pdf");
+        CyclicBarrier start = new CyclicBarrier(writers);
+        List<Future<?>> commits = new ArrayList<>();
+        for (int i = 0; i < writers; i++) {
+          commits.add(
+              pool.submit(
+                  () -> {
+                    start.await();
+                    storage.commit(staged.key());
+                    return null;
+                  }));
+        }
+        for (Future<?> commit : commits) {
+          commit.get(30, TimeUnit.SECONDS);
+        }
+
+        assertThat(repository.findByObjectKey(staged.key()))
+            .hasValueSatisfying(
+                row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.COMMITTED));
+        storage.delete(staged.key());
+      }
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  @Test
+  void committingACommittedObjectLeavesItUntouched() {
+    StagedObject staged = stage(uniqueContent(), "application/pdf");
+    storage.commit(staged.key());
+    StorageObject first = repository.findByObjectKey(staged.key()).orElseThrow();
+    long firstVersion = rowVersion(staged.key());
+
+    storage.commit(staged.key());
+
+    StorageObject again = repository.findByObjectKey(staged.key()).orElseThrow();
+    assertThat(again.getStatus()).isEqualTo(StorageObjectStatus.COMMITTED);
+    assertThat(again.getCommittedAt()).isEqualTo(first.getCommittedAt());
+    assertThat(rowVersion(staged.key())).isEqualTo(firstVersion);
+    storage.delete(staged.key());
+  }
+
+  @Test
+  void committingAnUnknownKeyIsANoOp() {
+    String unknown = "sha256/00/" + "0".repeat(64);
+
+    storage.commit(unknown);
+
+    assertThat(repository.findByObjectKey(unknown)).isEmpty();
   }
 }

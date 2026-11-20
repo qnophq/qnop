@@ -47,9 +47,16 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -155,6 +162,46 @@ class DocumentIngestIT extends AbstractIntegrationTest {
 
   private DistributionSummary uploadSize() {
     return meterRegistry.find(IngestMeters.UPLOAD_SIZE).tag("format", "pdf").summary();
+  }
+
+  @Test
+  @DisplayName("concurrent uploads of identical content are all created and all answer 201 (#982)")
+  void concurrentIdenticalUploadsAllSucceed() throws Exception {
+    UUID owner = createUser();
+    // Identical bytes share one content-addressed storage row, whose commit the uploads race on.
+    byte[] pdf = pdf("Same content " + UUID.randomUUID());
+    int uploads = 6;
+    ExecutorService pool = Executors.newFixedThreadPool(uploads);
+    try {
+      CyclicBarrier start = new CyclicBarrier(uploads);
+      List<Future<MvcResult>> results = new ArrayList<>();
+      for (int i = 0; i < uploads; i++) {
+        results.add(
+            pool.submit(
+                () -> {
+                  start.await();
+                  return mockMvc
+                      .perform(
+                          multipart("/api/v1/documents")
+                              .file(pdfFile(pdf))
+                              .param("title", "Concurrent IT")
+                              .with(asUser(owner)))
+                      .andReturn();
+                }));
+      }
+      Set<UUID> created = new HashSet<>();
+      for (Future<MvcResult> result : results) {
+        MvcResult upload = result.get(60, TimeUnit.SECONDS);
+        if (upload.getResponse().getStatus() == 201) {
+          created.add(documentIdOf(upload));
+        }
+        assertThat(upload.getResponse().getStatus()).as("upload status").isEqualTo(201);
+      }
+      // Each upload is its own review sharing one stored object, and every one is persisted.
+      assertThat(created).hasSize(uploads).allMatch(documents::existsById);
+    } finally {
+      pool.shutdownNow();
+    }
   }
 
   @Test
