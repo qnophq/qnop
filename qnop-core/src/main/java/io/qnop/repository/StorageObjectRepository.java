@@ -30,6 +30,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Data access for the object-storage staging registry (issue #243, ADR-0036). */
 public interface StorageObjectRepository extends JpaRepository<StorageObject, UUID> {
@@ -59,8 +60,45 @@ public interface StorageObjectRepository extends JpaRepository<StorageObject, UU
       @Param("pending") StorageObjectStatus pending,
       @Param("committed") StorageObjectStatus committed);
 
+  /**
+   * Marks the {@code PENDING} row of {@code objectKey} as staged just now, so an upload that reuses
+   * an old row is not older than the reaper's grace period between its stage and its commit (issue
+   * #987). For a {@code PENDING} row, {@code created_at} is therefore the time it was last staged.
+   * Runs in a transaction of its own, because staging runs outside one. The version is bumped like
+   * a managed update would.
+   *
+   * @return 1 if the row is still {@code PENDING} and was refreshed, 0 if it was committed or
+   *     removed in the meantime
+   */
+  @Transactional
+  @Modifying
+  @Query(
+      "UPDATE StorageObject s SET s.createdAt = :at, s.version = s.version + 1"
+          + " WHERE s.objectKey = :objectKey AND s.status = :pending")
+  int restageIfPending(
+      @Param("objectKey") String objectKey,
+      @Param("at") Instant at,
+      @Param("pending") StorageObjectStatus pending);
+
   /** Orphan-reaper query: rows in a given lifecycle state older than the cutoff. */
   List<StorageObject> findByStatusAndCreatedAtBefore(StorageObjectStatus status, Instant cutoff);
+
+  /**
+   * Claims an orphan for the reaper by deleting its row, but only while it is still {@code PENDING}
+   * and still older than the cutoff (issue #987). The reaper read the row earlier; an upload may
+   * have committed it or staged it again since. The statement takes the row lock, so a concurrent
+   * commit or restage waits for the reaper's transaction and then matches no row.
+   *
+   * @return 1 if this call removed the row, 0 if it is no longer an orphan
+   */
+  @Modifying
+  @Query(
+      "DELETE FROM StorageObject s"
+          + " WHERE s.id = :id AND s.status = :pending AND s.createdAt < :cutoff")
+  int deleteIfOrphaned(
+      @Param("id") UUID id,
+      @Param("cutoff") Instant cutoff,
+      @Param("pending") StorageObjectStatus pending);
 
   /**
    * Every tracked object key (any lifecycle state), for the storage-consistency referenced set

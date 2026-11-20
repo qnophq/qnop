@@ -38,6 +38,7 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -221,6 +222,79 @@ class StorageServiceIT extends AbstractIntegrationTest {
     assertThat(storage.get(committed.key())).isPresent();
 
     storage.delete(committed.key());
+  }
+
+  @Test
+  void reStagingAnOldPendingRowKeepsItFromTheReaper() {
+    // An upload whose content matches a PENDING row older than the grace period reuses that row.
+    // Before #987 the row kept its old created_at, so the reaper could take it, and the object,
+    // between this upload's stage and its commit.
+    byte[] data = uniqueContent();
+    StagedObject first = stage(data, "application/pdf");
+    backdate(first.key());
+
+    StagedObject again = stage(data, "application/pdf");
+    storage.reapOrphansOnce(false);
+
+    assertThat(again.key()).isEqualTo(first.key());
+    assertThat(repository.findByObjectKey(again.key())).isPresent();
+    assertThat(provider.exists(again.key())).isTrue();
+    storage.commit(again.key());
+    assertThat(repository.findByObjectKey(again.key()))
+        .hasValueSatisfying(
+            row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.COMMITTED));
+    storage.delete(again.key());
+  }
+
+  @Test
+  void reaperRacingACommitNeverLeavesACommittedRowWithoutItsObject() throws Exception {
+    // The reaper and a commit race on the same old PENDING row (issue #987). Before, the reaper
+    // deleted the object first and the row only when its transaction ended; a commit in between
+    // made the row delete fail and roll back, leaving a COMMITTED row whose object was gone.
+    // Either side may win now, but the row and its object go together. Several rounds, because
+    // one round may not interleave.
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      for (int round = 0; round < 10; round++) {
+        StagedObject staged = stage(uniqueContent(), "application/pdf");
+        backdate(staged.key());
+        CyclicBarrier start = new CyclicBarrier(2);
+        Future<?> reaper =
+            pool.submit(
+                () -> {
+                  start.await();
+                  return storage.reapOrphansOnce(false);
+                });
+        Future<?> commit =
+            pool.submit(
+                () -> {
+                  start.await();
+                  storage.commit(staged.key());
+                  return null;
+                });
+        reaper.get(30, TimeUnit.SECONDS);
+        commit.get(30, TimeUnit.SECONDS);
+
+        Optional<StorageObject> row = repository.findByObjectKey(staged.key());
+        if (row.isPresent()) {
+          assertThat(row.get().getStatus()).isEqualTo(StorageObjectStatus.COMMITTED);
+          assertThat(provider.exists(staged.key())).as("object of a committed row").isTrue();
+          storage.delete(staged.key());
+        } else {
+          assertThat(provider.exists(staged.key())).as("object of a reaped row").isFalse();
+        }
+      }
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  /** Moves a row's staging time beyond the reaper's grace period (default 1h). */
+  private void backdate(String key) {
+    jdbc.update(
+        "UPDATE storage_object SET created_at = created_at - interval '2 hours'"
+            + " WHERE object_key = ?",
+        key);
   }
 
   @Test
