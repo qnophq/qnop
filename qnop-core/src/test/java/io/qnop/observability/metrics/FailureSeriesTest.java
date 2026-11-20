@@ -66,15 +66,24 @@ class FailureSeriesTest {
   void signInRefusals() {
     AuthMeters meters = new AuthMeters(registry);
 
-    for (AuthMeters.Method method : AuthMeters.Method.values()) {
-      for (String outcome : new String[] {"rejected", "throttled", "error"}) {
-        assertThat(
-                counter(AuthMeters.LOGIN, "method", MeterTags.of(method), "outcome", outcome)
-                    .count())
-            .as("%s %s logins", method, outcome)
-            .isZero();
-      }
+    for (String outcome : new String[] {"rejected", "throttled", "error"}) {
+      assertThat(counter(AuthMeters.LOGIN, "method", "local", "outcome", outcome).count())
+          .as("local %s logins", outcome)
+          .isZero();
     }
+    for (String outcome : new String[] {"rejected", "error"}) {
+      assertThat(counter(AuthMeters.LOGIN, "method", "oidc", "outcome", outcome).count())
+          .as("oidc %s logins", outcome)
+          .isZero();
+    }
+    // A single sign-on is never throttled by qnop, so that series would never be recorded.
+    assertThat(
+            registry
+                .find(AuthMeters.LOGIN)
+                .tag("method", "oidc")
+                .tag("outcome", "throttled")
+                .counter())
+        .isNull();
     for (String outcome : new String[] {"missing", "reused", "unknown"}) {
       assertThat(counter(AuthMeters.REFRESH, "outcome", outcome).count())
           .as("%s refreshes", outcome)
@@ -84,7 +93,10 @@ class FailureSeriesTest {
     assertThat(registry.find(AuthMeters.REFRESH).tag("outcome", "success").counter()).isNull();
 
     meters.refresh(AuthMeters.RefreshOutcome.REUSED);
+    meters.login(AuthMeters.Method.LOCAL, AuthMeters.LoginOutcome.REJECTED);
     assertThat(counter(AuthMeters.REFRESH, "outcome", "reused").count()).isEqualTo(1);
+    assertThat(counter(AuthMeters.LOGIN, "method", "local", "outcome", "rejected").count())
+        .isEqualTo(1);
   }
 
   @Test
@@ -116,39 +128,50 @@ class FailureSeriesTest {
   }
 
   @Test
-  @DisplayName("extraction: rejected and failed versions of each format qnop extracts")
+  @DisplayName("extraction: rejected and failed versions of every format")
   void extractionFailures() {
-    new IngestMeters(registry);
+    IngestMeters meters = new IngestMeters(registry);
 
-    for (String format : new String[] {"pdf", "docx"}) {
+    // "other" too: a format an extension adds is extracted under it.
+    for (String format : new String[] {"pdf", "docx", "other"}) {
       for (String outcome : new String[] {"rejected", "error"}) {
         assertThat(timerCount(IngestMeters.EXTRACTION, "format", format, "outcome", outcome))
             .as("%s %s", format, outcome)
             .isZero();
       }
     }
-    assertThat(registry.find(IngestMeters.EXTRACTION).tag("format", "other").timers()).isEmpty();
+
+    meters.extracted(IngestMeters.Format.DOCX, IngestMeters.Outcome.ERROR, ONCE);
+    assertThat(timerCount(IngestMeters.EXTRACTION, "format", "docx", "outcome", "error"))
+        .isEqualTo(1);
   }
 
   @Test
   @DisplayName("conversion: rejected and failed conversions")
   void conversionFailures() {
-    new ConversionMeters(registry);
+    ConversionMeters meters = new ConversionMeters(registry);
 
     assertThat(timerCount(ConversionMeters.CONVERSION, "outcome", "rejected")).isZero();
     assertThat(timerCount(ConversionMeters.CONVERSION, "outcome", "failure")).isZero();
+
+    meters.converted(ConversionMeters.Outcome.FAILURE, ONCE);
+    assertThat(timerCount(ConversionMeters.CONVERSION, "outcome", "failure")).isEqualTo(1);
   }
 
   @Test
   @DisplayName("review events: listener failures of every event type")
   void listenerFailures() {
-    new ReviewEventMeters(registry);
+    ReviewEventMeters meters = new ReviewEventMeters(registry);
 
     for (ReviewEventMeters.Type type : ReviewEventMeters.Type.values()) {
       assertThat(counter(ReviewEventMeters.LISTENER_FAILURES, "type", MeterTags.of(type)).count())
           .as("%s listener failures", type)
           .isZero();
     }
+
+    meters.listenerFailed(ReviewEventMeters.Type.COMMENT_ADDED);
+    assertThat(counter(ReviewEventMeters.LISTENER_FAILURES, "type", "comment_added").count())
+        .isEqualTo(1);
   }
 
   private long timerCount(String name, String... tags) {

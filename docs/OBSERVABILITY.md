@@ -57,7 +57,9 @@ The `Instance` variable narrows the per-instance panels to one or several instan
 
 An empty panel is not always a fault. Success series appear with their first event: a deployment that has never sent a mail has no `outcome="sent"` series. Such a series is born at its value, and a rate needs an earlier sample to rise from, so the first events after a restart, all of them if they fall into one scrape interval, do not show in a rate.
 
-Failure series do not have that gap. Every series an alert rule or an error panel watches exists at 0 from the start: object-store errors per operation, every login and refresh outcome but success, rate-limit refusals per declared limit, mail failures per template, job retries and failures per job type, extraction and conversion failures, and listener failures per event type. A first failure, or a whole burst, after a restart is a rise from 0 that `rate()` and `increase()` see.
+Failure series do not have that gap. Every failure series an alert rule watches, and those of the sign-in, mail, storage, job and ingest panels, exists at 0 from the start: object-store errors per operation, every login and refresh outcome but success, rate-limit refusals per declared limit, mail failures per template, job retries and failures per job type, extraction and conversion failures, and listener failures per event type. A first failure, or a whole burst, after a restart is a rise from 0 that `rate()` and `increase()` see.
+
+Two panels keep the gap. "Runs by outcome" of the scheduled jobs: a failed run is alerted on through `qnop_scheduler_last_run_failed`, which has no gap. And the usage-tracking forwards: the backend is chosen at runtime, so its series cannot be known at start.
 
 The provisioned data source tells Grafana that Prometheus scrapes every 30 seconds. If you change the scrape interval, or import the dashboard into a Grafana of your own, set the data source's scrape interval to match, or short time ranges show gaps.
 

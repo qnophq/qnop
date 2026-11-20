@@ -75,7 +75,7 @@ public class AuthMeters {
     // (issue #984).
     for (Method method : Method.values()) {
       for (LoginOutcome outcome : LoginOutcome.values()) {
-        if (outcome != LoginOutcome.SUCCESS) {
+        if (outcome != LoginOutcome.SUCCESS && isRecorded(method, outcome)) {
           loginCounter(method, outcome);
         }
       }
@@ -113,6 +113,14 @@ public class AuthMeters {
    */
   public void rateLimited(String scope) {
     rateLimitCounter(scope).increment();
+  }
+
+  /**
+   * Whether a login of this method can end this way. Only the local login has a per-account limit;
+   * a single sign-on is throttled by its identity provider, which qnop never sees.
+   */
+  private static boolean isRecorded(Method method, LoginOutcome outcome) {
+    return !(method == Method.OIDC && outcome == LoginOutcome.THROTTLED);
   }
 
   private Counter loginCounter(Method method, LoginOutcome outcome) {

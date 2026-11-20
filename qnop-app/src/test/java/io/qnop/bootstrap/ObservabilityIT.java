@@ -133,14 +133,12 @@ class ObservabilityIT extends SeededIntegrationTest {
     // Issue #984: a series born at its first event hides that event, and a whole burst within
     // one scrape interval, from increase(). Each of these must already be there, whatever this
     // context has or has not done. They span the meter classes and every way a series is
-    // declared: by its meter, by the job queue's handlers, by the mail catalogue, and by the
-    // rate limits of the filters and of the identifier limiter.
+    // declared: by its meter, by the job queue's handlers, by the mail catalogue, and (below) by
+    // every rate limit.
     assertThat(
             List.of(
                 "qnop_auth_refresh_total{application=\"qnop\",outcome=\"reused\"}",
                 "qnop_auth_login_total{application=\"qnop\",method=\"local\",outcome=\"rejected\"}",
-                "qnop_ratelimit_rejected_total{application=\"qnop\",scope=\"login\"}",
-                "qnop_ratelimit_rejected_total{application=\"qnop\",scope=\"login-account\"}",
                 "qnop_storage_operation_seconds_count{application=\"qnop\",operation=\"put\",outcome=\"error\"}",
                 "qnop_mail_send_seconds_count{application=\"qnop\",outcome=\"failed\",template=\"adhoc\"}",
                 "qnop_mail_send_seconds_count{application=\"qnop\",outcome=\"failed\",template=\"password_reset\"}",
@@ -151,6 +149,39 @@ class ObservabilityIT extends SeededIntegrationTest {
             series ->
                 assertThat(scrape.lines().anyMatch(line -> line.startsWith(series + " ")))
                     .as("the scrape has %s", series)
+                    .isTrue());
+
+    // Every limit, filter or identifier one: the scopes are literals spread over the limits, and a
+    // new one that forgets to declare itself would bring the gap back for exactly that limit. The
+    // test context raises every limit out of reach, so only a declaration can create these.
+    assertThat(
+            List.of(
+                "login",
+                "refresh",
+                "register",
+                "verify-email",
+                "forgot-password",
+                "reset-password",
+                "change-password",
+                "tracking",
+                "login-account",
+                "login-account-network",
+                "register-email",
+                "forgot-password-email",
+                "forgot-password-email-network",
+                "reset-password-token"))
+        .allSatisfy(
+            scope ->
+                assertThat(
+                        scrape
+                            .lines()
+                            .anyMatch(
+                                line ->
+                                    line.startsWith(
+                                        "qnop_ratelimit_rejected_total{application=\"qnop\",scope=\""
+                                            + scope
+                                            + "\"} ")))
+                    .as("the scrape has the refusal series of the %s limit", scope)
                     .isTrue());
   }
 
