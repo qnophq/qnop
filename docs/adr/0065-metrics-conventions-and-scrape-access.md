@@ -194,3 +194,33 @@ maintenance jobs at once: the dashboard showed one series instead of one per job
 The tag is now `scheduler_job`. The rule it adds to "Names and tags": **a tag key never equals a
 label Prometheus sets on a target itself (`job`, `instance`)**. `MetricCatalogueTest` enforces it
 for every qnop meter and for the list of permitted tag keys.
+
+## Amendment (2026-11-20, failure series exist from the start)
+
+Counters and timers were created by their first event. A series created that way appears at its
+value, and `rate()`/`increase()` need an earlier sample to rise from. That hides the first event
+after a restart, and every event of a burst that falls into one scrape interval. On a local run,
+seven reused refresh tokens in one burst left `increase()` at 0, and `QnopRefreshTokenReuse` did
+not fire (issue #984).
+
+The rule this adds: **a failure series that an alert rule watches, or that an error panel shows
+for a dependency or a pipeline, is registered at 0 when the application starts.** The tag values are
+closed sets, so the series are known up front:
+
+- Meters whose tags are all enums register their failure series in their constructor: object-store
+  errors per operation, every outcome but success a login method can end with, every refresh
+  outcome but success, extraction failures per format, conversion failures, and listener failures
+  per event type.
+- Meters whose tag is an open-looking string still taken from a fixed set are declared by the code
+  that owns the set: the job queue declares each handler's type, the mail service each catalogue
+  template and the ad-hoc message, and each rate limit its scope when it is created.
+
+Two failure series are left out on purpose. A failed scheduler run is alerted on through the
+`qnop_scheduler_last_run_failed` gauge, which has no gap; registering every job × trigger × dry-run
+combination would add hundreds of bucket lines for a panel. And the tracking forwards are tagged
+with a backend chosen at runtime, which is not known at start.
+
+Success series still appear with their first event. Registering them all would add series that
+nobody alerts on, mail templates a deployment never sends among them. Pre-registration does not
+raise the cardinality bound: every series registered at start is one the first event would have
+created.

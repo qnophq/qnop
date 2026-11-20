@@ -84,17 +84,24 @@ public class StorageMeters {
         Counter.builder(ORPHANS_REAPED)
             .description("Uploads that were never committed and were removed by the orphan reaper")
             .register(registry);
+    // The error series exist from the start, so the first failure is a rise from 0 (issue #984).
+    for (Operation operation : Operation.values()) {
+      timer(operation, Outcome.ERROR);
+    }
   }
 
   /** One provider call took {@code duration}. */
   public void called(Operation operation, Outcome outcome, Duration duration) {
-    Timer.builder(OPERATION)
+    timer(operation, outcome).record(duration);
+  }
+
+  private Timer timer(Operation operation, Outcome outcome) {
+    return Timer.builder(OPERATION)
         .description("Duration of one call to the object store")
         .tag("operation", MeterTags.of(operation))
         .tag("outcome", MeterTags.of(outcome))
         .serviceLevelObjectives(BUCKETS)
-        .register(registry)
-        .record(duration);
+        .register(registry);
   }
 
   /**

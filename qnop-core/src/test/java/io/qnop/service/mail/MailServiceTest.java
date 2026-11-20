@@ -28,11 +28,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qnop.observability.metrics.MailMeters;
 import io.qnop.service.mail.MailService.SendResult;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
+import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -152,7 +154,7 @@ class MailServiceTest {
     // One sample per attempt, under the template's name: a render failure is not also an
     // ad-hoc send.
     assertThat(sends("password_reset", "failed")).isEqualTo(1);
-    assertThat(registry.find(MailMeters.SEND).timers()).hasSize(1);
+    assertThat(allSends()).isEqualTo(1);
   }
 
   @Test
@@ -166,7 +168,7 @@ class MailServiceTest {
     service.sendMailFromTemplate(MailTemplateKey.TEAM_INVITATION, "to@example.com", Map.of(), "en");
 
     assertThat(sends("team_invitation", "sent")).isEqualTo(1);
-    assertThat(registry.find(MailMeters.SEND).timers()).hasSize(1);
+    assertThat(allSends()).isEqualTo(1);
   }
 
   @Test
@@ -178,6 +180,36 @@ class MailServiceTest {
         .isInstanceOf(IllegalStateException.class);
 
     assertThat(sends(MailMeters.ADHOC, "failed")).isEqualTo(1);
+  }
+
+  /** How many send attempts were measured at all, across templates and outcomes. */
+  private long allSends() {
+    return registry.find(MailMeters.SEND).timers().stream().mapToLong(Timer::count).sum();
+  }
+
+  @Test
+  @DisplayName("every catalogue template, and the ad-hoc message, has a failure series at start")
+  void failureSeriesExistFromTheStart() {
+    // Issue #984: the first failure after a start must be a rise from 0, not a series born at 1.
+    for (MailTemplateKey key : MailTemplateKey.values()) {
+      String template = key.name().toLowerCase(Locale.ROOT);
+      assertThat(
+              registry
+                  .find(MailMeters.SEND)
+                  .tag("template", template)
+                  .tag("outcome", "failed")
+                  .timer())
+          .as("failure series of %s", template)
+          .isNotNull();
+    }
+    assertThat(
+            registry
+                .find(MailMeters.SEND)
+                .tag("template", MailMeters.ADHOC)
+                .tag("outcome", "failed")
+                .timer())
+        .isNotNull();
+    assertThat(allSends()).isZero();
   }
 
   /** How many send attempts were measured for this template and outcome (issue #962). */

@@ -86,6 +86,19 @@ class JobServiceMetersTest {
   }
 
   @Test
+  @DisplayName("each handler's retry and failure series exist, at zero, before any job ran")
+  void failureSeriesExistFromTheStart() {
+    serviceWith(handler(() -> {}));
+
+    // Issue #984: the first failed attempt after a start must be a rise from 0.
+    for (String outcome : List.of("retry", "failed")) {
+      Timer timer = execution(outcome);
+      assertThat(timer).as("the %s series", outcome).isNotNull();
+      assertThat(timer.count()).isZero();
+    }
+  }
+
+  @Test
   @DisplayName("a job that completes is timed as a success")
   void timesASuccess() {
     givenRunningJob(1, 5, Duration.ZERO);
@@ -93,8 +106,8 @@ class JobServiceMetersTest {
     serviceWith(handler(() -> {})).runOne(id);
 
     assertThat(execution("success").count()).isEqualTo(1);
-    assertThat(execution("retry")).isNull();
-    assertThat(execution("failed")).isNull();
+    assertThat(execution("retry").count()).isZero();
+    assertThat(execution("failed").count()).isZero();
     // Buckets, so a percentile can be computed across instances (ADR-0065).
     assertThat(execution("success").takeSnapshot().histogramCounts()).isNotEmpty();
   }
@@ -120,7 +133,7 @@ class JobServiceMetersTest {
     assertThatThrownBy(() -> service.runOne(id)).isInstanceOf(IllegalStateException.class);
 
     assertThat(execution("failed").count()).isEqualTo(1);
-    assertThat(execution("retry")).isNull();
+    assertThat(execution("retry").count()).isZero();
   }
 
   @Test
@@ -144,7 +157,9 @@ class JobServiceMetersTest {
 
     serviceWith(handler(JobServiceMetersTest::fail)).runOne(id);
 
-    assertThat(registry.find(JobMeters.EXECUTION).timers()).isEmpty();
+    // The retry and failure series exist from the start (issue #984); none recorded anything.
+    assertThat(registry.find(JobMeters.EXECUTION).timers())
+        .allSatisfy(timer -> assertThat(timer.count()).isZero());
     assertThat(registry.find(JobMeters.QUEUE_WAIT).timers()).isEmpty();
   }
 

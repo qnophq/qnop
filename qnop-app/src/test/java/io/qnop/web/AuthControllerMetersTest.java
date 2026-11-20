@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qnop.api.v1.model.LoginRequest;
 import io.qnop.observability.metrics.AuthMeters;
@@ -135,7 +136,10 @@ class AuthControllerMetersTest {
     assertThatThrownBy(() -> controller.login(request())).isInstanceOf(IllegalStateException.class);
 
     assertThat(logins("error")).isEqualTo(1.0);
-    assertThat(registry.find(AuthMeters.LOGIN).counters()).hasSize(1);
+    // The other outcomes' series exist from the start (issue #984), but count nothing.
+    assertThat(
+            registry.find(AuthMeters.LOGIN).counters().stream().mapToDouble(Counter::count).sum())
+        .isEqualTo(1.0);
   }
 
   @Test

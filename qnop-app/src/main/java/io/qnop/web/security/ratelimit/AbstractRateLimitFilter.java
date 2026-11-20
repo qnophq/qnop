@@ -51,6 +51,13 @@ abstract class AbstractRateLimitFilter extends OncePerRequestFilter {
     this.message = message;
   }
 
+  /** Declares this filter's limit once the subclass is fully constructed (issue #984). */
+  @Override
+  protected void initFilterBean() throws ServletException {
+    super.initFilterBean();
+    rateLimitService.declare(scope());
+  }
+
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
     return !handles(request);

@@ -78,6 +78,8 @@ public class JobService {
     this.handlers =
         handlers.stream()
             .collect(Collectors.toUnmodifiableMap(JobHandler::type, Function.identity()));
+    // Each handler's retry and failure series exist from the start (issue #984).
+    this.handlers.keySet().forEach(meters::typeDeclared);
   }
 
   /**

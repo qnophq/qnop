@@ -26,6 +26,7 @@ import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qnop.observability.metrics.AuthMeters;
 import io.qnop.security.QnopProperties;
@@ -84,11 +85,17 @@ class OidcLoginSuccessHandlerTest {
 
     assertThat(response.getRedirectedUrl()).isEqualTo("/");
     assertThat(logins("success")).isEqualTo(1.0);
-    assertThat(registry.find(AuthMeters.LOGIN).counters()).hasSize(1);
+    // The other outcomes' series exist from the start (issue #984), but count nothing.
+    assertThat(
+            registry.find(AuthMeters.LOGIN).counters().stream().mapToDouble(Counter::count).sum())
+        .isEqualTo(1.0);
     // The registration id is an administrator's free text; it must not become a series.
-    assertThat(registry.find(AuthMeters.LOGIN).counter().getId().getTags())
-        .extracting(tag -> tag.getKey())
-        .containsExactlyInAnyOrder("method", "outcome");
+    assertThat(registry.find(AuthMeters.LOGIN).counters())
+        .allSatisfy(
+            counter ->
+                assertThat(counter.getId().getTags())
+                    .extracting(tag -> tag.getKey())
+                    .containsExactlyInAnyOrder("method", "outcome"));
   }
 
   @Test

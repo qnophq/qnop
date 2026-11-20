@@ -69,18 +69,31 @@ public class MailMeters {
   }
 
   /**
+   * Declares a template, so its failure series exists at 0 before the first failure (issue #984).
+   * The mail service declares every template of its catalogue, and the ad-hoc message, at start.
+   *
+   * @param template a catalogue entry, or {@code null} for a message that has none
+   */
+  public void templateDeclared(Enum<?> template) {
+    timer(template, Outcome.FAILED);
+  }
+
+  /**
    * One send attempt took {@code duration}.
    *
    * @param template the catalogue entry the message was rendered from, or {@code null} for a
    *     message that has none
    */
   public void sent(Enum<?> template, Outcome outcome, Duration duration) {
-    Timer.builder(SEND)
+    timer(template, outcome).record(duration);
+  }
+
+  private Timer timer(Enum<?> template, Outcome outcome) {
+    return Timer.builder(SEND)
         .description("Duration of one attempt to send a mail")
         .tag("template", template == null ? ADHOC : MeterTags.of(template))
         .tag("outcome", MeterTags.of(outcome))
         .serviceLevelObjectives(BUCKETS)
-        .register(registry)
-        .record(duration);
+        .register(registry);
   }
 }
