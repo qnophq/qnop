@@ -210,12 +210,12 @@ public class StorageService {
         });
   }
 
+  /**
+   * Stores the buffered upload. The provider may open the buffer once per attempt, so a retry after
+   * a dropped connection sends the whole content again (issue #983).
+   */
   private void uploadBuffered(Path buffer, String key, long size, String contentType) {
-    try (InputStream in = Files.newInputStream(buffer)) {
-      provider.put(key, in, size, contentType);
-    } catch (IOException e) {
-      throw new StorageException("Failed to read buffered upload for " + key, e);
-    }
+    provider.putReopenable(key, () -> Files.newInputStream(buffer), size, contentType);
   }
 
   /**

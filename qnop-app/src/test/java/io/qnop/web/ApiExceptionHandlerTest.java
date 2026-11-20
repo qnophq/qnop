@@ -21,14 +21,22 @@
 package io.qnop.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.qnop.api.v1.model.ErrorResponse;
+import io.qnop.spi.storage.StorageException;
+import io.qnop.spi.storage.StorageUnavailableException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import jakarta.validation.constraints.NotBlank;
+import java.io.IOException;
 import java.util.Set;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -36,9 +44,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Unit tests for {@link ApiExceptionHandler}, focused on the constraint-violation 400 (issue #169).
+ * Unit tests for {@link ApiExceptionHandler}: the constraint-violation 400 (issue #169) and the 503
+ * for an unavailable object store (issue #983).
  */
 class ApiExceptionHandlerTest {
 
@@ -105,5 +118,48 @@ class ApiExceptionHandlerTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(response.getBody()).isNotNull();
     assertThat(response.getBody().getMessage()).isEqualTo("request parameter validation failed");
+  }
+
+  /** A controller that fails as a request does when object storage is down. */
+  @RestController
+  static final class FailingController {
+    @GetMapping("/unavailable")
+    String unavailable() {
+      throw new StorageUnavailableException(
+          "Failed to read object", new IOException("Connect to http://minio:9000 failed"));
+    }
+
+    @GetMapping("/refused")
+    String refused() {
+      throw new StorageException("Rejected storage key with an unexpected format");
+    }
+  }
+
+  private static MockMvc mvc() {
+    // Both advices, in the application's order: the catch-all comes last, so it must not be what
+    // answers a storage outage.
+    return MockMvcBuilders.standaloneSetup(new FailingController())
+        .setControllerAdvice(new ApiExceptionHandler(), new UnhandledExceptionHandler())
+        .build();
+  }
+
+  @Test
+  @DisplayName("an unavailable object store answers 503 STORAGE_UNAVAILABLE, not a generic 500")
+  void unavailableStorageIs503() throws Exception {
+    mvc()
+        .perform(get("/unavailable"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("STORAGE_UNAVAILABLE"))
+        // The internals of the failure stay in the log.
+        .andExpect(jsonPath("$.message").value(not(containsString("minio"))));
+  }
+
+  @Test
+  @DisplayName("any other storage failure is still a 500")
+  void otherStorageFailureIs500() throws Exception {
+    mvc()
+        .perform(get("/refused"))
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
   }
 }

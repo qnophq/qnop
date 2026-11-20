@@ -20,19 +20,31 @@
  */
 package io.qnop.service.storage;
 
+import io.qnop.spi.storage.ContentSource;
 import io.qnop.spi.storage.StorageContent;
 import io.qnop.spi.storage.StorageException;
 import io.qnop.spi.storage.StorageListing;
 import io.qnop.spi.storage.StorageProvider;
+import io.qnop.spi.storage.StorageUnavailableException;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.Optional;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.core.exception.SdkException;
+import software.amazon.awssdk.core.exception.SdkServiceException;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.http.ContentStreamProvider;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
@@ -41,6 +53,7 @@ import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.S3Object;
 
 /**
  * Community {@link StorageProvider} default (ADR-0005): an S3-compatible adapter over the AWS SDK
@@ -68,18 +81,45 @@ public class S3StorageProvider implements StorageProvider {
     this.bucket = bucket;
   }
 
+  /**
+   * Stores a one-shot stream. The SDK cannot replay it, so an attempt that fails is not retried;
+   * the core stores through {@link #putReopenable} instead.
+   */
   @Override
   public void put(String key, InputStream content, long contentLength, String contentType) {
     requireValidKey(key);
+    upload(key, RequestBody.fromInputStream(content, contentLength), contentLength, contentType);
+  }
+
+  /**
+   * Stores content the SDK can open again, so its retry of a failed attempt sends the whole content
+   * once more (issue #983). A one-shot stream made that retry fail with an {@link
+   * IllegalStateException} that hid the actual failure.
+   */
+  @Override
+  public void putReopenable(
+      String key, ContentSource content, long contentLength, String contentType) {
+    requireValidKey(key);
+    try (ReopenableContent reopenable = new ReopenableContent(content)) {
+      upload(
+          key,
+          RequestBody.fromContentProvider(reopenable, contentLength, contentType),
+          contentLength,
+          contentType);
+    }
+  }
+
+  private void upload(String key, RequestBody body, long contentLength, String contentType) {
     long started = System.nanoTime();
     try {
       s3.putObject(
           PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType).build(),
-          RequestBody.fromInputStream(content, contentLength));
+          body);
       // Keys are content-addressed and pattern-checked (issue #337): a hash, never a name.
       log.debug("PUT {} ({} bytes, {}) in {} ms", key, contentLength, contentType, millis(started));
-    } catch (S3Exception e) {
-      throw new StorageException("Failed to store object " + key, e);
+    } catch (SdkException | UncheckedIOException | IllegalStateException e) {
+      // IllegalStateException: the SDK's retry of a one-shot stream it has already read.
+      throw translate("Failed to store object " + key, e);
     }
   }
 
@@ -97,8 +137,8 @@ public class S3StorageProvider implements StorageProvider {
     } catch (NoSuchKeyException e) {
       log.debug("GET {} missed", key);
       return Optional.empty();
-    } catch (S3Exception e) {
-      throw new StorageException("Failed to read object " + key, e);
+    } catch (SdkException e) {
+      throw translate("Failed to read object " + key, e);
     }
   }
 
@@ -115,7 +155,9 @@ public class S3StorageProvider implements StorageProvider {
       if (e.statusCode() == 404) {
         return false;
       }
-      throw new StorageException("Failed to probe object " + key, e);
+      throw translate("Failed to probe object " + key, e);
+    } catch (SdkException e) {
+      throw translate("Failed to probe object " + key, e);
     }
   }
 
@@ -129,8 +171,8 @@ public class S3StorageProvider implements StorageProvider {
       s3.deleteObject(b -> b.bucket(bucket).key(key));
       log.debug("DELETE {}", key);
       return true;
-    } catch (S3Exception e) {
-      throw new StorageException("Failed to delete object " + key, e);
+    } catch (SdkException e) {
+      throw translate("Failed to delete object " + key, e);
     }
   }
 
@@ -139,20 +181,93 @@ public class S3StorageProvider implements StorageProvider {
    * NOT run discovered keys through {@link #requireValidKey} — the scan's whole purpose is to find
    * objects that do <em>not</em> match the canonical shape (out-of-band writes, leftovers). Uses
    * the SDK's auto-paginating {@code ListObjectsV2} so the stream stays lazy (one page in memory at
-   * a time); the caller consumes it in a try-with-resources block. Iteration-time S3 failures
-   * surface as the SDK's {@link S3Exception}; the scan service maps them to a scan failure.
+   * a time); the caller consumes it in a try-with-resources block. A page that fails to load while
+   * the stream is consumed surfaces as a {@link StorageException} too (issue #983).
    */
   @Override
   public Stream<StorageListing> list(String prefix) {
+    String failure = "Failed to list objects under prefix";
     try {
-      return s3
-          .listObjectsV2Paginator(
-              ListObjectsV2Request.builder().bucket(bucket).prefix(prefix).build())
-          .contents()
-          .stream()
+      Spliterator<S3Object> pages =
+          s3.listObjectsV2Paginator(
+                  ListObjectsV2Request.builder().bucket(bucket).prefix(prefix).build())
+              .contents()
+              .spliterator();
+      Spliterator<S3Object> translated =
+          new Spliterators.AbstractSpliterator<>(Long.MAX_VALUE, Spliterator.ORDERED) {
+            @Override
+            public boolean tryAdvance(Consumer<? super S3Object> action) {
+              try {
+                return pages.tryAdvance(action);
+              } catch (SdkException e) {
+                throw translate(failure, e);
+              }
+            }
+          };
+      return StreamSupport.stream(translated, false)
           .map(object -> new StorageListing(object.key(), object.size(), object.lastModified()));
-    } catch (S3Exception e) {
-      throw new StorageException("Failed to list objects under prefix", e);
+    } catch (SdkException e) {
+      throw translate(failure, e);
+    }
+  }
+
+  /**
+   * The {@link StorageException} for an SDK failure (issue #983). A store that cannot be reached,
+   * fails on its own side, or throttles is unavailable for now; anything else is a failure of the
+   * request.
+   */
+  static StorageException translate(String message, RuntimeException e) {
+    boolean unavailable =
+        switch (e) {
+          case SdkServiceException service ->
+              service.statusCode() >= 500 || service.isThrottlingException();
+          case SdkClientException client -> true;
+          default -> false;
+        };
+    return unavailable
+        ? new StorageUnavailableException(message, e)
+        : new StorageException(message, e);
+  }
+
+  /**
+   * Hands the SDK a fresh stream of the content for each attempt, and closes the one before: the
+   * SDK may not close a stream it gave up on.
+   */
+  private static final class ReopenableContent implements ContentStreamProvider, AutoCloseable {
+
+    private final ContentSource source;
+    private InputStream current;
+
+    ReopenableContent(ContentSource source) {
+      this.source = source;
+    }
+
+    @Override
+    public synchronized InputStream newStream() {
+      closeCurrent();
+      try {
+        current = source.open();
+        return current;
+      } catch (IOException e) {
+        throw new UncheckedIOException("Failed to open the content to store", e);
+      }
+    }
+
+    @Override
+    public synchronized void close() {
+      closeCurrent();
+    }
+
+    private void closeCurrent() {
+      if (current == null) {
+        return;
+      }
+      try {
+        current.close();
+      } catch (IOException e) {
+        log.debug("Could not close a stream of upload content: {}", e.getMessage());
+      }
+      current = null;
     }
   }
 

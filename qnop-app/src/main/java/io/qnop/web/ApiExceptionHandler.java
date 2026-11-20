@@ -25,6 +25,7 @@ import io.qnop.api.v1.model.FieldError;
 import io.qnop.service.InvalidTextException;
 import io.qnop.service.limits.FeatureDisabledException;
 import io.qnop.service.limits.InstanceLimitExceededException;
+import io.qnop.spi.storage.StorageUnavailableException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
@@ -155,6 +156,33 @@ public class ApiExceptionHandler {
                 .code(ex.code())
                 .message(ex.getMessage())
                 .timestamp(OffsetDateTime.now()));
+  }
+
+  /**
+   * Object storage cannot be reached, or fails on its own side (issue #983).
+   *
+   * <p>503 rather than 500: the server works, a service it depends on does not, and the same
+   * request may well succeed once it is back. Clients and load balancers act on that difference.
+   * The stack trace adds nothing to an outage, so the log line carries what failed and why.
+   */
+  @ExceptionHandler(StorageUnavailableException.class)
+  ResponseEntity<ErrorResponse> storageUnavailable(StorageUnavailableException ex) {
+    log.warn("Object storage is unavailable: {} ({})", ex.getMessage(), rootCause(ex));
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .body(
+            new ErrorResponse()
+                .code("STORAGE_UNAVAILABLE")
+                .message("Document storage is not available at the moment. Please try again later.")
+                .timestamp(OffsetDateTime.now()));
+  }
+
+  /** The innermost cause's message, which names the actual failure (a refused connection, …). */
+  private static String rootCause(Throwable ex) {
+    Throwable root = ex;
+    while (root.getCause() != null && root.getCause() != root) {
+      root = root.getCause();
+    }
+    return root.getClass().getSimpleName() + ": " + root.getMessage();
   }
 
   /** A single-line text field holds control characters (issue #909). */

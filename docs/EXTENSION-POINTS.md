@@ -55,11 +55,11 @@ in-process registries described below are the seams those bundles will feed.
 
 ### 1. `StorageProvider` — object storage (backend, published)
 
-- **Contract:** `io.qnop.spi.storage.StorageProvider` — `put(key, content, length, contentType)`, `get(key) → Optional<StorageContent>`, `exists(key)`, `delete(key)`; throws `StorageException`. Listing via `StorageListing`.
+- **Contract:** `io.qnop.spi.storage.StorageProvider` — `put(key, content, length, contentType)`, `putReopenable(key, ContentSource, length, contentType)` (a `default` that a retrying provider overrides, issue #983), `get(key) → Optional<StorageContent>`, `exists(key)`, `delete(key)`; throws `StorageException`, and its subtype `StorageUnavailableException` when the store cannot be reached or fails on its own side (answered with 503). Listing via `StorageListing`.
 - **Wiring:** replaceable default. The S3/MinIO adapter (`io.qnop.service.storage`, `S3Configuration`) is `@ConditionalOnMissingBean(StorageProvider.class)` — an extension providing its own bean replaces it entirely.
 - **Core keeps:** the upload-then-commit staging registry and the orphan reaper ([ADR-0036](adr/0036-object-storage-lifecycle-staging-and-reaper.md)) sit *above* the provider — a provider stores bytes by opaque key and knows nothing about commit semantics.
 - **Measured by core:** the storage services wrap the provider they are given in a measuring decorator ([ADR-0065](adr/0065-metrics-conventions-and-scrape-access.md)), so a replacement shows up in `qnop.storage.operation` and `qnop.storage.transferred` without doing anything. The bean itself is left as it is: an extension's provider keeps its own type, lifecycle and listeners.
-- **Owned by:** [ADR-0005](adr/0005-binary-documents-in-object-storage.md), ADR-0036; issue #243.
+- **Owned by:** [ADR-0005](adr/0005-binary-documents-in-object-storage.md), ADR-0036; issues #243, #983.
 
 ### 2. `DocumentExtractor` — document formats (backend, published)
 

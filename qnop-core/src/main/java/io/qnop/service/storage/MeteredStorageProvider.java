@@ -24,6 +24,7 @@ import io.qnop.observability.metrics.StorageMeters;
 import io.qnop.observability.metrics.StorageMeters.Direction;
 import io.qnop.observability.metrics.StorageMeters.Operation;
 import io.qnop.observability.metrics.StorageMeters.Outcome;
+import io.qnop.spi.storage.ContentSource;
 import io.qnop.spi.storage.StorageContent;
 import io.qnop.spi.storage.StorageListing;
 import io.qnop.spi.storage.StorageProvider;
@@ -67,6 +68,19 @@ final class MeteredStorageProvider implements StorageProvider {
         Operation.PUT,
         () -> {
           delegate.put(key, content, contentLength, contentType);
+          return null;
+        });
+    meters.transferred(Direction.UPLOAD, contentLength);
+  }
+
+  @Override
+  public void putReopenable(
+      String key, ContentSource content, long contentLength, String contentType) {
+    // Forwarded as it is, so a provider that retries can open the content again (issue #983).
+    timed(
+        Operation.PUT,
+        () -> {
+          delegate.putReopenable(key, content, contentLength, contentType);
           return null;
         });
     meters.transferred(Direction.UPLOAD, contentLength);
