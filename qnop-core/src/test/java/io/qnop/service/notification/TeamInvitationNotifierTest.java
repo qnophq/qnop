@@ -36,6 +36,7 @@ import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.PublicBaseUrl;
 import io.qnop.service.TeamInvitationCreated;
 import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailTemplateKey;
@@ -61,7 +62,13 @@ class TeamInvitationNotifierTest {
   private final ReviewNotificationSink mail = mock(ReviewNotificationSink.class);
   private final TeamInvitationNotifier notifier =
       new TeamInvitationNotifier(
-          teams, invitations, users, settings, locales, List.of(inApp, mail));
+          teams,
+          invitations,
+          users,
+          settings,
+          new PublicBaseUrl(settings),
+          locales,
+          List.of(inApp, mail));
 
   private final UUID teamId = UUID.randomUUID();
   private final UUID invitee = UUID.randomUUID();

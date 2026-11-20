@@ -28,6 +28,7 @@ import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.PublicBaseUrl;
 import io.qnop.service.TeamInvitationCreated;
 import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailMessages;
@@ -66,6 +67,7 @@ public class TeamInvitationNotifier {
   private final TeamInvitationRepository invitations;
   private final UserRepository users;
   private final ApplicationSettingsService settings;
+  private final PublicBaseUrl publicBaseUrl;
   private final MailLocaleResolver mailLocales;
   private final List<ReviewNotificationSink> sinks;
 
@@ -74,12 +76,14 @@ public class TeamInvitationNotifier {
       TeamInvitationRepository invitations,
       UserRepository users,
       ApplicationSettingsService settings,
+      PublicBaseUrl publicBaseUrl,
       MailLocaleResolver mailLocales,
       List<ReviewNotificationSink> sinks) {
     this.teams = teams;
     this.invitations = invitations;
     this.users = users;
     this.settings = settings;
+    this.publicBaseUrl = publicBaseUrl;
     this.mailLocales = mailLocales;
     this.sinks = sinks;
   }
@@ -148,11 +152,7 @@ public class TeamInvitationNotifier {
   }
 
   private String myTeamsUrl() {
-    String base = settings.getString(ApplicationSettingKey.GENERAL_BASE_URL);
-    if (base == null || base.isBlank()) {
-      log.warn("general.base_url is not configured — the invitation mail link will be relative");
-      base = "";
-    }
-    return base.replaceAll("/+$", "") + MY_TEAMS_PATH;
+    return publicBaseUrl.orReportMissing("the invitation mail link will be relative")
+        + MY_TEAMS_PATH;
   }
 }

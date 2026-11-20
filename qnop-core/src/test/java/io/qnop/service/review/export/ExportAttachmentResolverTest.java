@@ -28,6 +28,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.PublicBaseUrl;
 import io.qnop.service.document.DocumentAttachmentService;
 import io.qnop.service.document.DocumentAttachmentService.AttachmentDownload;
 import io.qnop.service.document.DocumentAttachmentService.AttachmentMetadata;
@@ -48,7 +49,8 @@ class ExportAttachmentResolverTest {
 
   private final DocumentAttachmentService attachments = mock(DocumentAttachmentService.class);
   private final ExportAttachmentResolver resolver =
-      new ExportAttachmentResolver(attachments, mock(ApplicationSettingsService.class));
+      new ExportAttachmentResolver(
+          attachments, new PublicBaseUrl(mock(ApplicationSettingsService.class)));
 
   @BeforeEach
   void budget() {
