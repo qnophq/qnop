@@ -40,6 +40,7 @@ import java.io.InputStream;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.PlatformTransactionManager;
 
 /** The object store is measured around the provider, whichever provider it is (issue #962). */
 class MeteredStorageProviderTest {
@@ -168,7 +169,8 @@ class MeteredStorageProviderTest {
             mock(StorageObjectRepository.class),
             mock(S3Properties.class),
             mock(SchedulerService.class),
-            meters);
+            meters,
+            mock(PlatformTransactionManager.class));
     when(delegate.get("k")).thenReturn(Optional.empty());
 
     service.get("k");

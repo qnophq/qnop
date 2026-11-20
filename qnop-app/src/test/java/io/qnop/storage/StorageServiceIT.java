@@ -35,9 +35,11 @@ import io.qnop.spi.storage.StorageContent;
 import io.qnop.spi.storage.StorageProvider;
 import java.io.ByteArrayInputStream;
 import java.security.MessageDigest;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -47,6 +49,8 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Object-storage acceptance against a real MinIO (issue #243, ADR-0005): put/get/delete round-trip,
@@ -61,6 +65,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
   @Autowired private StorageProvider provider;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private MeterRegistry meterRegistry;
+  @Autowired private PlatformTransactionManager transactionManager;
 
   private static byte[] uniqueContent() {
     return ("qnop-doc-" + UUID.randomUUID()).getBytes(UTF_8);
@@ -221,6 +226,158 @@ class StorageServiceIT extends AbstractIntegrationTest {
     assertThat(storage.get(committed.key())).isPresent();
 
     storage.delete(committed.key());
+  }
+
+  @Test
+  void reStagingAnOldPendingRowKeepsItFromTheReaper() {
+    // An upload whose content matches a PENDING row older than the grace period reuses that row.
+    // Before #987 the row kept its old created_at, so the reaper could take it, and the object,
+    // between this upload's stage and its commit.
+    byte[] data = uniqueContent();
+    StagedObject first = stage(data, "application/pdf");
+    backdate(first.key());
+
+    StagedObject again = stage(data, "application/pdf");
+    storage.reapOrphansOnce(false);
+
+    assertThat(again.key()).isEqualTo(first.key());
+    assertThat(repository.findByObjectKey(again.key())).isPresent();
+    assertThat(provider.exists(again.key())).isTrue();
+    storage.commit(again.key());
+    assertThat(repository.findByObjectKey(again.key()))
+        .hasValueSatisfying(
+            row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.COMMITTED));
+    storage.delete(again.key());
+  }
+
+  @Test
+  void reaperRacingACommitNeverLeavesACommittedRowWithoutItsObject() throws Exception {
+    // The reaper and a commit race on the same old PENDING row (issue #987). Before, the reaper
+    // deleted the object first and the row only when its transaction ended; a commit in between
+    // made the row delete fail and roll back, leaving a COMMITTED row whose object was gone.
+    // Either side may win now, but the row and its object go together. Several rounds, because
+    // one round may not interleave.
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      for (int round = 0; round < 10; round++) {
+        StagedObject staged = stage(uniqueContent(), "application/pdf");
+        backdate(staged.key());
+        CyclicBarrier start = new CyclicBarrier(2);
+        Future<?> reaper =
+            pool.submit(
+                () -> {
+                  start.await();
+                  return storage.reapOrphansOnce(false);
+                });
+        Future<?> commit =
+            pool.submit(
+                () -> {
+                  start.await();
+                  storage.commit(staged.key());
+                  return null;
+                });
+        reaper.get(30, TimeUnit.SECONDS);
+        commit.get(30, TimeUnit.SECONDS);
+
+        Optional<StorageObject> row = repository.findByObjectKey(staged.key());
+        if (row.isPresent()) {
+          assertThat(row.get().getStatus()).isEqualTo(StorageObjectStatus.COMMITTED);
+          assertThat(provider.exists(staged.key())).as("object of a committed row").isTrue();
+          storage.delete(staged.key());
+        } else {
+          assertThat(provider.exists(staged.key())).as("object of a reaped row").isFalse();
+        }
+      }
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  @Test
+  void reaperWaitingOnACommitKeepsTheCommittedRowAndItsObject() throws Exception {
+    // Deterministic form of the race above (issue #987): the commit holds the row lock when the
+    // reaper reaches the row. The reaper must wait, see the row committed, and keep the object.
+    StagedObject staged = stage(uniqueContent(), "application/pdf");
+    backdate(staged.key());
+
+    reapWhileHolding(() -> storage.commit(staged.key()));
+
+    assertThat(repository.findByObjectKey(staged.key()))
+        .hasValueSatisfying(
+            row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.COMMITTED));
+    assertThat(provider.exists(staged.key())).isTrue();
+    storage.delete(staged.key());
+  }
+
+  @Test
+  void reaperWaitingOnARestageKeepsTheRowAndItsObject() throws Exception {
+    // A stage of the same content holds the row lock while it marks the old row as staged now
+    // (issue #987). The reaper read the row as old; it must wait, see it fresh, and skip it.
+    byte[] data = uniqueContent();
+    StagedObject staged = stage(data, "application/pdf");
+    backdate(staged.key());
+
+    reapWhileHolding(
+        () ->
+            repository.restageIfPending(staged.key(), Instant.now(), StorageObjectStatus.PENDING));
+
+    assertThat(repository.findByObjectKey(staged.key()))
+        .hasValueSatisfying(
+            row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.PENDING));
+    assertThat(provider.exists(staged.key())).isTrue();
+    storage.delete(staged.key());
+  }
+
+  /**
+   * Runs {@code holder} in a transaction, starts a reaper pass, and commits the transaction only
+   * once the reaper is waiting for a lock that {@code holder} took; then waits for the pass.
+   */
+  private void reapWhileHolding(Runnable holder) throws Exception {
+    ExecutorService pool = Executors.newSingleThreadExecutor();
+    try {
+      Future<String> reaper =
+          new TransactionTemplate(transactionManager)
+              .execute(
+                  status -> {
+                    holder.run();
+                    Future<String> pass = pool.submit(() -> storage.reapOrphansOnce(false));
+                    awaitLockWait();
+                    return pass;
+                  });
+      reaper.get(30, TimeUnit.SECONDS);
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  /** Waits until a session of this database waits for a row lock, at most ten seconds. */
+  private void awaitLockWait() {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (System.nanoTime() < deadline) {
+      Integer waiting =
+          jdbc.queryForObject(
+              "SELECT count(*) FROM pg_stat_activity"
+                  + " WHERE wait_event_type = 'Lock' AND datname = current_database()",
+              Integer.class);
+      if (waiting != null && waiting > 0) {
+        return;
+      }
+      try {
+        Thread.sleep(20);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException(e);
+      }
+    }
+    throw new AssertionError("the reaper never waited for the row lock");
+  }
+
+  /** Moves a row's staging time beyond the reaper's grace period (default 1h). */
+  private void backdate(String key) {
+    jdbc.update(
+        "UPDATE storage_object SET created_at = created_at - interval '2 hours'"
+            + " WHERE object_key = ?",
+        key);
   }
 
   @Test

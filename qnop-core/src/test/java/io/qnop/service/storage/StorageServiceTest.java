@@ -21,10 +21,13 @@
 package io.qnop.service.storage;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -37,6 +40,7 @@ import io.qnop.entity.StorageObjectStatus;
 import io.qnop.observability.metrics.StorageMeters;
 import io.qnop.repository.StorageObjectRepository;
 import io.qnop.service.scheduler.SchedulerService;
+import io.qnop.spi.storage.StorageException;
 import io.qnop.spi.storage.StorageProvider;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -44,13 +48,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 /**
  * DB-free unit tests for {@link StorageService#stage} dedup correctness. A registry hit is only a
@@ -65,51 +70,83 @@ class StorageServiceTest {
   private final StorageObjectRepository repository = mock(StorageObjectRepository.class);
   private final S3Properties properties = mock(S3Properties.class);
   private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+  private final PlatformTransactionManager transactionManager = transactionManager();
   private final StorageService storage =
       new StorageService(
           provider,
           repository,
           properties,
           mock(SchedulerService.class),
-          new StorageMeters(registry));
+          new StorageMeters(registry),
+          transactionManager);
+
+  private static PlatformTransactionManager transactionManager() {
+    PlatformTransactionManager manager = mock(PlatformTransactionManager.class);
+    when(manager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+    return manager;
+  }
 
   private double reaped() {
     return registry.counter(StorageMeters.ORPHANS_REAPED).count();
   }
 
-  private void oneOrphanIsDue() {
+  private void orphansAreDue(StorageObject... orphans) {
     when(properties.reaperGracePeriod()).thenReturn(Duration.ofHours(1));
     when(repository.findByStatusAndCreatedAtBefore(eq(StorageObjectStatus.PENDING), any()))
-        .thenReturn(List.of(pendingRow()));
+        .thenReturn(List.of(orphans));
   }
 
   @Test
   @DisplayName("a dry run of the reaper deletes nothing and counts nothing (issue #962)")
   void dryRunCountsNothing() {
-    oneOrphanIsDue();
+    orphansAreDue(orphan("a"));
 
     storage.reapOrphansOnce(true);
 
     assertThat(reaped()).isZero();
+    verify(repository, never()).deleteIfOrphaned(any(), any(), any());
+    verify(provider, never()).delete(anyString());
   }
 
   @Test
-  @DisplayName("reaped orphans are counted only once the reaper's transaction commits")
-  void reapedOrphansAreCountedAfterCommit() {
-    oneOrphanIsDue();
-    TransactionSynchronizationManager.initSynchronization();
-    try {
-      storage.reapOrphansOnce(false);
+  @DisplayName("the reaper deletes only the objects whose rows it claimed, and counts only those")
+  void reaperDeletesOnlyClaimedOrphans() {
+    StorageObject claimed = orphan("claimed");
+    StorageObject committedMeanwhile = orphan("committed");
+    orphansAreDue(claimed, committedMeanwhile);
+    when(repository.deleteIfOrphaned(eq(claimed.getId()), any(), eq(StorageObjectStatus.PENDING)))
+        .thenReturn(1);
+    when(repository.deleteIfOrphaned(
+            eq(committedMeanwhile.getId()), any(), eq(StorageObjectStatus.PENDING)))
+        .thenReturn(0);
 
-      // A rollback from here would bring the rows back; the counter must not have moved.
-      assertThat(reaped()).isZero();
+    String summary = storage.reapOrphansOnce(false);
 
-      TransactionSynchronizationManager.getSynchronizations()
-          .forEach(TransactionSynchronization::afterCommit);
-      assertThat(reaped()).isEqualTo(1.0);
-    } finally {
-      TransactionSynchronizationManager.clearSynchronization();
-    }
+    // An upload committed the second row after the reaper read it (issue #987): its object stays.
+    verify(provider).delete("claimed");
+    verify(provider, never()).delete("committed");
+    assertThat(reaped()).isEqualTo(1.0);
+    assertThat(summary).isEqualTo("Deleted 1 uncommitted object(s)");
+  }
+
+  @Test
+  @DisplayName("an orphan whose object cannot be deleted keeps its row; the others are reaped")
+  void aFailedOrphanRollsBackAloneAndFailsTheRun() {
+    StorageObject stuck = orphan("stuck");
+    StorageObject reapable = orphan("reapable");
+    orphansAreDue(stuck, reapable);
+    when(repository.deleteIfOrphaned(any(), any(), any())).thenReturn(1);
+    doThrow(new StorageException("bucket unavailable")).when(provider).delete("stuck");
+
+    assertThatThrownBy(() -> storage.reapOrphansOnce(false))
+        .isInstanceOf(StorageException.class)
+        .hasMessageContaining("1 could not be deleted");
+
+    // One transaction per orphan: the stuck one's claim is rolled back, the other one committed.
+    verify(transactionManager).rollback(any());
+    verify(transactionManager).commit(any());
+    verify(provider).delete("reapable");
+    assertThat(reaped()).isEqualTo(1.0);
   }
 
   private static InputStream content() {
@@ -118,6 +155,12 @@ class StorageServiceTest {
 
   private static StorageObject pendingRow() {
     return StorageObject.pending("k", "h", "application/pdf", 1L);
+  }
+
+  private static StorageObject orphan(String key) {
+    StorageObject row = StorageObject.pending(key, "h", "application/pdf", 1L);
+    ReflectionTestUtils.setField(row, "id", UUID.randomUUID());
+    return row;
   }
 
   private static StorageObject committedRow() {
@@ -208,6 +251,8 @@ class StorageServiceTest {
   @DisplayName("a poisoned PENDING hit (object missing) re-uploads — the fix")
   void pendingRowWithMissingObjectIsReuploaded() {
     when(repository.findByObjectKey(anyString())).thenReturn(Optional.of(pendingRow()));
+    when(repository.restageIfPending(anyString(), any(), eq(StorageObjectStatus.PENDING)))
+        .thenReturn(1);
     when(provider.exists(anyString())).thenReturn(false);
 
     storage.stage(content(), "application/pdf");
@@ -221,12 +266,46 @@ class StorageServiceTest {
   @DisplayName("a PENDING hit whose object exists (mid-flight) is not re-uploaded")
   void pendingRowWithExistingObjectIsNotReuploaded() {
     when(repository.findByObjectKey(anyString())).thenReturn(Optional.of(pendingRow()));
+    when(repository.restageIfPending(anyString(), any(), eq(StorageObjectStatus.PENDING)))
+        .thenReturn(1);
     when(provider.exists(anyString())).thenReturn(true);
 
     storage.stage(content(), "application/pdf");
 
     verify(provider).exists(anyString());
     verify(provider, never()).put(anyString(), any(), anyLong(), anyString());
+  }
+
+  @Test
+  @DisplayName("a reused PENDING row is marked as staged now, so the reaper leaves it (issue #987)")
+  void reusedPendingRowIsRestaged() {
+    when(repository.findByObjectKey(anyString())).thenReturn(Optional.of(pendingRow()));
+    when(repository.restageIfPending(anyString(), any(), eq(StorageObjectStatus.PENDING)))
+        .thenReturn(1);
+    when(provider.exists(anyString())).thenReturn(true);
+    Instant before = Instant.now();
+
+    storage.stage(content(), "application/pdf");
+
+    verify(repository)
+        .restageIfPending(
+            anyString(), argThat(at -> !at.isBefore(before)), eq(StorageObjectStatus.PENDING));
+    verify(repository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("a PENDING row reaped after it was read is inserted and uploaded again (issue #987)")
+  void pendingRowReapedMeanwhileIsInsertedAgain() {
+    when(repository.findByObjectKey(anyString())).thenReturn(Optional.of(pendingRow()));
+    when(repository.restageIfPending(anyString(), any(), eq(StorageObjectStatus.PENDING)))
+        .thenReturn(0);
+
+    storage.stage(content(), "application/pdf");
+
+    // The reaper took the row and its object: a new row, and the upload, with no HEAD check.
+    verify(repository).save(any(StorageObject.class));
+    verify(provider, never()).exists(anyString());
+    verify(provider).put(anyString(), any(), anyLong(), eq("application/pdf"));
   }
 
   @Test
@@ -246,6 +325,8 @@ class StorageServiceTest {
   void concurrentInsertRaceIsVerifiedNotTrusted() {
     when(repository.findByObjectKey(anyString())).thenReturn(Optional.empty());
     when(repository.save(any())).thenThrow(new DataIntegrityViolationException("dup key"));
+    when(repository.restageIfPending(anyString(), any(), eq(StorageObjectStatus.PENDING)))
+        .thenReturn(1);
     when(provider.exists(anyString())).thenReturn(false); // race winner's put had failed too
 
     storage.stage(content(), "application/pdf");

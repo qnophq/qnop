@@ -20,9 +20,10 @@
  */
 package io.qnop.service.storage;
 
+import static io.qnop.entity.StorageObjectStatus.PENDING;
+
 import io.qnop.entity.StorageObject;
 import io.qnop.entity.StorageObjectStatus;
-import io.qnop.observability.metrics.AfterCommit;
 import io.qnop.observability.metrics.StorageMeters;
 import io.qnop.repository.StorageObjectRepository;
 import io.qnop.service.scheduler.SchedulerJobCatalog;
@@ -47,7 +48,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The upload-then-commit consistency layer over the {@link StorageProvider} (issue #243,
@@ -69,18 +73,24 @@ public class StorageService {
   private final S3Properties properties;
   private final SchedulerService scheduler;
   private final StorageMeters meters;
+  private final TransactionTemplate tx;
 
   public StorageService(
       StorageProvider provider,
       StorageObjectRepository repository,
       S3Properties properties,
       SchedulerService scheduler,
-      StorageMeters meters) {
+      StorageMeters meters,
+      PlatformTransactionManager transactionManager) {
     this.provider = MeteredStorageProvider.around(provider, meters);
     this.repository = repository;
     this.properties = properties;
     this.scheduler = scheduler;
     this.meters = meters;
+    // Each orphan needs a transaction of its own, even if a caller ever runs the reaper inside
+    // one: joining it would defer every claim to its end, the bug of issue #987.
+    this.tx = new TransactionTemplate(transactionManager);
+    this.tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
 
   /**
@@ -136,22 +146,36 @@ public class StorageService {
       // between the two always leaves a row the reaper can reclaim. A concurrent stage of identical
       // content may win the unique-key race — its row is only PENDING (the object may be missing),
       // so we still verify-and-(re)upload below rather than trusting it.
-      boolean rowPreexisted = existing.isPresent();
-      if (!rowPreexisted) {
-        try {
-          repository.save(StorageObject.pending(key, hash, contentType, size));
-        } catch (DataIntegrityViolationException e) {
-          rowPreexisted = true;
-        }
+      boolean inserted = existing.isEmpty() && insertPending(key, hash, contentType, size);
+      // A reused row may be older than the reaper's grace period, so it is marked as staged now:
+      // otherwise the reaper could take it, and its object, between this stage and the commit
+      // (issue #987). If the row is no longer PENDING, the reaper took it after it was read here
+      // (its object is gone with it) or an upload committed it; the insert tells the two apart.
+      if (!inserted && repository.restageIfPending(key, Instant.now(), PENDING) == 0) {
+        inserted = insertPending(key, hash, contentType, size);
       }
-      // A freshly inserted row always needs the upload; a pre-existing PENDING row (possibly
-      // poisoned, mid-flight, or a race winner's) needs it only when the object is actually absent.
-      if (!rowPreexisted || !provider.exists(key)) {
+      // A freshly inserted row always needs the upload; a pre-existing row (possibly poisoned,
+      // mid-flight, or a race winner's) needs it only when the object is actually absent.
+      if (inserted || !provider.exists(key)) {
         uploadBuffered(buffer, key, size, contentType);
       }
       return new StagedObject(key, hash, size);
     } finally {
       deleteQuietly(buffer);
+    }
+  }
+
+  /**
+   * Inserts the {@code PENDING} row of a key, in Spring Data's own transaction.
+   *
+   * @return true if this call inserted it, false if a row for the key exists already
+   */
+  private boolean insertPending(String key, String hash, String contentType, long size) {
+    try {
+      repository.save(StorageObject.pending(key, hash, contentType, size));
+      return true;
+    } catch (DataIntegrityViolationException e) {
+      return false;
     }
   }
 
@@ -201,8 +225,8 @@ public class StorageService {
   /**
    * Deletes objects left uploaded-but-uncommitted past the grace period (ADR-0036). Runs off-peak,
    * single-instance via ShedLock (ADR-0029). Routed through the scheduler gate (issue #524) so an
-   * admin can disable it, put it in dry-run, or trigger a run-now; the gate owns the transaction
-   * around {@link #reapOrphansOnce(boolean)}.
+   * admin can disable it, put it in dry-run, or trigger a run-now. The job is self-transactional
+   * (issue #987): {@link #reapOrphansOnce(boolean)} opens one transaction per orphan.
    */
   @Scheduled(cron = "${qnop.s3.reaper-cron:0 30 3 * * *}")
   @SchedulerLock(name = SchedulerJobCatalog.STORAGE_ORPHAN_REAPER, lockAtMostFor = "PT10M")
@@ -211,32 +235,68 @@ public class StorageService {
   }
 
   /**
-   * The raw reaper pass, run inside the scheduler gate's transaction (issue #524). The object is
-   * removed before its row, so a crash mid-sweep simply retries next run (delete is idempotent). In
-   * {@code dryRun} mode it counts what would be deleted but deletes nothing — a safe operator
-   * probe.
+   * The raw reaper pass, run by the scheduler gate without an enclosing transaction (issues #524,
+   * #987). In {@code dryRun} mode it counts what would be deleted but deletes nothing — a safe
+   * operator probe.
+   *
+   * <p>Each orphan is reaped in a transaction of its own, which claims the row first and deletes
+   * the object only if the claim succeeded. An upload that committed the row, or staged the same
+   * content again, after the orphans were read keeps both. A commit that arrives while the claim
+   * holds the row lock waits for it and then finds no row, which {@link #commit} logs. The object
+   * is deleted while the row lock is held, so a stage of the same content cannot upload it in
+   * between. One orphan that fails does not stop the others; the run then fails as a whole.
    */
   public String reapOrphansOnce(boolean dryRun) {
     Instant cutoff = Instant.now().minus(properties.reaperGracePeriod());
-    List<StorageObject> orphans =
-        repository.findByStatusAndCreatedAtBefore(StorageObjectStatus.PENDING, cutoff);
-    if (orphans.isEmpty()) {
+    List<StorageObject> candidates = repository.findByStatusAndCreatedAtBefore(PENDING, cutoff);
+    if (candidates.isEmpty()) {
       return "No orphaned uploads to reap";
     }
     if (dryRun) {
       log.info(
-          "Storage orphan reaper (dry-run) would delete {} uncommitted object(s).", orphans.size());
-      return "Would delete " + orphans.size() + " uncommitted object(s); nothing was changed";
+          "Storage orphan reaper (dry-run) would delete {} uncommitted object(s).",
+          candidates.size());
+      return "Would delete " + candidates.size() + " uncommitted object(s); nothing was changed";
     }
-    for (StorageObject orphan : orphans) {
-      provider.delete(orphan.getObjectKey());
-      repository.delete(orphan);
+    int reaped = 0;
+    int failed = 0;
+    for (StorageObject candidate : candidates) {
+      try {
+        if (Boolean.TRUE.equals(tx.execute(status -> reap(candidate, cutoff)))) {
+          reaped++;
+        }
+      } catch (RuntimeException e) {
+        // The row's claim rolled back with its transaction, so the orphan is tried again next run.
+        failed++;
+        log.warn("Storage orphan reaper could not delete {}", candidate.getObjectKey(), e);
+      }
     }
-    // The rows go with the gate's transaction; count them only once that has committed.
-    int reaped = orphans.size();
-    AfterCommit.run(() -> meters.orphansReaped(reaped));
-    log.info("Storage orphan reaper deleted {} uncommitted object(s).", orphans.size());
-    return "Deleted " + orphans.size() + " uncommitted object(s)";
+    meters.orphansReaped(reaped);
+    int skipped = candidates.size() - reaped - failed;
+    log.info(
+        "Storage orphan reaper deleted {} uncommitted object(s); {} were committed or staged"
+            + " again meanwhile, {} failed.",
+        reaped,
+        skipped,
+        failed);
+    if (failed > 0) {
+      throw new StorageException(
+          "Deleted " + reaped + " uncommitted object(s), but " + failed + " could not be deleted");
+    }
+    return "Deleted " + reaped + " uncommitted object(s)";
+  }
+
+  /**
+   * Claims one orphan and deletes its object, inside the caller's transaction.
+   *
+   * @return true if the orphan was removed, false if it is no longer one
+   */
+  private boolean reap(StorageObject candidate, Instant cutoff) {
+    if (repository.deleteIfOrphaned(candidate.getId(), cutoff, PENDING) == 0) {
+      return false;
+    }
+    provider.delete(candidate.getObjectKey());
+    return true;
   }
 
   /**

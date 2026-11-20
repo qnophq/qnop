@@ -80,6 +80,10 @@ public final class SchedulerJobCatalog {
               false,
               true,
               false),
+          // Self-transactional (issue #987): it claims and deletes one orphan per
+          // transaction. Inside the gate's transaction an object would be deleted
+          // long before its row, and a rollback at the end would bring back the row
+          // without its object, for an upload to commit.
           new SchedulerJobDefinition(
               STORAGE_ORPHAN_REAPER,
               "Storage orphan reaper",
@@ -87,7 +91,7 @@ public final class SchedulerJobCatalog {
               "0 30 3 * * *",
               true,
               true,
-              false),
+              true),
           new SchedulerJobDefinition(
               REVIEW_ARCHIVE,
               "Review archive",

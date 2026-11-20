@@ -27,3 +27,12 @@ ADR-0005 puts binary documents in S3-compatible object storage behind a `Storage
 - **Bucket-listing reaper** (no table): list objects and delete those unreferenced by any domain table older than their age. Rejected: couples the reaper to every present and future consumer, scales poorly on large buckets, and is racy without a per-object grace signal.
 - **Single-transaction upload** (put inside the DB transaction): impossible to make consistent — a commit failure after the put still orphans the object, with no row to reclaim it.
 - **Move-on-commit via a staging prefix** (`staging/…` → final key): avoids a table but adds a server-side copy per commit and still needs an age-based sweep; the registry is simpler and DB-native (consistent with the Postgres job queue, ADR-0033).
+
+## Amendment (2026-11-20, the reaper claims a row before it deletes the object — issue #987)
+
+The decision above deletes the object before its row, and the reaper ran in the scheduler gate's single transaction. A commit that changed a row between the reaper's read and the end of that transaction made the row delete fail its optimistic-lock check; the transaction rolled back, but the object deletes could not. The result was a `COMMITTED` row whose object was gone. Two refinements close this:
+
+- **Claim, then delete, one orphan per transaction.** The reaper is self-transactional (the mechanism of issue #577). For each candidate it first deletes the row conditionally — still `PENDING` and still older than the cutoff — and deletes the object only if that claim removed the row, while the row lock is still held. A commit or a stage of the same content that arrives meanwhile waits for the lock and then finds no row: `commit` logs it, and `stage` inserts a new row and uploads again. One orphan that fails is rolled back alone and retried on the next run; the run is then reported as failed. `qnop.storage.orphans.reaped` counts only the orphans actually removed.
+- **A reused `PENDING` row is restaged.** When `stage()` reuses an existing `PENDING` row (dedup, or a poisoned row from #289), it sets `created_at` to now. For a `PENDING` row, `created_at` is therefore the time it was last staged, and an upload between stage and commit is never older than the grace period because of an older upload of the same content.
+
+What remains is an upload whose own stage and commit lie further apart than the grace period (default 1h). The reaper may take its row; the commit then logs the missing row, as before. The storage-consistency scan (ADR-0044) reports such a reference.
