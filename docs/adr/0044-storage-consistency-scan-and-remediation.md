@@ -34,3 +34,7 @@ We want an admin dashboard (issue #523, adapted from Plugwerk's `/admin/storage-
 - **`list` as an abstract method.** Rejected: it would force every implementor (including Enterprise add-ons) to implement it — a breaking, major-style change; the `default` keeps it a true minor.
 - **Deleting missing-binary rows (as Plugwerk deletes a release row).** Rejected: annotations anchor to versions (ADR-0009) and the workflow depends on version history (ADR-0011); a `document_version` must never be blindly deleted.
 - **SLF4J-only remediation audit.** Rejected in favour of `audit_event` so the actions are queryable and appear in the compliance trail — enabled by the nullable `document_id`.
+
+## Amendment (2026-11-20, remediation locks the key — issue #992)
+
+The re-check of decision 3 alone left a gap. A remediated orphan has no registry row by definition. A concurrent upload of the same content could insert its `PENDING` row and put the object after the re-check, and the remediation would then delete that object from under it. Remediation now takes the key's transaction-scoped advisory lock (ADR-0036, amendment for issue #992) before the re-check, and holds it until its transaction ends. `stage()` takes the same lock to insert a key's first row. A concurrent upload therefore either registered its row before the re-check, which then skips the key, or waits until the deletion is done and uploads the object again.

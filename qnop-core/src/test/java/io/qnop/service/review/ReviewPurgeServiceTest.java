@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -49,6 +50,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -120,6 +122,15 @@ class ReviewPurgeServiceTest {
             transactionManager);
     when(settings.getInteger(ApplicationSettingKey.REVIEW_PURGE_ARCHIVED_AFTER_DAYS))
         .thenReturn(180);
+    // The storage layer asks again, under its lock, whether the key is referenced (issue #992).
+    when(storage.deleteUnlessReferenced(anyString(), any()))
+        .thenAnswer(
+            invocation -> {
+              Predicate<String> referenced = invocation.getArgument(1);
+              return referenced.test(invocation.getArgument(0))
+                  ? StorageService.Deletion.REFERENCED
+                  : StorageService.Deletion.DELETED;
+            });
   }
 
   /** An archived review with a real id, since the sweep addresses documents by id. */
@@ -189,7 +200,7 @@ class ReviewPurgeServiceTest {
     service.purgeOnce(true);
 
     verify(documents, never()).delete(any(Document.class));
-    verify(storage, never()).delete(anyString());
+    verify(storage, never()).deleteUnlessReferenced(anyString(), any());
     verifyNoInteractions(auditEvents);
   }
 
@@ -209,7 +220,7 @@ class ReviewPurgeServiceTest {
     service.purgeOnce(false);
 
     verify(documents).delete(document);
-    verify(storage).delete(KEY_A);
+    verify(storage).deleteUnlessReferenced(eq(KEY_A), any());
   }
 
   @Test
@@ -227,7 +238,7 @@ class ReviewPurgeServiceTest {
     service.purgeOnce(false);
 
     verify(documents).delete(document);
-    verify(storage, never()).delete(anyString());
+    verify(storage, never()).deleteUnlessReferenced(anyString(), any());
   }
 
   @Test
@@ -243,7 +254,7 @@ class ReviewPurgeServiceTest {
 
     service.purgeOnce(false);
 
-    verify(storage, never()).delete(anyString());
+    verify(storage, never()).deleteUnlessReferenced(anyString(), any());
   }
 
   @Test
@@ -259,8 +270,29 @@ class ReviewPurgeServiceTest {
 
     service.purgeOnce(false);
 
-    verify(storage).delete(KEY_A);
-    verify(storage, never()).delete(KEY_B);
+    verify(storage).deleteUnlessReferenced(eq(KEY_A), any());
+    verify(storage, never()).deleteUnlessReferenced(eq(KEY_B), any());
+  }
+
+  @Test
+  @DisplayName("a key referenced after the batch check is kept when it is checked again, locked")
+  void keyReferencedAfterTheBatchCheckIsKept() {
+    Document document = archived("Q3 report", 200);
+    eligible(document);
+    when(versions.findStorageKeysByDocumentId(document.getId())).thenReturn(List.of(KEY_A));
+    when(attachments.findStorageKeysByDocumentId(document.getId())).thenReturn(List.of());
+    // Unreferenced for the batch check; by the time the storage layer holds the key locked, an
+    // upload of the same content has committed a version that references it (issue #992).
+    when(versions.findVersionRefsByStorageKeyIn(any()))
+        .thenReturn(List.of())
+        .thenReturn(List.of(new VersionStorageRef(KEY_A, UUID.randomUUID(), 1)));
+    when(attachments.findAttachmentRefsByStorageKeyIn(any())).thenReturn(List.of());
+
+    String summary = service.purgeOnce(false);
+
+    verify(storage).deleteUnlessReferenced(eq(KEY_A), any());
+    verify(versions, times(2)).findVersionRefsByStorageKeyIn(any());
+    assertThat(summary).isEqualTo("Purged 1 review(s) and 0 storage object(s)");
   }
 
   // --- the eligibility re-check -------------------------------------------
@@ -280,7 +312,7 @@ class ReviewPurgeServiceTest {
     service.purgeOnce(false);
 
     verify(documents, never()).delete(any(Document.class));
-    verify(storage, never()).delete(anyString());
+    verify(storage, never()).deleteUnlessReferenced(anyString(), any());
     verifyNoInteractions(auditEvents);
   }
 

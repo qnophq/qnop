@@ -36,3 +36,21 @@ The decision above deletes the object before its row, and the reaper ran in the 
 - **A reused `PENDING` row is restaged.** When `stage()` reuses an existing `PENDING` row (dedup, or a poisoned row from #289), it sets `created_at` to now. For a `PENDING` row, `created_at` is therefore the time it was last staged, and an upload between stage and commit is never older than the grace period because of an older upload of the same content.
 
 What remains is an upload whose own stage and commit lie further apart than the grace period (default 1h). The reaper may take its row; the commit then logs the missing row, as before. The storage-consistency scan (ADR-0044) reports such a reference.
+
+## Amendment (2026-11-20, deleting content an upload is reusing — issue #992)
+
+Committed objects are deleted when the last review that references them is deleted or purged (`ReviewDeletionService`, ADR-0050). The orphan remediation (ADR-0044) also deletes bucket objects. Keys are content-addressed, so an upload of identical content dedups onto the same key. Before this change, such an upload could reuse a `COMMITTED` row whose object a concurrent deletion was about to remove. The deletion looked up references once, then deleted the object and its row with no lock that `stage` or `commit` respected. The upload's new version then pointed at an object that no longer existed. Four refinements close this:
+
+- **A dedup hit is recorded.** When `stage()` reuses a `COMMITTED` row, it sets the new column `storage_object.last_staged_at` to now, in a conditional update. The upload references the key only once its own domain row is written, and this mark is how a deletion learns about it in the meantime.
+- **A deletion locks the key, checks again, and defers to a recent stage.** `StorageService.deleteUnlessReferenced(key, isReferenced)` runs in a transaction of its own. It takes the key's lock and the row lock, then asks the caller's reference check again, so a reference committed since the caller first looked keeps the object. If nothing references the key, the outcome depends on the row:
+  - A `PENDING` row belongs to the reaper, and is left alone.
+  - A `COMMITTED` row staged within the reaper's grace period is handed back to the reaper. It becomes `PENDING`, with `created_at` set to `last_staged_at`. The upload's commit makes it `COMMITTED` again; an upload that never commits leaves it to the reaper.
+  - Otherwise the row is removed first, and then the object.
+
+  The plain `StorageService.delete(key)` is gone.
+- **A commit locks the row first.** `commit` takes the row lock before its conditional update. A commit that arrives while a deletion hands the row back therefore waits, and then commits the row as `PENDING`. Without the lock, it would judge the row `COMMITTED` from before the hand-back and leave it to the reaper, although the upload's version now references it.
+- **A key without a row is guarded by an advisory lock.** A row lock cannot protect a key that has no row, such as a bucket orphan. Inserting a key's first row in `stage`, deleting a key in `deleteUnlessReferenced`, and remediating an orphan each take a transaction-scoped PostgreSQL advisory lock on the key (`pg_advisory_xact_lock(hashtextextended(key, 0))`). A stage that would insert the row waits until the deletion is done, and then uploads the object again.
+
+`stage` now registers in a fixed order: mark a `COMMITTED` row, restage a `PENDING` row, or insert a new one. When the row changes between these steps, it tries again, at most five times.
+
+The limit is the same as for the reaper: an upload whose stage and commit lie further apart than the grace period can still lose a reused object to a deletion.

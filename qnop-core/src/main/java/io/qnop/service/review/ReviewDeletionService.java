@@ -182,29 +182,15 @@ public class ReviewDeletionService {
    *
    * <p>Keys are content-addressed, so two reviews holding the same file hold the same object. This
    * check is what keeps deleting one of them from emptying the other; both reference sources are
-   * queried once over the whole key set, never once per key.
+   * queried once over the whole key set, never once per key. A key that passes is checked once more
+   * while the storage layer holds it locked (issue #992): an upload of the same content may have
+   * referenced it since, or may be about to, and then the object stays.
    */
   int deleteUnreferencedObjects(Set<String> candidateKeys) {
     if (candidateKeys.isEmpty()) {
       return 0;
     }
-    Set<String> stillReferenced =
-        tx.execute(
-            status -> {
-              Set<String> referenced = new LinkedHashSet<>();
-              versions.findVersionRefsByStorageKeyIn(candidateKeys).stream()
-                  .map(ref -> ref.storageKey())
-                  .forEach(referenced::add);
-              // A converted version is rendered from a second object (issue #343),
-              // and the projection names the key that matched.
-              versions.findVersionRefsByRenditionKeyIn(candidateKeys).stream()
-                  .map(ref -> ref.storageKey())
-                  .forEach(referenced::add);
-              attachments.findAttachmentRefsByStorageKeyIn(candidateKeys).stream()
-                  .map(ref -> ref.storageKey())
-                  .forEach(referenced::add);
-              return referenced;
-            });
+    Set<String> stillReferenced = tx.execute(status -> referencedAmong(candidateKeys));
     Set<String> shared = stillReferenced == null ? Set.of() : stillReferenced;
     int deleted = 0;
     for (String key : candidateKeys) {
@@ -212,12 +198,37 @@ public class ReviewDeletionService {
         log.debug("Keeping storage object {} — still referenced by a surviving document.", key);
         continue;
       }
-      // Own transaction (StorageService.delete is @Transactional and we hold none), so the object
-      // and its registry row go together, now — not at the end of the run.
-      storage.delete(key);
-      deleted++;
+      // In a transaction of the storage layer's own, so the object and its registry row go
+      // together, now — not at the end of the run.
+      StorageService.Deletion outcome =
+          storage.deleteUnlessReferenced(key, k -> !referencedAmong(Set.of(k)).isEmpty());
+      if (outcome == StorageService.Deletion.DELETED) {
+        deleted++;
+      } else {
+        log.info(
+            "Keeping storage object {} — an upload of the same content uses it ({}).",
+            key,
+            outcome);
+      }
     }
     return deleted;
+  }
+
+  /** Those of {@code keys} that a document version, its rendition or an attachment references. */
+  private Set<String> referencedAmong(Set<String> keys) {
+    Set<String> referenced = new LinkedHashSet<>();
+    versions.findVersionRefsByStorageKeyIn(keys).stream()
+        .map(ref -> ref.storageKey())
+        .forEach(referenced::add);
+    // A converted version is rendered from a second object (issue #343),
+    // and the projection names the key that matched.
+    versions.findVersionRefsByRenditionKeyIn(keys).stream()
+        .map(ref -> ref.storageKey())
+        .forEach(referenced::add);
+    attachments.findAttachmentRefsByStorageKeyIn(keys).stream()
+        .map(ref -> ref.storageKey())
+        .forEach(referenced::add);
+    return referenced;
   }
 
   private void audit(UUID documentId, String title, UUID actorId, int objectsDeleted) {

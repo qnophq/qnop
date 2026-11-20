@@ -20,10 +20,10 @@
  */
 package io.qnop.service.storage;
 
+import static io.qnop.entity.StorageObjectStatus.COMMITTED;
 import static io.qnop.entity.StorageObjectStatus.PENDING;
 
 import io.qnop.entity.StorageObject;
-import io.qnop.entity.StorageObjectStatus;
 import io.qnop.observability.metrics.StorageMeters;
 import io.qnop.repository.StorageObjectRepository;
 import io.qnop.service.scheduler.SchedulerJobCatalog;
@@ -42,6 +42,7 @@ import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,6 +69,12 @@ public class StorageService {
 
   private static final Logger log = LoggerFactory.getLogger(StorageService.class);
 
+  /**
+   * How often a stage looks for the key's row again when it changed under it. Each retry follows a
+   * concurrent insert, deletion or reap of the same content, so more than a couple is unheard of.
+   */
+  private static final int MAX_STAGE_ATTEMPTS = 5;
+
   private final StorageProvider provider;
   private final StorageObjectRepository repository;
   private final S3Properties properties;
@@ -87,8 +94,9 @@ public class StorageService {
     this.properties = properties;
     this.scheduler = scheduler;
     this.meters = meters;
-    // Each orphan needs a transaction of its own, even if a caller ever runs the reaper inside
-    // one: joining it would defer every claim to its end, the bug of issue #987.
+    // Reaping an orphan, deleting a key and inserting a row each need a transaction of their own,
+    // even inside a caller's: joining it would defer the claim or lock to its end, and a rollback
+    // there would bring back a row whose object is gone (issues #987, #992).
     this.tx = new TransactionTemplate(transactionManager);
     this.tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
@@ -126,38 +134,48 @@ public class StorageService {
       long size = sizeOf(buffer);
       String key = keyFor(hash);
 
-      Optional<StorageObject> existing = repository.findByObjectKey(key);
-      if (existing.map(o -> o.getStatus() == StorageObjectStatus.COMMITTED).orElse(false)) {
-        // Fast path: a COMMITTED row means the object was durable once. But it can still vanish
-        // out of band (bucket wiped, environment restored without the object store), and the row
-        // survives — so verify it, and re-materialize from the bytes we already buffered when it
-        // is gone, rather than returning a key that points at nothing (issue #575). One HEAD per
-        // dedup hit is negligible against an upload; the row stays COMMITTED (it still is).
-        if (!provider.exists(key)) {
-          log.warn(
-              "Committed storage object {} was missing from the provider — re-uploaded from "
-                  + "buffered content (out-of-band object loss)",
-              key);
-          uploadBuffered(buffer, key, size, contentType);
+      for (int attempt = 1; ; attempt++) {
+        Instant now = Instant.now();
+        // Content that is stored and committed already is reused, and marked as staged now:
+        // nothing references it on this upload's behalf until its domain row is written, so a
+        // deletion in between must see that the key is in use (issue #992).
+        if (repository.markStagedIfCommitted(key, now, COMMITTED) == 1) {
+          // A COMMITTED row means the object was durable once. But it can still vanish out of
+          // band (bucket wiped, environment restored without the object store), and the row
+          // survives — so verify it, and re-materialize from the bytes we already buffered when
+          // it is gone, rather than returning a key that points at nothing (issue #575). One HEAD
+          // per dedup hit is negligible against an upload; the row stays COMMITTED (it still is).
+          if (!provider.exists(key)) {
+            log.warn(
+                "Committed storage object {} was missing from the provider — re-uploaded from "
+                    + "buffered content (out-of-band object loss)",
+                key);
+            uploadBuffered(buffer, key, size, contentType);
+          }
+          break;
         }
-        return new StagedObject(key, hash, size);
-      }
-      // Persist the PENDING row (in Spring Data's own transaction) BEFORE the upload, so a crash
-      // between the two always leaves a row the reaper can reclaim. A concurrent stage of identical
-      // content may win the unique-key race — its row is only PENDING (the object may be missing),
-      // so we still verify-and-(re)upload below rather than trusting it.
-      boolean inserted = existing.isEmpty() && insertPending(key, hash, contentType, size);
-      // A reused row may be older than the reaper's grace period, so it is marked as staged now:
-      // otherwise the reaper could take it, and its object, between this stage and the commit
-      // (issue #987). If the row is no longer PENDING, the reaper took it after it was read here
-      // (its object is gone with it) or an upload committed it; the insert tells the two apart.
-      if (!inserted && repository.restageIfPending(key, Instant.now(), PENDING) == 0) {
-        inserted = insertPending(key, hash, contentType, size);
-      }
-      // A freshly inserted row always needs the upload; a pre-existing row (possibly poisoned,
-      // mid-flight, or a race winner's) needs it only when the object is actually absent.
-      if (inserted || !provider.exists(key)) {
-        uploadBuffered(buffer, key, size, contentType);
+        // A PENDING row is another upload's, possibly a failed one's (poisoned, issue #289). It
+        // may be older than the reaper's grace period, so it is marked as staged now: otherwise
+        // the reaper could take it, and its object, between this stage and the commit (issue
+        // #987). The object is uploaded only if it is actually absent.
+        if (repository.restageIfPending(key, now, PENDING) == 1) {
+          if (!provider.exists(key)) {
+            uploadBuffered(buffer, key, size, contentType);
+          }
+          break;
+        }
+        // No row: persist the PENDING row BEFORE the upload, so a crash between the two always
+        // leaves a row the reaper can reclaim.
+        if (insertPending(key, hash, contentType, size)) {
+          uploadBuffered(buffer, key, size, contentType);
+          break;
+        }
+        // A concurrent stage inserted the row after it was looked for here, or a deletion or the
+        // reaper removed it in between: look again.
+        if (attempt == MAX_STAGE_ATTEMPTS) {
+          throw new StorageException(
+              "Could not register storage object " + key + ": its registry row kept changing");
+        }
       }
       return new StagedObject(key, hash, size);
     } finally {
@@ -166,13 +184,19 @@ public class StorageService {
   }
 
   /**
-   * Inserts the {@code PENDING} row of a key, in Spring Data's own transaction.
+   * Inserts the {@code PENDING} row of a key, in a transaction of its own.
    *
    * @return true if this call inserted it, false if a row for the key exists already
    */
   private boolean insertPending(String key, String hash, String contentType, long size) {
     try {
-      repository.save(StorageObject.pending(key, hash, contentType, size));
+      tx.executeWithoutResult(
+          status -> {
+            // Waits for a deletion of the same key that is under way (issue #992): its object
+            // must not be deleted after this upload has put it.
+            repository.lockObjectKey(key);
+            repository.saveAndFlush(StorageObject.pending(key, hash, contentType, size));
+          });
       return true;
     } catch (DataIntegrityViolationException e) {
       return false;
@@ -194,20 +218,22 @@ public class StorageService {
    *
    * <p>The update is a bulk statement that bypasses the persistence context: a {@code
    * StorageObject} the caller already holds is not refreshed by it. A key without a row is not an
-   * error, but it means the row vanished between stage and commit (the orphan reaper took it), so
-   * the domain row now references an object the registry no longer tracks; that is logged.
+   * error, but it means the row vanished between stage and commit (the orphan reaper, or a
+   * deletion, took it after the grace period), so the domain row now references an object the
+   * registry no longer tracks; that is logged.
    */
   @Transactional
   public void commit(String key) {
-    int committed =
-        repository.commitIfPending(
-            key, Instant.now(), StorageObjectStatus.PENDING, StorageObjectStatus.COMMITTED);
-    if (committed == 0 && repository.findByObjectKey(key).isEmpty()) {
+    // Locked first, so that a deletion handing the row back to the reaper is waited for and its
+    // PENDING row is committed, rather than judged COMMITTED from before it (issue #992).
+    if (repository.findByObjectKeyForUpdate(key).isEmpty()) {
       log.warn(
           "Commit of storage object {} found no registry row; it was removed between stage and"
               + " commit",
           key);
+      return;
     }
+    repository.commitIfPending(key, Instant.now(), PENDING, COMMITTED);
   }
 
   /** Opens the object for reading, or empty if absent. The caller closes the returned content. */
@@ -215,11 +241,68 @@ public class StorageService {
     return provider.get(key);
   }
 
-  /** Removes the object and its registry row. Idempotent. */
-  @Transactional
-  public void delete(String key) {
+  /** What {@link #deleteUnlessReferenced} did with a key. */
+  public enum Deletion {
+    /** The object and its registry row, if it had one, are gone. */
+    DELETED,
+    /** Something references the key, so both were kept. */
+    REFERENCED,
+    /**
+     * An upload staged the key within the reaper's grace period and may still commit it. Both were
+     * kept, and the row is left {@code PENDING} for that commit or else for the reaper.
+     */
+    STAGED
+  }
+
+  /**
+   * Deletes the object of {@code key} and its registry row, unless the key is referenced or an
+   * upload may be about to reference it (issue #992). Idempotent.
+   *
+   * <p>Keys are content-addressed, so an upload of identical content reuses the object without
+   * uploading it, and references it only once its own domain row is written. The deletion therefore
+   * runs in a transaction of its own that first locks the key: a stage that would insert the key's
+   * row, and a stage or commit of its existing row, wait for it. Only then is {@code isReferenced}
+   * asked, so a reference written since the caller last looked keeps the object. A row an upload
+   * staged within the grace period is handed back to the reaper as {@code PENDING} instead: the
+   * upload's commit makes it {@code COMMITTED} again, and an upload that never commits leaves it to
+   * the reaper. A {@code PENDING} row is the reaper's already. Its own transaction also means the
+   * object is never deleted while the row could still come back with a caller's rollback.
+   *
+   * @param isReferenced whether anything references the key; called inside the deletion's
+   *     transaction, after the key is locked
+   */
+  public Deletion deleteUnlessReferenced(String key, Predicate<String> isReferenced) {
+    Instant stagedSince = Instant.now().minus(properties.reaperGracePeriod());
+    return tx.execute(status -> deleteLocked(key, isReferenced, stagedSince));
+  }
+
+  private Deletion deleteLocked(String key, Predicate<String> isReferenced, Instant stagedSince) {
+    repository.lockObjectKey(key);
+    Optional<StorageObject> row = repository.findByObjectKeyForUpdate(key);
+    if (isReferenced.test(key)) {
+      return Deletion.REFERENCED;
+    }
+    if (row.isPresent()) {
+      StorageObject object = row.get();
+      if (object.getStatus() == PENDING) {
+        return Deletion.STAGED;
+      }
+      Instant lastStaged = object.getLastStagedAt();
+      if (lastStaged != null && lastStaged.isAfter(stagedSince)) {
+        repository.handBackToReaper(object.getId(), PENDING);
+        log.info(
+            "Kept storage object {}: an upload staged it at {} and may still commit it; the"
+                + " reaper removes it if it does not",
+            key,
+            lastStaged);
+        return Deletion.STAGED;
+      }
+      // Removed before the object, so a failure here leaves both.
+      repository.delete(object);
+      repository.flush();
+    }
     provider.delete(key);
-    repository.findByObjectKey(key).ifPresent(repository::delete);
+    return Deletion.DELETED;
   }
 
   /**

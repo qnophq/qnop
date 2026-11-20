@@ -43,8 +43,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * remediated in <em>its own</em> transaction: the references are re-checked against all three
  * sources immediately before deletion, so a key that became referenced since the scan (e.g. a new
  * upload reusing the same content, which registers a staging row) is skipped and reported back
- * rather than deleted. Idempotent; every deletion is recorded both as a structured log line and as
- * a document-less {@link AuditEvent} (nullable {@code document_id}).
+ * rather than deleted. The key is locked for that check and the delete (issue #992), so an upload
+ * of the same content waits to register its row until the deletion is done, and then uploads the
+ * object again. Idempotent; every deletion is recorded both as a structured log line and as a
+ * document-less {@link AuditEvent} (nullable {@code document_id}).
  *
  * <p>Missing binaries are deliberately never deleted here — a missing object is data loss the admin
  * resolves through the document/review flows, not a shortcut in this service.
@@ -108,6 +110,9 @@ public class StorageRemediationService {
 
   /** Deletes one key inside the caller's fresh transaction; returns null when deleted, else why. */
   private String deleteOne(String key, UUID actorId) {
+    // Held until this transaction ends (issue #992): a stage of the same content inserts the key's
+    // row under the same lock, so it cannot put the object between this check and the delete.
+    storageObjects.lockObjectKey(key);
     if (isReferenced(key)) {
       return "now referenced";
     }

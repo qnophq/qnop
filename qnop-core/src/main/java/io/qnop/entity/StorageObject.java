@@ -75,6 +75,14 @@ public class StorageObject {
   @Column(name = "committed_at")
   private Instant committedAt;
 
+  /**
+   * When an upload last staged this row again while it was {@code COMMITTED} (issue #992), or null
+   * if none has. Such an upload holds the key without referencing it yet, so a deletion leaves a
+   * row staged within the reaper's grace period to the reaper.
+   */
+  @Column(name = "last_staged_at")
+  private Instant lastStagedAt;
+
   @Version
   @Column(name = "version", nullable = false)
   private long version;
@@ -127,6 +135,10 @@ public class StorageObject {
 
   public Instant getCommittedAt() {
     return committedAt;
+  }
+
+  public Instant getLastStagedAt() {
+    return lastStagedAt;
   }
 
   @Override

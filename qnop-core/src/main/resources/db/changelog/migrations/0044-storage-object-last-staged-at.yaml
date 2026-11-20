@@ -1,0 +1,21 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# When an upload last staged a COMMITTED storage object again (issue #992,
+# ADR-0036 amendment). Keys are content-addressed, so an upload of content that
+# is already stored reuses the committed row and object. Between that stage and
+# the commit, nothing references the key yet, so deleting the last document that
+# used the content would take the object from under the upload. A deletion
+# therefore leaves a row staged within the reaper's grace period to the reaper
+# instead. NULL for a row no upload has staged again. A NEW changeset — shipped
+# changesets are immutable.
+databaseChangeLog:
+  - changeSet:
+      id: 0044-storage-object-last-staged-at
+      author: qnop
+      comment: storage_object.last_staged_at for deletions racing a dedup upload (issue #992).
+      changes:
+        - addColumn:
+            tableName: storage_object
+            columns:
+              - column: { name: last_staged_at, type: TIMESTAMP WITH TIME ZONE }

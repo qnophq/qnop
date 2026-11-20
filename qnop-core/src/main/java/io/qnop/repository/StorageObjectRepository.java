@@ -22,14 +22,17 @@ package io.qnop.repository;
 
 import io.qnop.entity.StorageObject;
 import io.qnop.entity.StorageObjectStatus;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Data access for the object-storage staging registry (issue #243, ADR-0036). */
@@ -79,6 +82,61 @@ public interface StorageObjectRepository extends JpaRepository<StorageObject, UU
       @Param("objectKey") String objectKey,
       @Param("at") Instant at,
       @Param("pending") StorageObjectStatus pending);
+
+  /**
+   * Records that an upload staged the {@code COMMITTED} row of {@code objectKey} again just now
+   * (issue #992). The upload reuses the stored object and references it only once its own domain
+   * row is written, so a deletion in between must see that the key is in use. Opens a transaction
+   * of its own when called outside one, as staging is. The version is bumped like a managed update
+   * would.
+   *
+   * @return 1 if the row is {@code COMMITTED} and was marked, 0 if it is pending or absent
+   */
+  @Transactional
+  @Modifying
+  @Query(
+      "UPDATE StorageObject s SET s.lastStagedAt = :at, s.version = s.version + 1"
+          + " WHERE s.objectKey = :objectKey AND s.status = :committed")
+  int markStagedIfCommitted(
+      @Param("objectKey") String objectKey,
+      @Param("at") Instant at,
+      @Param("committed") StorageObjectStatus committed);
+
+  /**
+   * The row of {@code objectKey}, locked for update until the caller's transaction ends (issue
+   * #992). A stage that marks or restages the row, and a commit, wait for the lock.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT s FROM StorageObject s WHERE s.objectKey = :objectKey")
+  Optional<StorageObject> findByObjectKeyForUpdate(@Param("objectKey") String objectKey);
+
+  /**
+   * Takes a transaction-scoped advisory lock on {@code objectKey} (issue #992). A row lock cannot
+   * guard a key that has no row yet; this lock can. Inserting a key's first row and deleting the
+   * object of a key take it, so neither runs while the other is under way.
+   *
+   * @return always 1
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  @Query(
+      value = "SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(:objectKey, 0))",
+      nativeQuery = true)
+  int lockObjectKey(@Param("objectKey") String objectKey);
+
+  /**
+   * Hands a {@code COMMITTED} row back to the reaper as {@code PENDING}, staged when an upload last
+   * staged it (issue #992). A deletion does this when nothing references the row but an upload
+   * staged it within the grace period: that upload's commit makes the row {@code COMMITTED} again,
+   * and if it never commits, the reaper removes the row and its object once the grace period has
+   * passed.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  @Modifying
+  @Query(
+      "UPDATE StorageObject s SET s.status = :pending, s.createdAt = s.lastStagedAt,"
+          + " s.version = s.version + 1 WHERE s.id = :id")
+  int handBackToReaper(@Param("id") UUID id, @Param("pending") StorageObjectStatus pending);
 
   /** Orphan-reaper query: rows in a given lifecycle state older than the cutoff. */
   List<StorageObject> findByStatusAndCreatedAtBefore(StorageObjectStatus status, Instant cutoff);
