@@ -353,7 +353,8 @@ class StorageServiceTest {
 
     assertThatThrownBy(() -> storage.stage(content(), "application/pdf"))
         .isInstanceOf(StorageException.class)
-        .hasMessageContaining("kept changing");
+        .hasMessageContaining("kept changing")
+        .hasCauseInstanceOf(DataIntegrityViolationException.class);
 
     verify(repository, times(5)).saveAndFlush(any());
     verify(provider, never()).put(anyString(), any(), anyLong(), anyString());

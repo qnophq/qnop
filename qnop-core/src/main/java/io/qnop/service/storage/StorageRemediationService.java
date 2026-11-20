@@ -131,6 +131,8 @@ public class StorageRemediationService {
         // A version's converted PDF is referenced just as much as its upload (#343).
         || !documentVersions.findVersionRefsByRenditionKeyIn(one).isEmpty()
         || !documentAttachments.findAttachmentRefsByStorageKeyIn(one).isEmpty()
+        // The only guard for a key that has a row (issue #992): the remediation takes no row lock,
+        // so a key with a row, which an upload may be reusing, is never one of its orphans.
         || storageObjects.findByObjectKey(key).isPresent();
   }
 }

@@ -44,6 +44,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -367,18 +368,30 @@ class StorageServiceIT extends AbstractIntegrationTest {
   /** Starts {@code task} on {@code pool} and returns once it is waiting for a lock. */
   private <T> Future<T> startWaiting(ExecutorService pool, Callable<T> task) {
     Future<T> result = pool.submit(task);
-    awaitLockWait();
+    awaitLockWait(result);
     return result;
   }
 
   /** Waits until a session of this database waits for a lock, at most ten seconds. */
-  private void awaitLockWait() {
+  private void awaitLockWait(Future<?> contender) {
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
     while (System.nanoTime() < deadline) {
+      if (contender.isDone()) {
+        try {
+          throw new AssertionError("the contender finished without waiting: " + contender.get());
+        } catch (InterruptedException | ExecutionException e) {
+          throw new AssertionError("the contender failed without waiting", e);
+        }
+      }
+      // Usually called inside the holder's transaction, where PostgreSQL would otherwise keep
+      // serving the activity snapshot taken at its first read.
+      jdbc.execute("SELECT pg_stat_clear_snapshot()");
       Integer waiting =
           jdbc.queryForObject(
               "SELECT count(*) FROM pg_stat_activity"
-                  + " WHERE wait_event_type = 'Lock' AND datname = current_database()",
+                  + " WHERE wait_event_type = 'Lock' AND datname = current_database()"
+                  // Only the storage registry's waits, not those of unrelated background work.
+                  + " AND (query ILIKE '%storage_object%' OR query ILIKE '%pg_advisory%')",
               Integer.class);
       if (waiting != null && waiting > 0) {
         return;
@@ -390,7 +403,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
         throw new IllegalStateException(e);
       }
     }
-    throw new AssertionError("nothing ever waited for the lock");
+    throw new AssertionError("the contender never waited for a lock");
   }
 
   /** Test cleanup: removes the object and its row, whatever state they are in. */
@@ -574,7 +587,9 @@ class StorageServiceIT extends AbstractIntegrationTest {
   @Test
   void remediationWaitsForAStageRegisteringTheSameContent() throws Exception {
     // A bucket orphan is remediated while an upload of the same content registers its row. The
-    // remediation must wait for the key, then see the row and keep the object.
+    // remediation must wait for the key, then see the row and keep the object. The holder is the
+    // stage's insert transaction (lock the key, insert the row), which a real stage commits too
+    // quickly to hold open.
     byte[] data = uniqueContent();
     StagedObject first = stage(data, "application/pdf");
     jdbc.update("DELETE FROM storage_object WHERE object_key = ?", first.key());

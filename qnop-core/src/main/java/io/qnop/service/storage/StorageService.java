@@ -51,6 +51,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -115,7 +116,11 @@ public class StorageService {
    * wiped or an environment is restored without the object store, leaving the row pointing at
    * nothing (issue #575). Both are healed here because {@code stage} demonstrably holds the full
    * bytes.
+   *
+   * <p>Never called inside a transaction (issue #992): each registry step commits on its own, so no
+   * row lock is held while the insert waits for the key's lock that a deletion holds.
    */
+  @Transactional(propagation = Propagation.NEVER)
   public StagedObject stage(InputStream content, String contentType) {
     return stage(content, contentType, Long.MAX_VALUE);
   }
@@ -127,6 +132,7 @@ public class StorageService {
    * local disk. This is the authoritative size check for content whose declared length cannot be
    * trusted.
    */
+  @Transactional(propagation = Propagation.NEVER)
   public StagedObject stage(InputStream content, String contentType, long maxBytes) {
     Path buffer = bufferToTempFile(content, maxBytes);
     try {
@@ -134,6 +140,7 @@ public class StorageService {
       long size = sizeOf(buffer);
       String key = keyFor(hash);
 
+      DataIntegrityViolationException conflict = null;
       for (int attempt = 1; ; attempt++) {
         Instant now = Instant.now();
         // Content that is stored and committed already is reused, and marked as staged now:
@@ -166,15 +173,19 @@ public class StorageService {
         }
         // No row: persist the PENDING row BEFORE the upload, so a crash between the two always
         // leaves a row the reaper can reclaim.
-        if (insertPending(key, hash, contentType, size)) {
+        try {
+          insertPending(key, hash, contentType, size);
           uploadBuffered(buffer, key, size, contentType);
           break;
+        } catch (DataIntegrityViolationException e) {
+          // Most likely a concurrent stage inserted the row after it was looked for here, or a
+          // deletion or the reaper removed it in between: look again.
+          conflict = e;
         }
-        // A concurrent stage inserted the row after it was looked for here, or a deletion or the
-        // reaper removed it in between: look again.
         if (attempt == MAX_STAGE_ATTEMPTS) {
           throw new StorageException(
-              "Could not register storage object " + key + ": its registry row kept changing");
+              "Could not register storage object " + key + ": its registry row kept changing",
+              conflict);
         }
       }
       return new StagedObject(key, hash, size);
@@ -186,21 +197,17 @@ public class StorageService {
   /**
    * Inserts the {@code PENDING} row of a key, in a transaction of its own.
    *
-   * @return true if this call inserted it, false if a row for the key exists already
+   * @throws DataIntegrityViolationException if the insert violates a constraint, most likely
+   *     because a row for the key exists already
    */
-  private boolean insertPending(String key, String hash, String contentType, long size) {
-    try {
-      tx.executeWithoutResult(
-          status -> {
-            // Waits for a deletion of the same key that is under way (issue #992): its object
-            // must not be deleted after this upload has put it.
-            repository.lockObjectKey(key);
-            repository.saveAndFlush(StorageObject.pending(key, hash, contentType, size));
-          });
-      return true;
-    } catch (DataIntegrityViolationException e) {
-      return false;
-    }
+  private void insertPending(String key, String hash, String contentType, long size) {
+    tx.executeWithoutResult(
+        status -> {
+          // Waits for a deletion of the same key that is under way (issue #992): its object
+          // must not be deleted after this upload has put it.
+          repository.lockObjectKey(key);
+          repository.saveAndFlush(StorageObject.pending(key, hash, contentType, size));
+        });
   }
 
   private void uploadBuffered(Path buffer, String key, long size, String contentType) {
@@ -249,7 +256,9 @@ public class StorageService {
     REFERENCED,
     /**
      * An upload staged the key within the reaper's grace period and may still commit it. Both were
-     * kept, and the row is left {@code PENDING} for that commit or else for the reaper.
+     * kept, and the row is left {@code PENDING} for that commit or else for the reaper. The mark is
+     * not cleared by that commit, as other uploads of the same content may still be in flight, so
+     * content uploaded again shortly before its deletion is only removed by a later reaper run.
      */
     STAGED
   }
@@ -301,6 +310,8 @@ public class StorageService {
       repository.delete(object);
       repository.flush();
     }
+    // Under both locks, as the reaper does: a stage or commit of this one key waits for a single
+    // object delete, and none can put the object again before it is gone.
     provider.delete(key);
     return Deletion.DELETED;
   }
