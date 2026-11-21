@@ -29,12 +29,14 @@ import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -134,7 +136,7 @@ class MetricCatalogueTest {
    * them: the common tag, the one Prometheus adds, and a histogram's bucket bound.
    */
   private static final Set<String> UNIVERSAL_GROUPING_LABELS =
-      Set.of("application", "instance", "le");
+      Stream.concat(UNIVERSAL_LABELS.stream(), Stream.of("le")).collect(Collectors.toSet());
 
   /** A qnop meter name as the catalogue lists it: the first cell of a table row. */
   private static final Pattern DOCUMENTED =
@@ -259,19 +261,27 @@ class MetricCatalogueTest {
    * only are left out: this registry does not publish them.
    */
   private static List<String> unpublishedLabels(String dashboard, String alerts) {
-    List<QueryLabelUsage> usages = new java.util.ArrayList<>();
-    usages.addAll(QueryLabelUsage.ofDashboard(dashboard));
-    usages.addAll(QueryLabelUsage.ofAlertRules(alerts));
-    assertThat(usages).as("panel queries and alert rules found").hasSizeGreaterThan(50);
+    List<QueryLabelUsage> usages =
+        Stream.concat(
+                QueryLabelUsage.ofDashboard(dashboard).stream(),
+                QueryLabelUsage.ofAlertRules(alerts).stream())
+            .filter(usage -> !usage.series().isEmpty())
+            .toList();
+    // Against a parser that silently stops finding the queries: today there are about 60.
+    assertThat(usages).as("panel queries and alert rules over qnop series").hasSizeGreaterThan(50);
 
-    List<String> violations = new java.util.ArrayList<>();
+    List<String> violations = new ArrayList<>();
     for (QueryLabelUsage usage : usages) {
-      if (usage.series().isEmpty()) {
-        continue;
-      }
       for (String label : usage.labels()) {
         if (!UNIVERSAL_GROUPING_LABELS.contains(label) && !carriesLabel(usage.series(), label)) {
-          violations.add(label + " of " + usage.where() + " is on none of " + usage.series());
+          violations.add(
+              label
+                  + " of "
+                  + usage.where()
+                  + " is on none of "
+                  + usage.series()
+                  + " (a typo or a renamed tag; a label from a framework series or label_replace"
+                  + " in the same expression is not known to this check)");
         }
       }
     }

@@ -52,14 +52,29 @@ record QueryLabelUsage(String where, Set<String> series, Set<String> labels) {
   /** A qnop series name anywhere in an expression, with or without a selector. */
   private static final Pattern QNOP_SERIES = Pattern.compile("\\b(qnop_[a-z0-9_]+)");
 
-  /** A grouping clause: {@code by (a, b)} or {@code without (a)}, before or after its operand. */
-  private static final Pattern GROUPING = Pattern.compile("\\b(?:by|without)\\s*\\(([^)]*)\\)");
+  /**
+   * A clause that names labels: a grouping ({@code by (a, b)}, {@code without (a)}), before or
+   * after its operand, or a vector matching ({@code on}, {@code ignoring}, {@code group_left},
+   * {@code group_right}). A matching label must be on both sides, so on the qnop series, too.
+   */
+  private static final Pattern GROUPING =
+      Pattern.compile("\\b(?:by|without|on|ignoring|group_left|group_right)\\s*\\(([^)]*)\\)");
+
+  /** A quoted string in an expression: a label value, never a series name. */
+  private static final Pattern QUOTED = Pattern.compile("\"[^\"]*\"");
 
   /** A label a Grafana legend prints: {@code {{label}}}. */
   private static final Pattern LEGEND_LABEL = Pattern.compile("\\{\\{\\s*([a-zA-Z_]\\w*)\\s*}}");
 
-  /** A label an alert annotation prints: {@code {{ $labels.label }}}. */
-  private static final Pattern TEMPLATE_LABEL = Pattern.compile("\\$labels\\.([a-zA-Z_]\\w*)");
+  /**
+   * A label an alert annotation prints, in any of the forms Go templates allow: {@code
+   * $labels.label}, {@code $labels["label"]} or {@code index $labels "label"}.
+   */
+  private static final Pattern TEMPLATE_LABEL =
+      Pattern.compile(
+          "\\$labels\\.([a-zA-Z_]\\w*)"
+              + "|\\$labels\\[\\s*\"([^\"]+)\"\\s*]"
+              + "|index\\s+\\$labels\\s+\"([^\"]+)\"");
 
   /** Every panel query of a Grafana dashboard, nested rows included. */
   static List<QueryLabelUsage> ofDashboard(String json) {
@@ -76,7 +91,7 @@ record QueryLabelUsage(String where, Set<String> series, Set<String> labels) {
     for (Object group : list(rules.get("groups"))) {
       for (Object item : list(((Map<?, ?>) group).get("rules"))) {
         Map<?, ?> rule = (Map<?, ?>) item;
-        String expr = String.valueOf(rule.get("expr"));
+        String expr = text(rule.get("expr"));
         Set<String> labels = grouping(expr);
         Object annotations = rule.get("annotations");
         if (annotations instanceof Map<?, ?> texts) {
@@ -93,7 +108,7 @@ record QueryLabelUsage(String where, Set<String> series, Set<String> labels) {
       Map<?, ?> panel = (Map<?, ?>) item;
       for (Object target : list(panel.get("targets"))) {
         Map<?, ?> query = (Map<?, ?>) target;
-        String expr = String.valueOf(query.get("expr"));
+        String expr = text(query.get("expr"));
         Set<String> labels = grouping(expr);
         labels.addAll(matches(LEGEND_LABEL, query.get("legendFormat")));
         usages.add(
@@ -104,12 +119,16 @@ record QueryLabelUsage(String where, Set<String> series, Set<String> labels) {
   }
 
   private static Set<String> series(String expr) {
-    return new TreeSet<>(matches(QNOP_SERIES, expr));
+    return new TreeSet<>(matches(QNOP_SERIES, QUOTED.matcher(expr).replaceAll("\"\"")));
+  }
+
+  private static String text(Object value) {
+    return value == null ? "" : value.toString();
   }
 
   private static Set<String> grouping(String expr) {
     Set<String> labels = new LinkedHashSet<>();
-    for (String clause : matches(GROUPING, expr)) {
+    for (String clause : matches(GROUPING, QUOTED.matcher(expr).replaceAll("\"\""))) {
       for (String label : clause.split(",")) {
         if (!label.isBlank()) {
           labels.add(label.strip());
@@ -126,7 +145,13 @@ record QueryLabelUsage(String where, Set<String> series, Set<String> labels) {
     }
     Matcher matcher = pattern.matcher(text.toString());
     while (matcher.find()) {
-      found.add(matcher.group(1));
+      // The first group that matched: a pattern may offer several forms of one thing.
+      for (int group = 1; group <= matcher.groupCount(); group++) {
+        if (matcher.group(group) != null) {
+          found.add(matcher.group(group));
+          break;
+        }
+      }
     }
     return found;
   }

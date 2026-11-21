@@ -230,9 +230,15 @@ created.
 The test checked the labels of selectors only. A label a panel or rule uses elsewhere fails more
 quietly than a selector: `sum by (job)` over a series without `job` is one aggregate series, and
 `{{ $labels.job }}` in an alert prints nothing. `MetricCatalogueTest` now also checks, for every
-panel query and rule that reads a `qnop_*` series, the labels of its `by (...)` and
-`without (...)` clauses, of the panel's legend and of the rule's annotations. Each must be on a
-published sample of one of the series the expression reads, or be one every series may carry
-(`application`, `instance`, `le`). The files are parsed, not searched, so a rule's expression
-over several lines of YAML is read as one. Expressions over framework series only stay with the
-running-application check, because the test's registry does not publish them.
+panel query and rule that reads a `qnop_*` series, the labels of its grouping clauses (`by`,
+`without`) and vector matchings (`on`, `ignoring`, `group_left`, `group_right`), of the panel's
+legend (`{{label}}`) and of the rule's annotations (`$labels.x`, `$labels["x"]`,
+`index $labels "x"`). Each must be on a published sample of one of the series the expression
+reads, or be one every series may carry (`application`, `instance`, `le`). The files are parsed,
+not searched, so a rule's expression over several lines of YAML is read as one.
+
+Out of scope: expressions over framework series only, which stay with the running-application
+check because the test's registry does not publish them; a label that an expression mixing qnop
+and framework series takes from the framework side, or that `label_replace` creates, which the
+check reports and which then needs an exception in the test; series selected only through
+`__name__`; templates in a rule's `labels:`; dashboard variables and Grafana transformations.
