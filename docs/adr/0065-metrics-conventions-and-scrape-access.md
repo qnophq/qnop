@@ -224,3 +224,15 @@ Success series still appear with their first event. Registering them all would a
 nobody alerts on, mail templates a deployment never sends among them. Pre-registration does not
 raise the cardinality bound: every series registered at start is one the first event would have
 created.
+
+## Amendment (2026-11-21, labels outside selectors — issue #981)
+
+The test checked the labels of selectors only. A label a panel or rule uses elsewhere fails more
+quietly than a selector: `sum by (job)` over a series without `job` is one aggregate series, and
+`{{ $labels.job }}` in an alert prints nothing. `MetricCatalogueTest` now also checks, for every
+panel query and rule that reads a `qnop_*` series, the labels of its `by (...)` and
+`without (...)` clauses, of the panel's legend and of the rule's annotations. Each must be on a
+published sample of one of the series the expression reads, or be one every series may carry
+(`application`, `instance`, `le`). The files are parsed, not searched, so a rule's expression
+over several lines of YAML is read as one. Expressions over framework series only stay with the
+running-application check, because the test's registry does not publish them.
