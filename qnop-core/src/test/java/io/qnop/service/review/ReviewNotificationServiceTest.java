@@ -105,6 +105,7 @@ class ReviewNotificationServiceTest {
         teamMembers,
         users,
         settings,
+        new io.qnop.service.PublicBaseUrl(settings),
         identity,
         new ReviewFacadeService(
             mock(io.qnop.service.document.DocumentAccessService.class),

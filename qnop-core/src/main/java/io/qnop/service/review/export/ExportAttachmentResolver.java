@@ -20,8 +20,7 @@
  */
 package io.qnop.service.review.export;
 
-import io.qnop.service.ApplicationSettingKey;
-import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.PublicBaseUrl;
 import io.qnop.service.document.DocumentAttachmentService;
 import io.qnop.service.image.ImageHeaderProbe;
 import java.awt.image.BufferedImage;
@@ -75,12 +74,12 @@ public class ExportAttachmentResolver {
 
   private final DocumentAttachmentService attachments;
 
-  private final ApplicationSettingsService settings;
+  private final PublicBaseUrl publicBaseUrl;
 
   public ExportAttachmentResolver(
-      DocumentAttachmentService attachments, ApplicationSettingsService settings) {
+      DocumentAttachmentService attachments, PublicBaseUrl publicBaseUrl) {
     this.attachments = attachments;
-    this.settings = settings;
+    this.publicBaseUrl = publicBaseUrl;
   }
 
   /**
@@ -180,15 +179,15 @@ public class ExportAttachmentResolver {
    * {@code file://} target on the reader's own disk.
    */
   private String baseUrl(String requestOrigin) {
-    String configured = settings.getString(ApplicationSettingKey.GENERAL_BASE_URL);
-    if (configured != null && !configured.isBlank()) {
-      return trimSlash(configured);
+    Optional<String> configured = publicBaseUrl.configured();
+    if (configured.isPresent()) {
+      return configured.get();
     }
     if (requestOrigin != null && !requestOrigin.isBlank()) {
       log.debug("general.base_url is unset — linking export attachments via the request origin");
       return trimSlash(requestOrigin);
     }
-    log.warn("general.base_url is not configured — export attachments will not be linked");
+    publicBaseUrl.reportMissing("export attachments will not be linked");
     return "";
   }
 

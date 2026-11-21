@@ -36,6 +36,7 @@ import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.PublicBaseUrl;
 import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailMessages;
 import io.qnop.service.mail.MailTemplateKey;
@@ -93,6 +94,7 @@ public class ReviewNotificationService {
   private final TeamMembershipRepository teamMembers;
   private final UserRepository users;
   private final ApplicationSettingsService settings;
+  private final PublicBaseUrl publicBaseUrl;
   private final ReviewIdentityResolver identity;
   private final ReviewFacadeService facade;
   private final MailLocaleResolver mailLocales;
@@ -108,6 +110,7 @@ public class ReviewNotificationService {
       TeamMembershipRepository teamMembers,
       UserRepository users,
       ApplicationSettingsService settings,
+      PublicBaseUrl publicBaseUrl,
       ReviewIdentityResolver identity,
       ReviewFacadeService facade,
       MailLocaleResolver mailLocales,
@@ -121,6 +124,7 @@ public class ReviewNotificationService {
     this.teamMembers = teamMembers;
     this.users = users;
     this.settings = settings;
+    this.publicBaseUrl = publicBaseUrl;
     this.identity = identity;
     this.facade = facade;
     this.mailLocales = mailLocales;
@@ -599,17 +603,8 @@ public class ReviewNotificationService {
   }
 
   private String reviewUrl(Document document) {
-    String base = settings.getString(ApplicationSettingKey.GENERAL_BASE_URL);
-    if (base == null || base.isBlank()) {
-      // The mail still goes out, but its links are relative and thus dead in a
-      // mail client — configure Settings -> General -> Base URL.
-      log.warn(
-          "general.base_url is not configured — notification mail links will be relative/broken");
-      base = "";
-    }
-    while (base.endsWith("/")) {
-      base = base.substring(0, base.length() - 1);
-    }
+    // The mail still goes out, but its links are relative and thus dead in a mail client.
+    String base = publicBaseUrl.orReportMissing("notification mail links will be relative/broken");
     String segment = document.getSlug() != null ? document.getSlug() : document.getId().toString();
     return base + "/reviews/" + segment;
   }

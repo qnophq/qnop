@@ -31,6 +31,7 @@ import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserSettingRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.PublicBaseUrl;
 import io.qnop.service.UserSettingKey;
 import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailMessages;
@@ -91,6 +92,7 @@ public class NotificationDigestService {
   private final UserSettingRepository userSettings;
   private final DocumentRepository documents;
   private final ApplicationSettingsService settings;
+  private final PublicBaseUrl publicBaseUrl;
   private final io.qnop.service.review.ReviewIdentityResolver identity;
   private final io.qnop.service.review.ReviewAudience audience;
   private final MailService mail;
@@ -105,6 +107,7 @@ public class NotificationDigestService {
       UserSettingRepository userSettings,
       DocumentRepository documents,
       ApplicationSettingsService settings,
+      PublicBaseUrl publicBaseUrl,
       io.qnop.service.review.ReviewIdentityResolver identity,
       io.qnop.service.review.ReviewAudience audience,
       MailService mail,
@@ -117,6 +120,7 @@ public class NotificationDigestService {
     this.userSettings = userSettings;
     this.documents = documents;
     this.settings = settings;
+    this.publicBaseUrl = publicBaseUrl;
     this.identity = identity;
     this.audience = audience;
     this.mail = mail;
@@ -384,14 +388,9 @@ public class NotificationDigestService {
   }
 
   private String baseUrl() {
-    String base = settings.getString(ApplicationSettingKey.GENERAL_BASE_URL);
-    if (base == null || base.isBlank()) {
-      // Rather than emit relative links that are dead in a mail client, the
-      // renderer leaves them out entirely — configure Settings → General → Base URL.
-      log.warn("general.base_url is not configured — the digest will have no links");
-      return "";
-    }
-    return base.replaceAll("/+$", "");
+    // Rather than emit relative links that are dead in a mail client, the
+    // renderer leaves them out entirely.
+    return publicBaseUrl.orReportMissing("the digest will have no links");
   }
 
   private String reviewsUrl() {
