@@ -29,12 +29,14 @@ import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -129,6 +131,13 @@ class MetricCatalogueTest {
   /** Labels every qnop series has: the common tag, and the one Prometheus adds. */
   private static final Set<String> UNIVERSAL_LABELS = Set.of("application", "instance");
 
+  /**
+   * Labels any qnop series may be grouped by or printed with, whether or not a sample of it shows
+   * them: the common tag, the one Prometheus adds, and a histogram's bucket bound.
+   */
+  private static final Set<String> UNIVERSAL_GROUPING_LABELS =
+      Stream.concat(UNIVERSAL_LABELS.stream(), Stream.of("le")).collect(Collectors.toSet());
+
   /** A qnop meter name as the catalogue lists it: the first cell of a table row. */
   private static final Pattern DOCUMENTED =
       Pattern.compile("^\\| `(qnop\\.[a-z.]+)`", Pattern.MULTILINE);
@@ -189,6 +198,100 @@ class MetricCatalogueTest {
         }
       }
     }
+  }
+
+  @Test
+  @DisplayName("every label a panel or rule groups by, or prints, exists on the series it reads")
+  void groupingAndTemplateLabelsArePublished() throws IOException {
+    assertThat(unpublishedLabels(Files.readString(DASHBOARD), Files.readString(ALERTS))).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a grouping, legend or annotation on a label the series lacks is caught")
+  void anUnpublishedGroupingOrTemplateLabelIsCaught() throws IOException {
+    String dashboard = Files.readString(DASHBOARD);
+    String alerts = Files.readString(ALERTS);
+    // #979 in its plain form: the scheduler's tag read as Prometheus's own job label.
+    assertThat(dashboard).contains("by (scheduler_job)", "{{scheduler_job}}");
+    assertThat(alerts).contains("$labels.scheduler_job");
+
+    assertThat(unpublishedLabels(dashboard.replace("by (scheduler_job)", "by (job)"), alerts))
+        .isNotEmpty()
+        .allMatch(violation -> violation.startsWith("job "));
+    assertThat(unpublishedLabels(dashboard.replace("{{scheduler_job}}", "{{job}}"), alerts))
+        .isNotEmpty()
+        .allMatch(violation -> violation.startsWith("job "));
+    assertThat(unpublishedLabels(dashboard, alerts.replace("$labels.scheduler_job", "$labels.job")))
+        .isNotEmpty()
+        .allMatch(violation -> violation.startsWith("job "));
+  }
+
+  @Test
+  @DisplayName("an alert expression over several lines is read as one, with its annotations")
+  void multiLineAlertExpressionsAreRead() {
+    String rules =
+        """
+        groups:
+          - name: test
+            rules:
+              - alert: Spread
+                expr: |
+                  max by (scheduler_job)
+                    (qnop_scheduler_job_enabled{application="qnop"}) == 1
+                    unless max without (outcome) (qnop_scheduler_runs_total)
+                annotations:
+                  summary: Job {{ $labels.job }} on {{ $labels.instance }}
+        """;
+
+    assertThat(QueryLabelUsage.ofAlertRules(rules))
+        .singleElement()
+        .satisfies(
+            usage -> {
+              assertThat(usage.where()).isEqualTo("alert Spread");
+              assertThat(usage.series())
+                  .containsExactly("qnop_scheduler_job_enabled", "qnop_scheduler_runs_total");
+              assertThat(usage.labels())
+                  .containsExactlyInAnyOrder("scheduler_job", "outcome", "job", "instance");
+            });
+  }
+
+  /**
+   * The labels that panels and rules over qnop series group by or print, but that no published
+   * sample of those series carries, as {@code "label of where"}. Expressions over framework series
+   * only are left out: this registry does not publish them.
+   */
+  private static List<String> unpublishedLabels(String dashboard, String alerts) {
+    List<QueryLabelUsage> usages =
+        Stream.concat(
+                QueryLabelUsage.ofDashboard(dashboard).stream(),
+                QueryLabelUsage.ofAlertRules(alerts).stream())
+            .filter(usage -> !usage.series().isEmpty())
+            .toList();
+    // Against a parser that silently stops finding the queries: today there are about 60.
+    assertThat(usages).as("panel queries and alert rules over qnop series").hasSizeGreaterThan(50);
+
+    List<String> violations = new ArrayList<>();
+    for (QueryLabelUsage usage : usages) {
+      for (String label : usage.labels()) {
+        if (!UNIVERSAL_GROUPING_LABELS.contains(label) && !carriesLabel(usage.series(), label)) {
+          violations.add(
+              label
+                  + " of "
+                  + usage.where()
+                  + " is on none of "
+                  + usage.series()
+                  + " (a typo or a renamed tag; a label from a framework series or label_replace"
+                  + " in the same expression is not known to this check)");
+        }
+      }
+    }
+    return violations;
+  }
+
+  private static boolean carriesLabel(Set<String> series, String label) {
+    return samples.stream()
+        .filter(line -> series.contains(line.split("[{ ]", 2)[0]))
+        .anyMatch(line -> line.contains("{" + label + "=\"") || line.contains("," + label + "=\""));
   }
 
   @Test
