@@ -45,7 +45,7 @@ jacksonAnnotations = "2.22"
 postgresql = "42.7.14"
 jackson3 = "3.2.3"
 tomcat = "11.0.27"
-swaggerAnnotations = "2.2.55"
+swaggerAnnotations = "2.2.56"
 jakartaValidation = "3.1.1"
 jakartaAnnotation = "3.0.0"
 # Auth rate limiting (issue #18, ADR-0027). bucket4j is not in the Spring Boot BOM,
