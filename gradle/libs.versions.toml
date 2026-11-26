@@ -28,7 +28,7 @@ springBoot = "4.1.2"
 # produces pure DTOs into qnop-api-model and Spring MVC interfaces into
 # qnop-api-endpoint from a single spec. Jackson annotations stay on 2.x
 # (com.fasterxml.jackson) — the generated models only carry annotations.
-openapiGenerator = "7.24.0"
+openapiGenerator = "7.27.0"
 jacksonAnnotations = "2.22"
 # Pins ahead of the Spring Boot BOM, each for published advisories. Remove one
 # when a Boot release carries that version or newer; Renovate will offer the
